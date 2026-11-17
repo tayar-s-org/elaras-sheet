@@ -4,11 +4,12 @@ import { STATUS_LABEL } from '../../lib/tables.js';
 import { useRoom } from './useRoom.js';
 import ChatPanel from './ChatPanel.jsx';
 import PartyPanel from './PartyPanel.jsx';
+import DicePanel, { RollHistory } from './DicePanel.jsx';
 
 export default function RoomPage({ auth, id }) {
   const [tab, setTab] = useState('chat');
   const room = useRoom(id, auth.user, auth.profile?.display_name || auth.user?.email);
-  const { table, members, messages, states, characters, online, connected, error } = room;
+  const { table, members, messages, rolls, states, characters, online, connected, error } = room;
 
   if (auth.loading) return <main className="page"><p className="muted">Verificando sessão…</p></main>;
   if (!auth.user) return <main className="page"><p className="muted">Entre para acessar a sala.</p><button className="primary" onClick={() => navigate('/entrar')}>Entrar</button></main>;
@@ -50,10 +51,16 @@ export default function RoomPage({ auth, id }) {
     <aside className="room-panel">
       <div className="tabs-row" role="tablist">
         <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'primary' : 'outline'} onClick={() => setTab('chat')}>Chat</button>
+        <button role="tab" aria-selected={tab === 'dice'} className={tab === 'dice' ? 'primary' : 'outline'} onClick={() => setTab('dice')}>Dados</button>
         <button role="tab" aria-selected={tab === 'party'} className={tab === 'party' ? 'primary' : 'outline'} onClick={() => setTab('party')}>{isGm ? 'Grupo' : 'Fichas'}</button>
       </div>
       {closed && <p className="callout">Esta mesa foi encerrada. O histórico continua visível, mas ninguém pode escrever.</p>}
-      {tab === 'chat'
+      {tab === 'dice' ? <>
+        <DicePanel tableId={id} me={auth.user.id} members={members} characters={characters} onRolled={room.addRoll} disabled={closed} />
+        <h3>Histórico</h3>
+        <RollHistory rolls={rolls} members={members} me={auth.user.id} />
+      </>
+        : tab === 'chat'
         ? <ChatPanel tableId={id} me={auth.user.id} members={members} messages={messages} addMessage={room.addMessage} disabled={closed} />
         : <PartyPanel tableId={id} me={auth.user.id} isGm={isGm} members={members} characters={characters} states={states} patchState={room.patchState} closed={closed} />}
     </aside>

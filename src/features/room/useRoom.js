@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { getTable, getMembers } from '../../lib/tables.js';
-import { recentMessages, loadStates, loadCharacters } from '../../lib/room.js';
+import { recentMessages, recentRolls, loadStates, loadCharacters } from '../../lib/room.js';
 
 // Carrega a mesa e mantem mensagens, estados, membros e presenca sincronizados em tempo real.
 export function useRoom(tableId, user, displayName) {
   const [table, setTable] = useState(undefined);
   const [members, setMembers] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [rolls, setRolls] = useState([]);
   const [states, setStates] = useState({});
   const [characters, setCharacters] = useState({});
   const [online, setOnline] = useState([]);
@@ -37,14 +38,17 @@ export function useRoom(tableId, user, displayName) {
         const list = await reloadMembers();
         const me = list.find(m => m.user_id === user.id);
         if (!me || me.status !== 'approved') return;
-        const [msgs, st] = await Promise.all([recentMessages(tableId), loadStates(tableId)]);
+        const [msgs, st, rl] = await Promise.all([recentMessages(tableId), loadStates(tableId), recentRolls(tableId)]);
         if (!alive) return;
         setMessages(msgs);
         setStates(st);
+        setRolls(rl);
         channel = supabase.channel(`table:${tableId}`, { config: { private: true, presence: { key: user.id } } })
           .on('presence', { event: 'sync' }, () => setOnline(Object.values(channel.presenceState()).flat()))
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_messages', filter: `table_id=eq.${tableId}` },
             p => setMessages(prev => prev.some(m => m.id === p.new.id) ? prev : [...prev, p.new]))
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_rolls', filter: `table_id=eq.${tableId}` },
+            p => setRolls(prev => prev.some(r => r.id === p.new.id) ? prev : [...prev, p.new]))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'table_character_state', filter: `table_id=eq.${tableId}` },
             p => p.new?.character_id && setStates(prev => ({ ...prev, [p.new.character_id]: p.new.state })))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'table_members', filter: `table_id=eq.${tableId}` },
@@ -64,6 +68,7 @@ export function useRoom(tableId, user, displayName) {
   }, [tableId, user?.id, reloadMembers]);
 
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
+  const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
   const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
-  return { table, members, messages, states, characters, online, connected, error, addMessage, patchState };
+  return { table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

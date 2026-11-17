@@ -962,3 +962,15 @@ h3 {
 .party-card h4{margin:0}
 .counter{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-top:6px}
 @media (max-width:980px){.room{grid-template-columns:1fr}.room-board{min-height:220px}}
+.dice-panel{display:grid;gap:10px}
+.dice-buttons{display:flex;flex-wrap:wrap;gap:6px}
+.trait-roll{display:grid;gap:8px;border:1px solid var(--line,#d8d2e8);border-radius:10px;padding:10px}
+.roll-history{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:45vh;overflow:auto}
+.roll{padding:8px 10px;border:1px solid var(--line,#d8d2e8);border-radius:10px;display:grid;gap:2px}
+.roll.good{border-left:4px solid #2e9e5b}
+.roll.bad{border-left:4px solid #b3382c}
+.roll-head{display:flex;justify-content:space-between;gap:8px}
+.roll-total{display:flex;align-items:baseline;gap:8px}
+.roll-total b{font-size:1.6rem}
+.roll-outcome{font-weight:600}
+.roll-detail{font-size:.85rem;opacity:.85;word-break:break-word}
