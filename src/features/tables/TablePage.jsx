@@ -106,6 +106,7 @@ export default function TablePage({ auth, id }) {
     <p className="muted">{STATUS_LABEL[table.status]} · {table.visibility === 'public' ? 'Pública' : 'Privada'} · Savage Worlds</p>
     {table.description && <p>{table.description}</p>}
     {error && <p role="alert" className="muted">{error}</p>}
+    {(isGm || me?.status === 'approved') && <button className="primary" onClick={() => navigate(`/sala/${id}`)}>Entrar na sala</button>}
     {isGm ? <GmPanel table={table} members={members} reload={reload} run={run} />
       : me ? <PlayerPanel table={table} me={me} members={members} reload={reload} run={run} />
         : <p className="muted">Você não participa desta mesa. Use Descobrir ou um código de convite para pedir entrada.</p>}

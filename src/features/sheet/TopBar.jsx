@@ -23,7 +23,7 @@ export default function TopBar({ theme, setTheme, file, loadPdf, save, setTab, r
         <div className="top-actions">
           {cloudConfigured && <>
             <button className={route === "/" ? "quiet selected" : "quiet"} onClick={() => navigate("/")}>Fichas</button>
-            <button className={route.startsWith("/mesa") ? "quiet selected" : "quiet"} onClick={() => navigate("/mesas")}>Mesas</button>
+            <button className={(route.startsWith("/mesa") || route.startsWith("/sala")) ? "quiet selected" : "quiet"} onClick={() => navigate("/mesas")}>Mesas</button>
           </>}
           <button className="outline theme-toggle" aria-label="Modo escuro" aria-pressed={theme === 'dark'} onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
