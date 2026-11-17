@@ -935,3 +935,10 @@ h3 {
 .auth-card{display:grid;gap:14px;width:min(420px,100%);padding:28px;border:1px solid var(--line,#d8d2e8);border-radius:16px;background:var(--surface,#fff)}
 .auth-card h1{margin:0}
 .cloud-list{display:grid;gap:6px;margin-top:8px}
+.page{max-width:860px;margin:0 auto;padding:24px;display:grid;gap:14px}
+.tabs-row{display:flex;flex-wrap:wrap;gap:8px}
+.table-list{display:grid;gap:10px}
+.table-card{display:grid;gap:4px;text-align:left;padding:14px 16px;border:1px solid var(--line,#d8d2e8);border-radius:12px;background:var(--surface,#fff);color:inherit;cursor:pointer}
+.table-card.static{cursor:default}
+.join-form{display:grid;gap:12px;max-width:480px}
+.invite{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}

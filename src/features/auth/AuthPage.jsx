@@ -27,7 +27,9 @@ export default function AuthPage({ auth }) {
         const signedIn = await auth.signUp(email.trim(), password, name.trim());
         if (!signedIn) { setMessage('Conta criada. Confirme o e-mail enviado para poder entrar.'); return; }
       } else await auth.signIn(email.trim(), password);
-      navigate('/');
+      let next = '/';
+      try { next = sessionStorage.getItem('elara-next') || '/'; sessionStorage.removeItem('elara-next'); } catch { /* sem storage */ }
+      navigate(next);
     } catch (error) { setMessage(translate(error.message)); }
     finally { setBusy(false); }
   }
