@@ -46,11 +46,13 @@ Raças aplicam bases de atributo e perícia sem custo, ajustes de Resistência e
 
 As novas escolhas são preservadas no PDF editável. Fichas anteriores continuam com os ajustes antigos até escolher uma raça do catálogo. O leitor tem 218 páginas originais, zoom e texto ampliado; vantagens e desvantagens também têm um catálogo pesquisável.
 
-Aplicativo React inteiramente no frontend para criar fichas da campanha, consultar o texto completo do livro e salvar/importar fichas em PDF.
+Aplicativo React para criar fichas da campanha, consultar o livro e salvar/importar fichas em PDF. O frontend funciona sozinho (GitHub Pages ou qualquer servidor estático); o backend Node descrito acima é opcional e só roda em instalação própria.
+
+> **Roadmap:** o projeto está evoluindo para uma plataforma multiplayer (contas, mesas, sala em tempo real) sobre Supabase. As fichas continuam compatíveis; o servidor Node será aposentado ao final da migração.
 
 ## Executar
 
-Requer Node.js 20.19+ ou 22.12+.
+Requer Node.js 22.12+ (mesmo requisito do servidor opcional).
 
 ```sh
 npm install
@@ -67,16 +69,16 @@ Abra o endereço mostrado pelo Vite. Para gerar a versão estática, execute `np
 4. Clique em **Salvar PDF**. O arquivo contém a ficha legível e os dados para reabertura.
 5. Para continuar em outro computador, clique em **Abrir PDF** e selecione o arquivo original exportado pelo aplicativo. Reimprimir ou otimizar o PDF em outros programas pode remover os dados editáveis.
 
-O rascunho atual é salvo no localStorage deste navegador. PDFs são o meio portátil de guardar fichas. Não há servidor, conta nem banco de dados.
+O rascunho atual é salvo no localStorage deste navegador. PDFs são o meio portátil de guardar fichas. Contas e armazenamento na nuvem ainda não existem na versão publicada no Pages.
 
 ## Regras e limites
 
-- O contador usa as alterações da planilha do mestre consultada em 16/11/2026 e um orçamento compartilhado configurável. A planilha deixa o total inicial em aberto.
+- O contador usa as alterações da planilha do mestre e um orçamento compartilhado configurável. A planilha deixa o total inicial em aberto.
 - Atributos custam 2 pontos por estágio e perícias iniciais custam 1. Vantagens custam 1, 2, 3… Pontos de desvantagens são 3 para menor e 5 para maior.
 - O checkbox racial aplica apenas a Agilidade inicial d6. Registre os outros efeitos raciais e ajustes manualmente. Desvantagens raciais já compensadas devem ficar nas Anotações para evitar pontos extras indevidos.
 - Poderes, vantagens, pré-requisitos e equipamentos são de registro livre, aprovados pelo mestre. A perícia Conjurar segue a associação ao Espírito indicada pela adaptação da mesa.
 - A fórmula de mana conta as vantagens marcadas como “vantagem de poder”. Ajustes permitem refletir acordos específicos.
-- O livro completo é fornecido como texto extraído em `public/assets/livro.js`. Sua edição é a brasileira baseada no Deluxe. Imagens e diagramação das tabelas não estão incluídas. A consulta identifica páginas do arquivo PDF.
+- O leitor usa `public/assets/book.json` (texto) e as páginas em `public/assets/book/*.webp`, geradas por `scripts/extract-book.py` a partir de `assets/livro.pdf`. A edição é a brasileira baseada no Deluxe e será movida para armazenamento privado na fase de contas.
 - Fadiga, gastos em jogo e compras de novas perícias durante a campanha ficam registrados nas notas. O contador calcula criação, e não automatiza avanços de campanha.
 - A biblioteca de regras é uma cópia local e não se atualiza automaticamente com a planilha do mestre.
 - Fontes web são opcionais. Sem internet, o aplicativo usa fontes locais substitutas.
