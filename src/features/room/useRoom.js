@@ -54,6 +54,7 @@ export function useRoom(tableId, user, displayName) {
           .subscribe(status => {
             if (!alive) return;
             setConnected(status === 'SUBSCRIBED');
+            if (status === 'SUBSCRIBED') setError('');
             if (status === 'SUBSCRIBED') channel.track({ user_id: user.id, name: nameRef.current, at: new Date().toISOString() });
             if (status === 'CHANNEL_ERROR') setError('Conexão em tempo real indisponível. Recarregue a página.');
           });
