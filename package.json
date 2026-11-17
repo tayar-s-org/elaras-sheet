@@ -11,9 +11,10 @@
     "test": "node --test src/rules.test.js src/dice.test.js src/sheets.test.js src/catalogRules.test.js server/server.test.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
+    "jspdf": "^3.0.4",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "jspdf": "^3.0.4"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "vite": "^6.4.1"

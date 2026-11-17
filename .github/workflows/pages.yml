@@ -27,6 +27,8 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_SUPABASE_URL: https://ttjzhxhnpifvbipyonxs.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_e1BZDiKjybK1Bsm0m5G1Cg_PDNYCjAk
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

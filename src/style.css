@@ -929,3 +929,9 @@ h3 {
   .reader-options label { justify-content: space-between; }
   .readable-page { padding: 16px; }
 }
+
+/* Contas e nuvem */
+.auth-page{display:grid;place-items:center;min-height:70vh;padding:24px}
+.auth-card{display:grid;gap:14px;width:min(420px,100%);padding:28px;border:1px solid var(--line,#d8d2e8);border-radius:16px;background:var(--surface,#fff)}
+.auth-card h1{margin:0}
+.cloud-list{display:grid;gap:6px;margin-top:8px}

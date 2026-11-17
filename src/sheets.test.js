@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newCharacter,elaraCharacter} from './rules.js';
-import {SHEETS_STORAGE,LEGACY_STORAGE,openSheet,editSheet,closeSheet,restoreSheets,openServerSheet} from './sheets.js';
+import {SHEETS_STORAGE,LEGACY_STORAGE,openSheet,editSheet,closeSheet,restoreSheets,openServerSheet,openCloudSheet,setCloud} from './sheets.js';
 import {createPdfBlob,importPdf} from './pdf.js';
 
 test('reabrir ficha do servidor preserva edição, chave e aba existente',()=>{
@@ -52,4 +52,25 @@ test('fechar aba seleciona vizinha e sempre mantém uma ficha utilizável',()=>{
   s=closeSheet(s,'a');
   assert.equal(s.sheets.length,1);
   assert.equal(s.sheets[0].id,s.activeId);
+});
+test('ficha da nuvem mantém vínculo, não duplica abas e sobrevive ao recarregamento',()=>{
+  const id='22222222-2222-4222-8222-222222222222';
+  const row={id,revision:3,character:elaraCharacter()};
+  let s=openCloudSheet(openSheet({sheets:[],activeId:''},newCharacter(),'a'),row);
+  assert.equal(s.sheets.length,2);
+  assert.equal(s.sheets[1].cloud.id,id);
+  const opened=s.activeId;
+  s=openSheet(s,newCharacter(),'c');
+  s=openCloudSheet(s,{...row,revision:4});
+  assert.equal(s.sheets.length,3);
+  assert.equal(s.activeId,opened);
+  assert.equal(s.sheets[1].cloud.revision,4);
+  s=editSheet(s,opened,c=>({...c,name:'Editada'}));
+  s=openCloudSheet(s,{...row,revision:5});
+  assert.equal(s.sheets[1].character.name,'Editada');
+  assert.equal(s.sheets[1].cloud.revision,4);
+  s=setCloud(s,opened,{id,revision:6,character:s.sheets[1].character});
+  assert.equal(s.sheets[1].cloud.revision,6);
+  const data=new Map([[SHEETS_STORAGE,JSON.stringify(s)]]);
+  assert.deepEqual(restoreSheets({getItem:k=>data.get(k)??null}),s);
 });

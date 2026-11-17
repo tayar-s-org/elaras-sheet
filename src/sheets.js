@@ -15,6 +15,16 @@ export function openServerSheet(session,row) {
   const next=openSheet(session,row.character);
   return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,remote:{id:row.id,revision:row.revision,base:JSON.stringify(row.character),editToken:session.editKeys?.[row.id]||''}}:s)};
 }
+export function openCloudSheet(session,row) {
+  const existing=session.sheets.find(s=>s.cloud?.id===row.id);
+  const cloud={id:row.id,revision:row.revision,base:JSON.stringify(row.character)};
+  if(existing) return {...session,activeId:existing.id,sheets:session.sheets.map(s=>s.id===existing.id && JSON.stringify(s.character)===s.cloud.base?{...s,character:row.character,cloud}:s)};
+  const next=openSheet(session,row.character);
+  return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,cloud}:s)};
+}
+export function setCloud(session,id,row) {
+  return {...session,sheets:session.sheets.map(s=>s.id===id?{...s,cloud:{id:row.id,revision:row.revision,base:JSON.stringify(row.character)}}:s)};
+}
 export function closeSheet(session,id) {
   const index=session.sheets.findIndex(s=>s.id===id);
   const sheets=session.sheets.filter(s=>s.id!==id);
@@ -31,7 +41,10 @@ export function restoreSheets(storage) {
         seen.add(s.id);
         const remote = s.remote && /^[a-f0-9-]{36}$/.test(s.remote.id) && Number.isInteger(s.remote.revision) && s.remote.revision>0
           ? {id:s.remote.id,revision:s.remote.revision,base:typeof s.remote.base==='string'?s.remote.base:JSON.stringify(validateCharacter(s.character)),editToken:typeof s.remote.editToken==='string'?s.remote.editToken:''} : undefined;
-        return {id:s.id,character:validateCharacter(s.character),...(remote?{remote}:{})};
+        const character=validateCharacter(s.character);
+        const cloud = s.cloud && /^[a-f0-9-]{36}$/.test(s.cloud.id) && Number.isInteger(s.cloud.revision) && s.cloud.revision>0
+          ? {id:s.cloud.id,revision:s.cloud.revision,base:typeof s.cloud.base==='string'?s.cloud.base:JSON.stringify(character)} : undefined;
+        return {id:s.id,character,...(remote?{remote}:{}),...(cloud?{cloud}:{})};
       });
       const editKeys=Object.fromEntries(Object.entries(raw.editKeys||{}).filter(([id,key])=>/^[a-f0-9-]{36}$/.test(id) && typeof key==='string' && /^[a-f0-9]{64}$/.test(key)));
       for(const s of sheets)if(s.remote?.editToken)editKeys[s.remote.id]=s.remote.editToken;

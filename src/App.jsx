@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
 import { exportPdf, importPdf } from "./pdf.js";
-import { SHEETS_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openServerSheet } from "./sheets.js";
+import { SHEETS_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, setCloud } from "./sheets.js";
 import SheetTabs from "./SheetTabs.jsx";
 import MasterView from "./MasterView.jsx";
-import ServerSheets, { api } from "./ServerSheets.jsx";
+import CloudSheets from "./features/library/CloudSheets.jsx";
+import AuthPage from "./features/auth/AuthPage.jsx";
+import { useAuth } from "./features/auth/useAuth.js";
+import { useHashRoute } from "./lib/router.js";
 import Dice from "./Dice.jsx";
 import TopBar from "./features/sheet/TopBar.jsx";
 import SheetSummary from "./features/sheet/SheetSummary.jsx";
@@ -39,28 +42,11 @@ export default function App() {
     catch { return restoreSheets({getItem:()=>null}); }
   });
   const activeId = session.activeId;
-  const sessionRef=useRef(session);
-  sessionRef.current=session;
-  useEffect(()=>{
-    let disposed=false;
-    async function sync(){
-      const tracked=sessionRef.current.sheets.filter(s=>s.remote && JSON.stringify(s.character)===s.remote.base);
-      for(const sheet of tracked){
-        try {
-          const row=await api(`/${sheet.remote.id}`);
-          if(disposed)return;
-          setSession(prev=>({...prev,sheets:prev.sheets.map(current=>current.id===sheet.id && current.remote?.id===row.id && row.revision>current.remote.revision && JSON.stringify(current.character)===current.remote.base
-            ? {...current,character:row.character,remote:{...current.remote,revision:row.revision,base:JSON.stringify(row.character)}}:current)}));
-        }catch{/* Keep local drafts available if disconnected. */}
-      }
-    }
-    const timer=setInterval(sync,5000);
-    return()=>{disposed=true;clearInterval(timer);};
-  },[]);
+  const auth = useAuth();
+  const route = useHashRoute();
   const c = session.sheets.find(s => s.id === activeId).character;
   const setC = value => setSession(prev => editSheet(prev, activeId, value));
   const [master, setMaster] = useState(false);
-  const [masterKey, setMasterKey] = useState('');
   const addCharacter = character => {setSession(prev => openSheet(prev, character));setMaster(false);setTab(0);};
   const [tab, setTab] = useState(0);
   const [toast, setToast] = useState("");
@@ -127,15 +113,13 @@ export default function App() {
     }
   }
   const ctx = { c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
+  if (route === "/entrar") return <><TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} /><AuthPage auth={auth} /></>;
   return (
     <>
       <TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} />
-      <ServerSheets key={activeId} sheet={session.sheets.find(s=>s.id===activeId)} masterKey={masterKey} onMasterKey={setMasterKey}
-        onSaved={(id,row,token)=>setSession(prev=>{
-          const editToken=row.editToken||token||prev.editKeys?.[row.id]||'';
-          return {...prev,...(editToken?{editKeys:{...prev.editKeys,[row.id]:editToken}}:{}),sheets:prev.sheets.map(s=>s.id===id?{...s,remote:{id:row.id,revision:row.revision,base:JSON.stringify(row.character),editToken}}:s)};
-        })}
-        onOpen={row=>{setSession(prev=>openServerSheet(prev,row));setMaster(false);setTab(0);}} />
+      <CloudSheets auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} sheets={session.sheets}
+        onSaved={(id,row)=>setSession(prev=>setCloud(prev,id,row))}
+        onOpen={row=>{setSession(prev=>openCloudSheet(prev,row));setMaster(false);setTab(0);}} />
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}
         onNew={() => addCharacter(newCharacter())} master={master} onMaster={() => setMaster(value => !value)}
         onClose={id => setConfirm({title:"Fechar esta ficha?",text:"Ela será removida dos rascunhos deste navegador. Salve o PDF antes de fechar se quiser guardá-la.",action:() => setSession(prev => closeSheet(prev,id))})} />
