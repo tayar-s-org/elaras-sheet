@@ -7,6 +7,7 @@ const POLL_MS = 15000;
 // Botão "Rotina de Treino" com aviso: o mestre vê quantas rotinas aguardam aprovação; o jogador vê o estado das dele.
 export default function TrainingButton({ tableId, me, isGm, members, characters, closed }) {
   const [open, setOpen] = useState(false);
+  const [startView, setStartView] = useState(null);
   const [list, setList] = useState(null);
   const refresh = useCallback(() => loadRoutineList(tableId).then(setList).catch(() => {}), [tableId]);
   useEffect(() => {
@@ -26,7 +27,8 @@ export default function TrainingButton({ tableId, me, isGm, members, characters,
   else if (!isGm && mineApproved > 0) badge = <span className="tr-badge approved">{mineApproved} aprovada{mineApproved > 1 ? 's' : ''}</span>;
 
   return <>
-    <button type="button" className="outline side-training" onClick={() => setOpen(true)}>Rotina de Treino {badge}</button>
-    {open && <TrainingModal tableId={tableId} me={me} isGm={isGm} members={members} characters={characters} closed={closed} onClose={() => setOpen(false)} />}
+    <button type="button" className="outline side-training" onClick={() => { setStartView(null); setOpen(true); }}>Rotina de Treino {badge}</button>
+    <button type="button" className="outline side-training" onClick={() => { setStartView('history'); setOpen(true); }}>{isGm ? 'Treinamentos dos jogadores' : 'Ver Meus Treinamentos'}</button>
+    {open && <TrainingModal tableId={tableId} me={me} isGm={isGm} initialView={startView} members={members} characters={characters} closed={closed} onClose={() => setOpen(false)} />}
   </>;
 }

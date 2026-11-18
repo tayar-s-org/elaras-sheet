@@ -4,12 +4,14 @@ import {
   loadRoutines, createRoutine, saveRoutine, submitRoutine, setRoutineStatus, deleteRoutine, TRAINING_STATUS,
 } from '../../lib/training.js';
 import { loadRoutineDays, assignDays } from '../../lib/clock.js';
+import { validateCharacter } from '../../rules.js';
 import { emptyRoutine, normalizeRoutine, simulateRoutine, routineProblems } from '../../training/routine.js';
 import { statsFromCharacter } from '../../rpg/processor.js';
 import { blockedReason } from '../../rpg/activities.js';
 import { loadProgress, loadTraining } from '../../lib/engine.js';
 import { loadRequests, approvedJobs, loadSpellProgress } from '../../lib/requests.js';
 import RequestsPanel from '../routine/Requests.jsx';
+import TrainingHistory from '../routine/TrainingHistory.jsx';
 import RoutineGrid from '../routine/RoutineGrid.jsx';
 import { formatClock, dayParts, dayOfTick, shiftMonth } from '../../rpg/clock.js';
 import CampaignCalendar from '../routine/CampaignCalendar.jsx';
@@ -22,6 +24,9 @@ import './training.css';
 const POLL_MS = 8000;
 const viewOfDay = dayNo => { const p = dayParts(dayNo); return { year: p.year, month: p.month }; };
 
+function validatedSheet(data) {
+  try { return validateCharacter(data); } catch { return { skills: {}, attributes: {}, bonuses: {} }; }
+}
 const FALLBACK_STATS = { maxStamina: 0, maxMana: 0, spirit: { die: 4, bonus: 0 }, conjurar: { die: 0, bonus: 0 }, meditar: { die: 0, bonus: 0 }, skills: [], spells: [], trainedSpells: [] };
 function statsOf(data, trained, jobs) {
   try { return statsFromCharacter(data, trained, jobs); } catch { return FALLBACK_STATS; }
@@ -32,10 +37,10 @@ const label = r => r?.name?.trim() || 'Sem nome';
 // Rotina de treino: cada ficha tem várias rotinas com nome (um dia, hora a hora) e uma agenda por dia da campanha
 // onde coloca as rotinas aprovadas pelo mestre. O mestre também controla o tempo da campanha aqui.
 // Tudo é por PERSONAGEM (character_id): trocar de ficha na mesa não leva as rotinas da ficha antiga.
-export default function TrainingModal({ tableId, me, isGm, initial, initialRoutine, members, characters, closed, onClose }) {
+export default function TrainingModal({ tableId, me, isGm, initial, initialRoutine, initialView, members, characters, closed, onClose }) {
   const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]), [members, characters]);
   const [selected, setSelected] = useState(() => (initial && roster.some(m => m.character_id === initial) ? initial : roster.find(m => m.user_id === me)?.character_id || roster[0]?.character_id));
-  const [view, setView] = useState(initialRoutine ? 'routines' : 'calendar');
+  const [view, setView] = useState(initialView || (initialRoutine ? 'routines' : 'calendar'));
   const [rows, setRows] = useState([]); // todas as rotinas da mesa
   const [routineId, setRoutineId] = useState(initialRoutine || null);
   const [available, setAvailable] = useState(true);
@@ -240,6 +245,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
             <div className="tabs-row tr-views" role="tablist" aria-label="Seção">
               <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'primary' : 'outline'} onClick={() => setView('calendar')}>Calendário</button>
               <button type="button" role="tab" aria-selected={view === 'routines'} className={view === 'routines' ? 'primary' : 'outline'} onClick={() => setView('routines')}>Rotinas ({theirs.length})</button>
+              <button type="button" role="tab" aria-selected={view === 'history'} className={view === 'history' ? 'primary' : 'outline'} onClick={() => setView('history')}>{owner ? 'Ver Meus Treinamentos' : 'Treinamentos'}</button>
               <button type="button" role="tab" aria-selected={view === 'requests'} className={view === 'requests' ? 'primary' : 'outline'} onClick={() => setView('requests')}>Solicitações{pendingRequests ? ` (${pendingRequests})` : ''}</button>
               {isGm && <button type="button" role="tab" aria-selected={view === 'time'} className={view === 'time' ? 'primary' : 'outline'} onClick={() => setView('time')}>Tempo da campanha</button>}
             </div>
@@ -250,6 +256,9 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
                   onShift={shift} onToday={goToday} onAssign={assign} highlight={flagged}
                   onOpen={id => { setRoutineId(id); setView('routines'); }} />
                 : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
+              : view === 'history'
+                ? <TrainingHistory tableId={tableId} characterId={selected} owner={owner} closed={closed} stats={stats} character={character?.data ? validatedSheet(character.data) : null}
+                  tick={tick} progress={progress[selected] || []} training={training[selected]} spellProgress={spellProgress[selected]} requests={requests} onGo={setView} refresh={refreshAll} />
               : view === 'requests'
                 ? <RequestsPanel tableId={tableId} characterId={selected} owner={owner} isGm={isGm} closed={closed} requests={requests} stats={stats}
                   training={training[selected]} spellProgress={spellProgress[selected]} refresh={refreshAll} />
