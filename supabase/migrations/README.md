@@ -16,3 +16,5 @@ Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replac
   (backup em `*_backup_0023`). Desfazer: `0023_rollback.sql`.
 - `0024_time_engine.sql`: ledger, acumuladores de XP, `advance_time`, evolucao. Desfazer: `0024_rollback.sql`.
 - `0025_work_and_study.sql`: solicitacoes (trabalho e melhoria de feitiço), salario, tentativa de aprimorar.
+- `0029_aptitude_permanent.sql`: Aptidão (0026): pontos confirmados passam a ser permanentes (só dá para acrescentar).
+  Atenção: os arquivos `0027_custom_skills.sql` e `0028_character_table.sql` são de outra frente (perícias personalizadas e vínculo ficha-mesa).
