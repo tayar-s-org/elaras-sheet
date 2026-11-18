@@ -25,7 +25,7 @@ export default function TrainingApprovals({ part, tableId, me, members, characte
     try { await setRoutineStatus(id, status, note); setReturning(null); setText(''); await refresh(); }
     catch (e) { setError(e.message); } finally { setBusy(''); }
   };
-  const modal = open && <TrainingModal tableId={tableId} me={me} isGm initial={open.user_id} initialRoutine={open.id} members={members} characters={characters} closed={closed} onClose={() => { setOpen(null); refresh(); }} />;
+  const modal = open && <TrainingModal tableId={tableId} me={me} isGm initial={open.character_id} initialRoutine={open.id} members={members} characters={characters} closed={closed} onClose={() => { setOpen(null); refresh(); }} />;
 
   if (part === 'decided') {
     if (!approved.length) return null;

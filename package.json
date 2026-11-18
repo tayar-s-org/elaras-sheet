@@ -8,7 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test src/rules.test.js src/dice.test.js src/sheets.test.js src/catalogRules.test.js src/diceRoll.test.js src/dice3d/dice3d.test.js src/incapacitation.test.js src/money.test.js src/creature.test.js src/music.test.js src/soundpad.test.js src/defaultSounds.test.js src/market/market.test.js src/training/routine.test.js src/training/calendar.test.js server/server.test.js"
+    "test": "node --test src/rules.test.js src/dice.test.js src/sheets.test.js src/catalogRules.test.js src/diceRoll.test.js src/dice3d/dice3d.test.js src/incapacitation.test.js src/money.test.js src/creature.test.js src/music.test.js src/soundpad.test.js src/defaultSounds.test.js src/market/market.test.js src/training/routine.test.js src/training/calendar.test.js src/rpg/clock.test.js src/rpg/readiness.test.js server/server.test.js"
   },
   "dependencies": {
     "@fontsource/alegreya-sans": "^5.3.0",

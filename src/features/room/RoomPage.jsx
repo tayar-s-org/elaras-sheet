@@ -16,6 +16,9 @@ import { useCustomItemRequests } from './useCustomItemRequests.js';
 import { setLastRoom, clearLastRoom } from '../../lib/lastRoom.js';
 import { useBoard } from './useBoard.js';
 import { useLiveCharacters } from './useLiveCharacters.js';
+import { useClock } from '../routine/useClock.js';
+import { formatClock } from '../../rpg/clock.js';
+import '../routine/routine.css';
 
 const SETTINGS_KEY = 'elara-dice3d';
 const loadSettings = () => {
@@ -49,6 +52,7 @@ export default function RoomPage({ auth, id }) {
   const { table, members, messages, rolls, states, characters: savedCharacters, online, connected, error } = room;
   const characters = useLiveCharacters(id, members, savedCharacters, Boolean(room.ready));
   const itemRequests = useCustomItemRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
+  const clock = useClock(id, Boolean(room.ready));
   const trainingRequests = useTrainingApprovals(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   // Guarda esta sala como a sessao atual (o menu do topo oferece "Voltar a mesa"); esquece se a pessoa perdeu o acesso.
   const userId = auth.user?.id;
@@ -77,6 +81,7 @@ export default function RoomPage({ auth, id }) {
     <aside className="room-side">
       <p className="eyebrow">{STATUS_LABEL[table.status].toUpperCase()}</p>
       <h2>{table.name}</h2>
+      {clock.available && clock.tick != null && <p className="room-clock"><span className="muted">Campanha</span><strong>{formatClock(clock.tick)}</strong></p>}
       <TrainingButton tableId={id} me={auth.user.id} isGm={isGm} members={members} characters={characters} closed={closed} />
       <p className="muted">Mestre: {table.profiles?.display_name} · Savage Worlds</p>
       <p className="muted"><span className={`dot ${connected ? 'on' : 'off'}`} aria-hidden="true" /> {connected ? 'Conectado' : 'Conectando…'}</p>

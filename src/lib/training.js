@@ -2,17 +2,17 @@ import { supabase } from './supabase.js';
 
 export const TRAINING_STATUS = { draft: 'Rascunho', pending: 'Pendente de aprovação', approved: 'Aprovada' };
 
-const COLS = 'id,user_id,name,data,status,review_note,created_at';
+const COLS = 'id,user_id,character_id,name,data,status,review_note,created_at';
 const fail = (error, fallback) => { if (error) throw new Error(error.message || fallback); };
 
-// Todas as rotinas da mesa (cada jogador pode ter várias, com nome). Devolve null se a migration 0020 ainda não foi rodada.
+// Todas as rotinas da mesa (cada ficha pode ter várias, com nome). Devolve null se a migration 0023 ainda não foi rodada.
 export async function loadRoutines(tableId) {
   const { data, error } = await supabase.from('table_training').select(COLS).eq('table_id', tableId).order('created_at');
   return error ? null : data;
 }
 // Só id, dono, nome e estado (mais leve, para os avisos e a aba de aprovações).
 export async function loadRoutineList(tableId) {
-  const { data, error } = await supabase.from('table_training').select('id,user_id,name,status').eq('table_id', tableId).order('created_at');
+  const { data, error } = await supabase.from('table_training').select('id,user_id,character_id,name,status').eq('table_id', tableId).order('created_at');
   return error ? null : data;
 }
 export async function createRoutine(tableId, name, data) {
@@ -40,16 +40,4 @@ export async function setRoutineStatus(id, status, note) {
 export async function deleteRoutine(id) {
   const { error } = await supabase.from('table_training').delete().eq('id', id);
   fail(error, 'Não foi possível apagar a rotina.');
-}
-
-// Calendário do mês ('2026-08') de todos os jogadores da mesa: { user_id: { "dia": id da rotina } }.
-export async function loadCalendars(tableId, month) {
-  const { data, error } = await supabase.from('table_training_calendar').select('user_id,days').eq('table_id', tableId).eq('month', month);
-  if (error) return null;
-  return Object.fromEntries(data.map(r => [r.user_id, r.days || {}]));
-}
-export async function saveCalendar(tableId, userId, month, days) {
-  const { error } = await supabase.from('table_training_calendar')
-    .upsert({ table_id: tableId, user_id: userId, month, days }, { onConflict: 'table_id,user_id,month' });
-  fail(error, 'Não foi possível salvar o calendário.');
 }

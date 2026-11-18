@@ -2,15 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { calculate, validateCharacter } from '../../rules.js';
 import {
-  loadRoutines, createRoutine, saveRoutine, submitRoutine, setRoutineStatus, deleteRoutine,
-  loadCalendars, saveCalendar, TRAINING_STATUS,
+  loadRoutines, createRoutine, saveRoutine, submitRoutine, setRoutineStatus, deleteRoutine, TRAINING_STATUS,
 } from '../../lib/training.js';
+import { loadRoutineDays, assignDays } from '../../lib/clock.js';
 import {
   ACTIVITIES, emptyRoutine, normalizeRoutine, simulateRoutine, maxMeditations, maxPracticeHours,
   MANA_IMPROVEMENT_POINTS, blockedReason,
 } from '../../training/routine.js';
-import { monthKey, shiftMonth, sanitizeDays, setDay } from '../../training/calendar.js';
-import TrainingCalendar from './TrainingCalendar.jsx';
+import { formatClock, dayParts, dayOfTick, shiftMonth } from '../../rpg/clock.js';
+import CampaignCalendar from '../routine/CampaignCalendar.jsx';
+import ClockPanel from '../routine/ClockPanel.jsx';
+import { useClock } from '../routine/useClock.js';
 import '../sheet/modules.css';
 import '../sheet/market.css';
 import './training.css';
@@ -18,8 +20,7 @@ import './training.css';
 const fmt = n => (Math.round(n * 100) / 100).toString().replace('.', ',');
 const signed = n => (n > 0 ? `+${fmt(n)}` : n < 0 ? `−${fmt(Math.abs(n))}` : '0');
 const POLL_MS = 8000;
-const CAL_SAVE_MS = 500;
-const now = () => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; };
+const viewOfDay = dayNo => { const p = dayParts(dayNo); return { year: p.year, month: p.month }; };
 
 function statsOf(data) {
   try {
@@ -44,28 +45,27 @@ function Rules({ stats }) {
 
 const label = r => r?.name?.trim() || 'Sem nome';
 
-// Rotina de treino: cada jogador tem várias rotinas com nome (um dia, hora a hora) e um calendário mensal
-// onde coloca as rotinas aprovadas pelo mestre.
+// Rotina de treino: cada ficha tem várias rotinas com nome (um dia, hora a hora) e uma agenda por dia da campanha
+// onde coloca as rotinas aprovadas pelo mestre. O mestre também controla o tempo da campanha aqui.
+// Tudo é por PERSONAGEM (character_id): trocar de ficha na mesa não leva as rotinas da ficha antiga.
 export default function TrainingModal({ tableId, me, isGm, initial, initialRoutine, members, characters, closed, onClose }) {
   const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]), [members, characters]);
-  const [selected, setSelected] = useState(() => (initial && roster.some(m => m.user_id === initial) ? initial : roster.some(m => m.user_id === me) ? me : roster[0]?.user_id));
+  const [selected, setSelected] = useState(() => (initial && roster.some(m => m.character_id === initial) ? initial : roster.find(m => m.user_id === me)?.character_id || roster[0]?.character_id));
   const [view, setView] = useState(initialRoutine ? 'routines' : 'calendar');
   const [rows, setRows] = useState([]); // todas as rotinas da mesa
   const [routineId, setRoutineId] = useState(initialRoutine || null);
   const [available, setAvailable] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState('');
-  const [month, setMonth] = useState(now);
-  const [cal, setCal] = useState({ key: monthKey(now().year, now().month), byUser: {} });
+  const clock = useClock(tableId, true);
+  const [monthView, setMonthView] = useState(null);
+  const [daysByChar, setDaysByChar] = useState({});
+  const [flagged, setFlagged] = useState([]);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [returning, setReturning] = useState(false);
   const [returnText, setReturnText] = useState('');
   const dirtyId = useRef(null); // rotina minha com alteração ainda não salva
-  const dirtyCal = useRef(false);
-  const calRef = useRef(cal);
-  calRef.current = cal;
-  const calTimer = useRef(null);
-  const key = monthKey(month.year, month.month);
+  const writes = useRef(0); // gravações do calendário em andamento (a leitura periódica não as atropela)
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose(); };
@@ -73,39 +73,26 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Salva o calendário agora (se há alteração pendente). Usado pelo temporizador, ao trocar de mês e ao fechar.
-  const flushCal = useCallback(async () => {
-    clearTimeout(calTimer.current);
-    if (!dirtyCal.current) return;
-    dirtyCal.current = false;
-    const { key: k, byUser } = calRef.current;
-    try { await saveCalendar(tableId, me, k, byUser[me] || {}); setStatus('Calendário salvo'); }
-    catch (e) { dirtyCal.current = true; setStatus(e.message); }
-  }, [tableId, me]);
-  useEffect(() => () => { flushCal(); }, [flushCal]);
+  // Primeira vez que o relógio chega: o calendário abre no mês da campanha.
+  const tick = clock.tick;
+  useEffect(() => { if (tick != null) setMonthView(prev => prev || viewOfDay(dayOfTick(tick))); }, [tick]);
 
   // Carrega e atualiza de tempos em tempos; o que eu estou editando não é sobrescrito.
+  const pull = useCallback(async () => {
+    const [list, assigned] = await Promise.all([loadRoutines(tableId), loadRoutineDays(tableId)]);
+    if (list === null || assigned === null) { setAvailable(false); setLoaded(true); return; }
+    setAvailable(true);
+    setRows(prev => list.map(r => (r.id === dirtyId.current ? (prev.find(p => p.id === r.id) || { ...r, data: normalizeRoutine(r.data) }) : { ...r, data: normalizeRoutine(r.data) })));
+    if (!writes.current) setDaysByChar(assigned);
+    setLoaded(true);
+  }, [tableId]);
   useEffect(() => {
     let alive = true;
-    const pull = async () => {
-      const [list, cals] = await Promise.all([loadRoutines(tableId), loadCalendars(tableId, key)]);
-      if (!alive) return;
-      if (list === null) { setAvailable(false); setLoaded(true); return; }
-      setAvailable(true);
-      setRows(prev => list.map(r => (r.id === dirtyId.current ? (prev.find(p => p.id === r.id) || { ...r, data: normalizeRoutine(r.data) }) : { ...r, data: normalizeRoutine(r.data) })));
-      setCal(prev => {
-        const byUser = {};
-        const [y, m] = key.split('-').map(Number);
-        for (const [uid, days] of Object.entries(cals || {})) byUser[uid] = sanitizeDays(days, y, m - 1);
-        if (dirtyCal.current && prev.key === key && prev.byUser[me]) byUser[me] = prev.byUser[me];
-        return { key, byUser };
-      });
-      setLoaded(true);
-    };
-    pull();
-    const timer = setInterval(pull, POLL_MS);
+    const run = () => { if (alive) pull().catch(() => {}); };
+    run();
+    const timer = setInterval(run, POLL_MS);
     return () => { alive = false; clearInterval(timer); };
-  }, [tableId, me, key]);
+  }, [pull, tick]);
 
   // Salva a rotina que estou editando um pouco depois da última alteração.
   useEffect(() => {
@@ -119,27 +106,41 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     return () => clearTimeout(timer);
   }, [rows, available]);
 
-  const member = roster.find(m => m.user_id === selected);
+  const member = roster.find(m => m.character_id === selected);
   const character = member ? characters[member.character_id] : null;
   const stats = useMemo(() => statsOf(character?.data), [character]);
-  const owner = selected === me;
+  const owner = member?.user_id === me;
   const canEdit = owner && !closed && available;
-  const theirs = useMemo(() => rows.filter(r => r.user_id === selected), [rows, selected]);
+  const theirs = useMemo(() => rows.filter(r => r.character_id === selected), [rows, selected]);
   const current = theirs.find(r => r.id === routineId) || null;
   const sim = useMemo(() => simulateRoutine(current?.data || emptyRoutine(), stats), [current, stats]);
-  const days = cal.byUser[selected] || {};
+  const days = daysByChar[selected] || {};
+  const routinesById = useMemo(() => Object.fromEntries(rows.map(r => [r.id, r])), [rows]);
+  const nameOf = id => characters[id]?.name || 'Personagem';
+  const clockReady = tick != null && clock.available;
+  const roleCharacters = useMemo(() => roster.map(m => ({ characterId: m.character_id, userId: m.user_id, name: characters[m.character_id]?.name || '' })), [roster, characters]);
 
   // ---- calendário ----
-  const shift = async delta => { await flushCal(); setMonth(m => shiftMonth(m, delta)); };
-  const goToday = async () => { await flushCal(); setMonth(now()); };
-  const touchCal = fn => {
-    dirtyCal.current = true;
-    setCal(prev => ({ ...prev, byUser: { ...prev.byUser, [me]: fn(prev.byUser[me] || {}) } }));
-    clearTimeout(calTimer.current);
-    calTimer.current = setTimeout(flushCal, CAL_SAVE_MS);
+  const shift = delta => setMonthView(m => shiftMonth(m || { year: 1, month: 1 }, delta));
+  const goToday = () => { if (tick != null) setMonthView(viewOfDay(dayOfTick(tick))); };
+  const assign = async (dayNos, id) => {
+    if (!canEdit) return;
+    setDaysByChar(prev => {
+      const mine = { ...(prev[selected] || {}) };
+      for (const d of dayNos) { if (id) mine[d] = id; else delete mine[d]; }
+      return { ...prev, [selected]: mine };
+    });
+    writes.current += 1;
+    try { await assignDays(tableId, selected, dayNos, id); setStatus('Calendário salvo'); }
+    catch (e) { setStatus(e.message); }
+    finally { writes.current -= 1; if (!writes.current) pull().catch(() => {}); }
   };
-  const setCalDay = (day, id) => touchCal(d => setDay(d, day, id));
-  const clearMonth = () => { if (window.confirm('Tirar todas as rotinas deste mês do calendário?')) touchCal(() => ({})); };
+  const openCalendarOf = (characterId, firstDay, dayNos) => {
+    setSelected(characterId);
+    setView('calendar');
+    setMonthView(viewOfDay(firstDay));
+    setFlagged(dayNos || []);
+  };
 
   // ---- rotinas ----
   const patchRow = (id, fn) => { dirtyId.current = id; setRows(prev => prev.map(r => (r.id === id ? fn(r) : r))); };
@@ -162,11 +163,12 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     setView('routines');
   });
   const remove = () => {
-    if (!window.confirm(`Apagar a rotina "${label(current)}"? Os dias do calendário que a usam ficam vazios.`)) return;
+    if (!window.confirm(`Apagar a rotina "${label(current)}"? Os dias futuros que a usam ficam vazios.`)) return;
     act(async () => {
       await deleteRoutine(current.id);
       setRows(prev => prev.filter(r => r.id !== current.id));
       setRoutineId(null);
+      pull().catch(() => {});
     });
   };
   const submit = () => act(async () => {
@@ -185,7 +187,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   useEffect(() => { setReturning(false); setReturnText(''); }, [routineId, selected]);
   useEffect(() => { if (routineId && loaded && !theirs.some(r => r.id === routineId)) setRoutineId(null); }, [theirs, routineId, loaded]);
 
-  const pendingOf = uid => rows.filter(r => r.user_id === uid && r.status === 'pending').length;
+  const pendingOf = cid => rows.filter(r => r.character_id === cid && r.status === 'pending').length;
   const shown = current?.status || 'draft';
   const editor = current && <div className="tr-editor">
     <label className="field tr-name"><span>Nome da rotina</span>
@@ -266,20 +268,24 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     <Rules stats={stats} />
   </div>;
 
+  const migrationHelp = <p className="callout">O novo sistema de rotinas e calendário ainda não está disponível neste servidor. O mestre da mesa precisa rodar a migration <code>0023_campaign_clock.sql</code> no Supabase.</p>;
+
   return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="mod-editor training-modal" role="dialog" aria-modal="true" aria-labelledby="training-title">
       <header className="mod-editor-head">
         <h2 id="training-title">Rotina de Treino</h2>
+        {clockReady && <span className="tr-clock" title="Data e hora da campanha, iguais para todos da mesa">{formatClock(tick)}</span>}
         <span className="tr-status" role="status">{owner ? status : ''}</span>
         <button type="button" className="primary" onClick={onClose}>Fechar</button>
       </header>
       <div className="mod-editor-body">
-        {!available && <p className="callout">A rotina de treino com calendário ainda não está disponível neste servidor. O mestre da mesa precisa rodar a migration <code>0020_training_calendar.sql</code> no Supabase.</p>}
+        {!available && migrationHelp}
+        {available && !clock.available && migrationHelp}
         {!roster.length ? <p className="muted">Nenhum jogador com ficha vinculada nesta mesa ainda.</p> : <>
-          <div className="tabs-row" role="tablist" aria-label="Jogadores">
-            {roster.map(m => <button key={m.user_id} type="button" role="tab" aria-selected={selected === m.user_id} className={selected === m.user_id ? 'primary' : 'outline'} onClick={() => setSelected(m.user_id)}>
-              {characters[m.character_id].name || m.profiles?.display_name || 'Jogador'}{m.user_id === me ? ' (você)' : ''}
-              {pendingOf(m.user_id) > 0 && <span className="tr-badge pending">{pendingOf(m.user_id)} pendente{pendingOf(m.user_id) > 1 ? 's' : ''}</span>}
+          <div className="tabs-row" role="tablist" aria-label="Personagens">
+            {roster.map(m => <button key={m.character_id} type="button" role="tab" aria-selected={selected === m.character_id} className={selected === m.character_id ? 'primary' : 'outline'} onClick={() => setSelected(m.character_id)}>
+              {characters[m.character_id].name || m.profiles?.display_name || 'Personagem'}{m.user_id === me ? ' (você)' : ''}
+              {pendingOf(m.character_id) > 0 && <span className="tr-badge pending">{pendingOf(m.character_id)} pendente{pendingOf(m.character_id) > 1 ? 's' : ''}</span>}
             </button>)}
           </div>
           {!loaded ? <p className="muted">Carregando…</p> : <>
@@ -287,21 +293,29 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
             <div className="tabs-row tr-views" role="tablist" aria-label="Seção">
               <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'primary' : 'outline'} onClick={() => setView('calendar')}>Calendário</button>
               <button type="button" role="tab" aria-selected={view === 'routines'} className={view === 'routines' ? 'primary' : 'outline'} onClick={() => setView('routines')}>Rotinas ({theirs.length})</button>
+              {isGm && <button type="button" role="tab" aria-selected={view === 'time'} className={view === 'time' ? 'primary' : 'outline'} onClick={() => setView('time')}>Tempo da campanha</button>}
             </div>
 
             {view === 'calendar'
-              ? <TrainingCalendar year={month.year} month={month.month} days={days} routines={theirs} editable={canEdit}
-                onShift={shift} onToday={goToday} onSet={setCalDay} onClear={clearMonth}
-                onOpen={id => { setRoutineId(id); setView('routines'); }} />
-              : <div className="tr-routines">
-                <div className="tr-list">
-                  {theirs.map(r => <button key={r.id} type="button" role="tab" aria-selected={routineId === r.id} className={`tr-routine${routineId === r.id ? ' on' : ''}`} onClick={() => setRoutineId(r.id)}>
-                    <b>{label(r)}</b><span className={`tr-badge ${r.status}`}>{TRAINING_STATUS[r.status]}</span></button>)}
-                  {canEdit && <button type="button" className="outline" disabled={approvalBusy || theirs.length >= 20} onClick={create}>+ Nova rotina</button>}
-                  {!theirs.length && <p className="muted">{owner ? 'Você ainda não tem rotinas. Crie uma, preencha as 24 horas e envie para o mestre aprovar.' : 'Este jogador ainda não criou rotinas.'}</p>}
-                </div>
-                {editor || (theirs.length > 0 && <p className="muted">Escolha uma rotina para ver ou editar.</p>)}
-              </div>}
+              ? (clockReady && monthView
+                ? <CampaignCalendar view={monthView} days={days} routines={theirs} tick={tick} editable={canEdit}
+                  onShift={shift} onToday={goToday} onAssign={assign} highlight={flagged}
+                  onOpen={id => { setRoutineId(id); setView('routines'); }} />
+                : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
+              : view === 'time' && isGm
+                ? (clockReady
+                  ? <ClockPanel tableId={tableId} tick={tick} characters={roleCharacters} routines={routinesById} routineDays={daysByChar}
+                    nameOf={nameOf} onOpenCalendar={openCalendarOf} onAdvanced={() => { clock.refresh(); pull().catch(() => {}); }} closed={closed} />
+                  : <p className="muted">O relógio da campanha depende da migration 0023.</p>)
+                : <div className="tr-routines">
+                  <div className="tr-list">
+                    {theirs.map(r => <button key={r.id} type="button" role="tab" aria-selected={routineId === r.id} className={`tr-routine${routineId === r.id ? ' on' : ''}`} onClick={() => setRoutineId(r.id)}>
+                      <b>{label(r)}</b><span className={`tr-badge ${r.status}`}>{TRAINING_STATUS[r.status]}</span></button>)}
+                    {canEdit && <button type="button" className="outline" disabled={approvalBusy || theirs.length >= 20} onClick={create}>+ Nova rotina</button>}
+                    {!theirs.length && <p className="muted">{owner ? 'Este personagem ainda não tem rotinas. Crie uma, preencha as 24 horas e envie para o mestre aprovar.' : 'Este personagem ainda não tem rotinas.'}</p>}
+                  </div>
+                  {editor || (theirs.length > 0 && <p className="muted">Escolha uma rotina para ver ou editar.</p>)}
+                </div>}
           </>}
         </>}
       </div>

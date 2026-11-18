@@ -1,10 +1,28 @@
 import { resourceLevel } from '../incapacitation.js';
 import { level as resourceBand } from '../features/room/vitals.js';
+import { SLOT_LABELS, HOURS_PER_DAY } from '../rpg/clock.js';
 
-// Rotina de treino: simula um dia (de 01:00 a 00:00) com as regras da mesa para atividades físicas,
+// Rotina de treino: simula um dia (de 06:00 a 05:00 do dia seguinte) com as regras da mesa para atividades físicas,
 // mágicas, descanso e meditação. Tudo calculado a partir do que o jogador escolhe em cada hora.
 
-export const HOURS = [...Array.from({ length: 23 }, (_, i) => `${String(i + 1).padStart(2, '0')}:00`), '00:00'];
+// As 24 linhas da rotina: 06:00 … 23:00, 00:00 … 05:00 (a primeira ação do dia começa às 06:00).
+export const HOURS = SLOT_LABELS;
+// Versão do formato gravado. v1 (sistema antigo) tinha a grade 01:00 … 00:00; v2 começa às 06:00.
+export const ROUTINE_VERSION = 2;
+
+// Rotina do formato antigo → grade nova. A linha antiga i era a hora (i+1) e a nova é a hora 06:00 + i, então
+// a linha nova i vem da antiga (i+5) mod 24. O original fica em `legacy_v1` e nada se perde.
+export function migrateRoutineV1toV2(raw) {
+  if (!raw || typeof raw !== 'object' || raw.v === ROUTINE_VERSION) return raw;
+  const { legacy_v1: previous, ...rest } = raw;
+  const old = Array.isArray(rest.rows) ? rest.rows : [];
+  return {
+    ...rest,
+    v: ROUTINE_VERSION,
+    rows: HOURS.map((_, i) => old[(i + 5) % HOURS_PER_DAY] ?? { a: '', n: '' }),
+    legacy_v1: previous ?? raw,
+  };
+}
 
 export const ACTIVITIES = [
   { id: '', label: '—' },
@@ -52,17 +70,19 @@ export function blockedReason(activity, stamina, mana) {
 }
 
 export const emptyRoutine = () => ({
-  period: '', place: '', fed: true, meditRoll: 0, meditAvg: false, startStamina: null, startMana: null,
+  v: ROUTINE_VERSION, period: '', place: '', fed: true, meditRoll: 0, meditAvg: false, startStamina: null, startMana: null,
   rows: HOURS.map(() => ({ a: '', n: '' })),
 });
 
 // Garante o formato (dados vindos do banco podem estar incompletos ou adulterados).
-export function normalizeRoutine(raw) {
+export function normalizeRoutine(input) {
   const base = emptyRoutine();
-  if (!raw || typeof raw !== 'object') return base;
+  if (!input || typeof input !== 'object') return base;
+  const raw = migrateRoutineV1toV2(input);
   const num = (v, min, max) => (v === null || v === undefined || v === '' ? null : Math.min(max, Math.max(min, Math.trunc(Number(v)) || 0)));
   const ids = new Set(ACTIVITIES.map(a => a.id));
   return {
+    v: ROUTINE_VERSION,
     period: String(raw.period || '').slice(0, 60),
     place: String(raw.place || '').slice(0, 100),
     fed: raw.fed !== false,

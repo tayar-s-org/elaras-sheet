@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS, emptyRoutine, normalizeRoutine, physicalCost, meditationRate, maxMeditations, maxPracticeHours, simulateRoutine } from './routine.js';
+import { HOURS, ROUTINE_VERSION, migrateRoutineV1toV2, emptyRoutine, normalizeRoutine, physicalCost, meditationRate, maxMeditations, maxPracticeHours, simulateRoutine } from './routine.js';
 
 const stats = { maxStamina: 40, maxMana: 30, spirit: 12, conjurar: 12 };
 const plan = (acts, extra = {}) => {
@@ -20,9 +20,9 @@ test('treino físico custa 1, 2 e 4 por hora; 4h = 4, 8h = 12, 12h = 28', () => 
 
 test('descanso completo: +12 na 8ª hora e reinicia o treino físico', () => {
   const r = plan([
-    ['01:00', 'fisico'], ['02:00', 'fisico'], ['03:00', 'fisico'], ['04:00', 'fisico'], ['05:00', 'fisico'],
+    ['06:00', 'fisico'], ['07:00', 'fisico'], ['08:00', 'fisico'], ['09:00', 'fisico'], ['10:00', 'fisico'],
     ...HOURS.slice(5, 13).map(h => [h, 'descanso']),
-    ['14:00', 'fisico'],
+    ['19:00', 'fisico'],
   ]);
   const sim = simulateRoutine(r, stats);
   assert.equal(sim.rows[4].ve, -2, 'a 5ª hora de treino custa 2');
@@ -58,7 +58,7 @@ test('meditação recupera 1/(4 − x/4) por hora e limita as entradas por dia',
   const sim = simulateRoutine(run('meditar', 4, { startMana: 0, meditRoll: 12 }), stats);
   assert.equal(sim.totalVM, 4);
   // duas meditações separadas por uma hora livre: com Espírito d6 só a primeira conta
-  const split = plan([['01:00', 'meditar'], ['02:00', 'meditar'], ['04:00', 'meditar']], { startMana: 0, meditRoll: 12 });
+  const split = plan([['06:00', 'meditar'], ['07:00', 'meditar'], ['09:00', 'meditar']], { startMana: 0, meditRoll: 12 });
   const two = simulateRoutine(split, { ...stats, spirit: 6 });
   assert.equal(two.totalVM, 2);
   assert.ok(two.warnings.length >= 1);
@@ -75,7 +75,7 @@ test('aprimoramento de mana exige mana cheia e conta horas por ponto', () => {
 });
 
 test('normalizeRoutine corrige dados incompletos ou inválidos', () => {
-  const n = normalizeRoutine({ rows: [{ a: 'fisico' }, { a: 'hack' }], meditRoll: 99, fed: false, period: 'x'.repeat(200) });
+  const n = normalizeRoutine({ v: 2, rows: [{ a: 'fisico' }, { a: 'hack' }], meditRoll: 99, fed: false, period: 'x'.repeat(200) });
   assert.equal(n.rows.length, 24);
   assert.equal(n.rows[0].a, 'fisico');
   assert.equal(n.rows[1].a, '');
@@ -116,4 +116,36 @@ test('Usar média: a rolagem de Meditar vira a média do dado da ficha', async (
   assert.equal(sim.roll, 4.5);
   assert.equal(sim.rate, Math.round(100 / (4 - 4.5 / 4)) / 100);          // usa a média, não os 12 digitados
   assert.equal(simulateRoutine({ ...routine, meditAvg: false }, stats).roll, 12);
+});
+
+test('a grade da rotina começa às 06:00 e termina às 05:00', () => {
+  assert.equal(HOURS.length, 24);
+  assert.equal(HOURS[0], '06:00');
+  assert.equal(HOURS[17], '23:00');
+  assert.equal(HOURS[18], '00:00');
+  assert.equal(HOURS[23], '05:00');
+  assert.equal(emptyRoutine().v, ROUTINE_VERSION);
+});
+
+test('migração v1→v2: a hora antiga continua sendo a mesma hora, o original fica em legacy_v1', () => {
+  // formato antigo: linha i = hora (i+1); 01:00 é a linha 0 e 00:00 é a 23
+  const oldRows = Array.from({ length: 24 }, (_, i) => ({ a: '', n: `h${(i + 1) % 24}` }));
+  oldRows[5] = { a: 'meditar', n: 'seis da manhã' };    // 06:00 antigo
+  oldRows[23] = { a: 'descanso', n: 'meia-noite' };      // 00:00 antigo
+  oldRows[0] = { a: 'simples', n: 'uma da manhã' };      // 01:00 antigo
+  const old = { period: 'p', place: 'l', fed: true, rows: oldRows };
+  const m = migrateRoutineV1toV2(old);
+  assert.equal(m.v, 2);
+  assert.equal(m.rows[0].n, 'seis da manhã', '06:00 é a primeira linha agora');
+  assert.equal(m.rows[HOURS.indexOf('00:00')].n, 'meia-noite');
+  assert.equal(m.rows[HOURS.indexOf('01:00')].n, 'uma da manhã');
+  assert.equal(m.rows[HOURS.indexOf('05:00')].n, 'h5');
+  assert.deepEqual(m.legacy_v1, old, 'dados originais preservados');
+  assert.equal(m.period, 'p');
+  assert.equal(migrateRoutineV1toV2(m), m, 'já migrada: não mexe de novo');
+  const again = migrateRoutineV1toV2({ ...m, v: 1 });
+  assert.deepEqual(again.legacy_v1, m.legacy_v1, 'rodar duas vezes não encadeia legacy dentro de legacy');
+  const n = normalizeRoutine(old);
+  assert.equal(n.rows[0].a, 'meditar');
+  assert.equal(n.rows[HOURS.indexOf('00:00')].a, 'descanso');
 });
