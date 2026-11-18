@@ -138,3 +138,10 @@
 .tr-roll-row input[type=number] { flex: 0 0 64px; width: 64px; min-width: 0; }
 .tr-roll-row .tr-avg { margin: 0; font-size: .74rem; letter-spacing: 0; text-transform: none; font-weight: 500; }
 .tr-roll-row .tr-avg input { width: 15px; height: 15px; flex: none; }
+
+/* Em qualquer resolucao o texto das linhas nao pode ser cortado: altura automatica pelo conteudo (a da linha e so o minimo) */
+.tr-act-row select, .tr-act-row input { height: auto; min-height: 0; line-height: 1.3; padding: 2px 6px; box-sizing: border-box; }
+.tr-act-row { align-items: stretch; }
+.tr-table td, .tr-table tbody th { line-height: 1.3; }
+.tr-table td.tr-act { padding-top: 1px; padding-bottom: 1px; }
+.tr-table td.tr-act .tr-act-row select, .tr-table td.tr-act .tr-act-row input { padding: 1px 6px; line-height: 1.25; height: auto; }
