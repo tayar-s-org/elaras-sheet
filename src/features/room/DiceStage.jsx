@@ -12,19 +12,16 @@ const DURATION = 1900;      // ms de movimento por dado
 const HOLD = 5000;          // ms com os dados e o resultado visíveis antes de sumirem
 const easeOutCubic = p => 1 - (1 - p) ** 3;
 
-function click(audio) {
+// Som do lançamento (~2 s), tocado quando os dados são jogados. Cada toque usa uma cópia, então rolagens seguidas
+// podem se sobrepor. O navegador pode bloquear o áudio até a pessoa interagir com a página; nesse caso fica mudo.
+const ROLL_SOUND = `${import.meta.env.BASE_URL}assets/sounds/dice-roll.mp3`;
+let rollAudio = null;
+function playRollSound() {
   try {
-    const ctx = audio.ctx || (audio.ctx = new (window.AudioContext || window.webkitAudioContext)());
-    if (ctx.state === 'suspended') ctx.resume();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 160 + Math.random() * 140;
-    gain.gain.setValueAtTime(0.06, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.07);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.08);
+    rollAudio ||= Object.assign(new Audio(ROLL_SOUND), { preload: 'auto' });
+    const copy = rollAudio.cloneNode();
+    copy.volume = 0.8;
+    copy.play().catch(() => {});
   } catch { /* sem audio: segue em silencio */ }
 }
 
@@ -75,7 +72,7 @@ export default function DiceStage({ event, settings, onFinish }) {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    const state = { dice: [], raf: 0, timers: [], current: null, audio: {} };
+    const state = { dice: [], raf: 0, timers: [], current: null };
     const resize = () => {
       const w = host.clientWidth || 1;
       const h = host.clientHeight || 1;
@@ -110,6 +107,7 @@ export default function DiceStage({ event, settings, onFinish }) {
       const showBadge = () => setBadge({ who: ev.who, formula: info.title, total: info.total, outcome: info.outcome, tone: info.tone });
       const plan = planDice(roll);
       state.current = roll.id;
+      if (settingsRef.current?.sound) playRollSound();
       if (!plan) { showBadge(); finish(roll.id); state.timers.push(setTimeout(() => setBadge(null), HOLD)); return; }
       setBadge(null);
 
@@ -139,7 +137,7 @@ export default function DiceStage({ event, settings, onFinish }) {
           : { x: (side === 1 ? -1 : 1) * (visibleWidth / 2 + 3), z: end.z + rng() * 4 };
         const axis = new Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize();
         const spin = (6 + rng() * 4) * Math.PI * (rng() < 0.5 ? -1 : 1);
-        state.dice.push({ mesh, rest: def.restY * mesh.userData.scale, target: yaw.multiply(target), end, start, axis, spin, delay: rng() * 260, bounces: 0 });
+        state.dice.push({ mesh, rest: def.restY * mesh.userData.scale, target: yaw.multiply(target), end, start, axis, spin, delay: rng() * 260 });
         scene.add(mesh);
         mesh.position.set(start.x, 6, start.z);
       });
@@ -157,8 +155,6 @@ export default function DiceStage({ event, settings, onFinish }) {
           d.mesh.position.y = d.rest + 2.5 * (1 - p) ** 2 * Math.abs(Math.cos(3.2 * Math.PI * p));
           spinQ.setFromAxisAngle(d.axis, d.spin * (1 - e));
           d.mesh.quaternion.copy(spinQ).multiply(d.target);
-          const hits = Math.floor(3.2 * p + 0.5);
-          if (hits > d.bounces && p < 0.97) { d.bounces = hits; if (settingsRef.current?.sound) click(state.audio); }
         }
         renderer.render(scene, camera);
         if (!done) { state.raf = requestAnimationFrame(frame); return; }

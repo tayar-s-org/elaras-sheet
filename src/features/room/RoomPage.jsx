@@ -15,7 +15,7 @@ import { useLiveCharacters } from './useLiveCharacters.js';
 const SETTINGS_KEY = 'elara-dice3d';
 const loadSettings = () => {
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  try { return { anim: !reduced, sound: false, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { anim: !reduced, sound: false }; }
+  try { return { anim: !reduced, sound: true, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { anim: !reduced, sound: true }; }
 };
 
 export default function RoomPage({ auth, id }) {
