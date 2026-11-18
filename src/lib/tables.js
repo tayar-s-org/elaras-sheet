@@ -22,7 +22,7 @@ export async function deleteTable(id) {
   fail(error);
 }
 export async function getTable(id) {
-  const { data, error } = await supabase.from('tables').select(`${TABLE_COLS},profiles(display_name)`).eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('tables').select(`${TABLE_COLS},profiles!tables_owner_id_fkey(display_name)`).eq('id', id).maybeSingle();
   fail(error);
   return data;
 }
