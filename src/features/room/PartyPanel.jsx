@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { saveState } from '../../lib/room.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals.js';
+import './party.css';
 
-function Counter({ id, label, value, max, canEdit, onChange }) {
+function Counter({ id, label, value, max, amount, canEdit, onChange }) {
   const mana = id === 'mana';
   const lvl = level(value, max, mana);
   return <div className="counter-wrap">
     <div className="counter">
       <span>{label}</span>
       <span className={`chip l${lvl}`}>{LEVEL_TEXT[mana ? 'mana' : 'normal'][lvl]}</span>
-      {canEdit && <button className="outline" aria-label={`Diminuir ${label}`} disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>}
+      {canEdit && <button className="outline" aria-label={`Tirar ${amount} de ${label}`} title={`Tirar ${amount}`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - amount))}>−</button>}
       <strong>{value}<small>/{max}</small></strong>
-      {canEdit && <button className="outline" aria-label={`Aumentar ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>}
+      {canEdit && <button className="outline" aria-label={`Adicionar ${amount} a ${label}`} title={`Adicionar ${amount}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + amount))}>+</button>}
     </div>
     <div className={`res-bar${mana ? ' mana' : ''}`} aria-hidden="true"><i style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%` }} /></div>
   </div>;
@@ -19,6 +20,8 @@ function Counter({ id, label, value, max, canEdit, onChange }) {
 
 function CharacterCard({ member, row, state, canEdit, tableId, patchState, closed }) {
   const [error, setError] = useState('');
+  const [amountText, setAmountText] = useState('1');
+  const amount = Math.max(1, Math.min(999, Math.trunc(Number(amountText)) || 1));
   const max = safeMaxima(row.data);
   const value = k => currentValue(state, max, k);
   async function change(k, v) {
@@ -30,7 +33,10 @@ function CharacterCard({ member, row, state, canEdit, tableId, patchState, close
   return <article className="party-card">
     <h4>{row.name || 'Sem nome'}</h4>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
-    {RESOURCES.map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
+    {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
+      <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}
+        onChange={e => setAmountText(e.target.value)} onBlur={() => setAmountText(String(amount))} onFocus={e => e.target.select()} /></label>}
+    {RESOURCES.map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} amount={amount} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
     {error && <p role="alert" className="muted">{error}</p>}
   </article>;
 }

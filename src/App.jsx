@@ -10,6 +10,7 @@ import { useAuth } from "./features/auth/useAuth.js";
 import { useHashRoute, navigate, loginThen } from "./lib/router.js";
 import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
+import { listMine, getCharacter, deleteCharacter } from "./lib/cloud.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
 import InvitePage from "./features/tables/InvitePage.jsx";
@@ -96,6 +97,25 @@ export default function App() {
       });
     }
   }, [auth.user?.id]);
+  // As fichas da conta viram abas: ao entrar, abre cada uma que ainda nao esta aberta (a aba ativa nao muda).
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  useEffect(() => {
+    if (!auth.user) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        for (const row of (await listMine()).slice(0, 30)) {
+          if (!alive) return;
+          if (sessionRef.current.sheets.some(s => s.cloud?.id === row.id)) continue;
+          const full = await getCharacter(row.id);
+          if (!alive) return;
+          setSession(prev => prev.sheets.some(s => s.cloud?.id === row.id) ? prev : { ...openCloudSheet(prev, full), activeId: prev.activeId });
+        }
+      } catch { /* a lista tenta de novo no proximo carregamento */ }
+    })();
+    return () => { alive = false; };
+  }, [auth.user?.id]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 6500);
@@ -170,11 +190,18 @@ export default function App() {
   return (
     <>
       {topbar}
-      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)}
-        onOpen={row=>{setSession(prev=>openCloudSheet(prev,row));setMaster(false);setTab(0);}} />
+      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} />
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}
         onNew={() => addCharacter(newCharacter())} master={master} onMaster={() => setMaster(value => !value)}
-        onClose={id => setConfirm({title:"Fechar esta ficha?",text:"Ela será removida dos rascunhos deste navegador. Salve o PDF antes de fechar se quiser guardá-la.",action:() => setSession(prev => closeSheet(prev,id))})} />
+        onClose={id => {
+          const sheet = session.sheets.find(s => s.id === id);
+          setConfirm(sheet?.cloud
+            ? {title:"Apagar esta ficha?",text:"A ficha será apagada da sua conta e não poderá ser recuperada. Se ela estiver vinculada a uma mesa, o vínculo some também. Salve o PDF antes se quiser guardá-la.",action:async () => {
+              try { await deleteCharacter(sheet.cloud.id); setSession(prev => closeSheet(prev,id)); }
+              catch (error) { setToast("Não foi possível apagar a ficha. " + error.message); }
+            }}
+            : {title:"Fechar esta ficha?",text:"Ela ainda não foi salva na sua conta e será descartada. Salve o PDF antes de fechar se quiser guardá-la.",action:() => setSession(prev => closeSheet(prev,id))});
+        }} />
       {master ? <MasterView sheets={session.sheets} onEdit={id => {setSession(prev => ({...prev,activeId:id}));setMaster(false);}} onSave={save} /> : <main className="layout">
         <aside className="sidebar">
           <p className="eyebrow">SEU PERSONAGEM</p>
