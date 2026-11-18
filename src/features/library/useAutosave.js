@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createCharacter, updateCharacter, linkIfNoCharacter, ConflictError } from '../../lib/cloud.js';
 import { setCloud } from '../../sheets.js';
-import { newCharacter } from '../../rules.js';
 
-const BLANK = JSON.stringify(newCharacter());
 const DELAY = 1000;
 const RETRY = 8000;
 
-// Salva na conta, sozinho, toda ficha alterada. Uma ficha em branco so e criada na nuvem depois da primeira edicao.
+// Salva na conta, sozinho, toda ficha alterada. A ficha so e criada na nuvem depois de escolher a mesa dela.
 export function useAutosave(session, setSession, enabled) {
   const [status, setStatus] = useState({ state: 'idle', message: '' });
   const inflight = useRef(new Set());
@@ -20,9 +18,10 @@ export function useAutosave(session, setSession, enabled) {
     const timers = [];
     for (const sheet of session.sheets) {
       const json = JSON.stringify(sheet.character);
-      const dirty = sheet.cloud ? json !== sheet.cloud.base : json !== BLANK;
-      // Ficha nova so vai para a nuvem depois de escolher a mesa para a qual ela e criada.
+      // Ficha nova so vai para a nuvem depois de escolher a mesa para a qual ela e criada; escolhida a mesa, vai mesmo em branco
+      // (senao ela nao apareceria na lista de fichas da sala ate a primeira edicao).
       if (!sheet.cloud && !sheet.tableId) continue;
+      const dirty = sheet.cloud ? json !== sheet.cloud.base : true;
       if (!dirty || inflight.current.has(sheet.id) || blocked.current.has(sheet.id) || failed.current.get(sheet.id) === json) continue;
       timers.push(setTimeout(async () => {
         inflight.current.add(sheet.id);
