@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { cloudConfigured } from '../../lib/supabase.js';
 import { loginThen } from '../../lib/router.js';
-import { createCharacter, updateCharacter, listMine, getCharacter, deleteCharacter } from '../../lib/cloud.js';
+import { listMine, getCharacter, deleteCharacter } from '../../lib/cloud.js';
 
-export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen, status }) {
+export default function CloudSheets({ auth, sheet, onOpen, status }) {
   const [list, setList] = useState([]);
   const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const cloud = sheet.cloud;
   const dirty = cloud && JSON.stringify(sheet.character) !== cloud.base;
@@ -28,31 +27,6 @@ export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen, stat
     </section>;
   }
 
-  async function saveOne(target) {
-    const row = target.cloud
-      ? await updateCharacter(target.cloud.id, target.cloud.revision, target.character)
-      : await createCharacter(target.character);
-    onSaved(target.id, row);
-    return row;
-  }
-  async function save() {
-    setBusy(true);
-    try { await saveOne(sheet); setMessage('Ficha salva na nuvem.'); if (expanded) await refresh(); }
-    catch (e) { setMessage(e.message); }
-    finally { setBusy(false); }
-  }
-  async function saveAll() {
-    setBusy(true);
-    let ok = 0;
-    const errors = [];
-    for (const target of sheets) {
-      if (target.cloud && JSON.stringify(target.character) === target.cloud.base) continue;
-      try { await saveOne(target); ok++; } catch (e) { errors.push(`${target.character.name || 'Sem nome'}: ${e.message}`); }
-    }
-    setMessage(`${ok} ficha(s) enviada(s).${errors.length ? ' ' + errors.join(' ') : ''}`);
-    if (expanded) await refresh();
-    setBusy(false);
-  }
   async function open(id) {
     try { onOpen(await getCharacter(id)); setMessage(''); } catch (e) { setMessage(e.message); }
   }
@@ -63,8 +37,6 @@ export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen, stat
 
   return <section className="server-sheets">
     <div className="sheet-tools">
-      <button className="primary" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar agora'}</button>
-      <button className="outline" disabled={busy} onClick={saveAll}>Enviar todas as abas</button>
       <button className="outline" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>Minhas fichas</button>
       <span className={`save-status ${status?.state || 'idle'}`} role="status">{status?.state === 'saving' ? 'Salvando…' : status?.state === 'error' ? status.message : dirty ? 'Alterações serão salvas sozinhas…' : cloud ? `Salvo na nuvem · versão ${cloud.revision}` : 'Ficha em branco (salva ao editar)'}</span>
     </div>

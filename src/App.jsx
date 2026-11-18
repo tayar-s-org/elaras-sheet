@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
 import { exportPdf, importPdf } from "./pdf.js";
-import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, setCloud } from "./sheets.js";
+import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet } from "./sheets.js";
 import SheetTabs from "./SheetTabs.jsx";
 import MasterView from "./MasterView.jsx";
 import CloudSheets from "./features/library/CloudSheets.jsx";
@@ -148,8 +148,7 @@ export default function App() {
   return (
     <>
       {topbar}
-      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} sheets={session.sheets}
-        onSaved={(id,row)=>setSession(prev=>setCloud(prev,id,row))}
+      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)}
         onOpen={row=>{setSession(prev=>openCloudSheet(prev,row));setMaster(false);setTab(0);}} />
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}
         onNew={() => addCharacter(newCharacter())} master={master} onMaster={() => setMaster(value => !value)}

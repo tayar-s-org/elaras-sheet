@@ -4,7 +4,8 @@ import { setCloud } from '../../sheets.js';
 import { newCharacter } from '../../rules.js';
 
 const BLANK = JSON.stringify(newCharacter());
-const DELAY = 1500;
+const DELAY = 1000;
+const RETRY = 8000;
 
 // Salva na conta, sozinho, toda ficha alterada. Uma ficha em branco so e criada na nuvem depois da primeira edicao.
 export function useAutosave(session, setSession, enabled) {
@@ -12,6 +13,7 @@ export function useAutosave(session, setSession, enabled) {
   const inflight = useRef(new Set());
   const blocked = useRef(new Set());   // conflito de versao: nao tenta de novo sozinho
   const failed = useRef(new Map());    // id -> ultimo JSON que falhou
+  const [retry, setRetry] = useState(0); // muda para reavaliar as fichas que falharam
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -37,6 +39,7 @@ export function useAutosave(session, setSession, enabled) {
             setStatus({ state: 'error', message: 'Esta ficha mudou em outro lugar. Feche a aba e abra a versão da nuvem em "Minhas fichas".' });
           } else {
             failed.current.set(sheet.id, json);
+            setTimeout(() => { if (failed.current.get(sheet.id) === json) { failed.current.delete(sheet.id); setRetry(n => n + 1); } }, RETRY);
             setStatus({ state: 'error', message: `Não foi possível salvar: ${error.message}` });
           }
         } finally {
@@ -45,7 +48,7 @@ export function useAutosave(session, setSession, enabled) {
       }, DELAY));
     }
     return () => timers.forEach(clearTimeout);
-  }, [session, enabled, setSession]);
+  }, [session, enabled, setSession, retry]);
 
   // Ao trocar de conta ou sair, esquece conflitos e falhas da conta anterior.
   useEffect(() => { if (!enabled) { blocked.current.clear(); failed.current.clear(); setStatus({ state: 'idle', message: '' }); } }, [enabled]);
