@@ -42,7 +42,7 @@ const STEPS = [
     title: "Vantagens, complicações e poderes",
     body: [
       "Módulo Vantagens. Cada complicação rende pontos: menor +3 e maior +5. Cada vantagem custa 1 ponto a mais que a anterior (a 1ª custa 1, a 2ª custa 2, a 3ª custa 3…). A primeira vantagem do humano é gratuita, e uma vantagem pode ser repetida pelo mesmo custo da posição dela. Os pré-requisitos do livro continuam valendo, e o catálogo avisa o que falta.",
-      "Quem usa magia precisa de Antecedente Arcano. Cada vantagem Pontos de Poder soma +10 de mana. Os poderes ficam em Magia e bagagem, com busca no livro.",
+      "Quem usa magia precisa de Antecedente Arcano. Cada vantagem Pontos de Poder soma +10 de mana. Os poderes ficam no módulo Magia, com busca no livro.",
     ],
   },
   {
@@ -54,7 +54,7 @@ const STEPS = [
   {
     title: "Compre o equipamento",
     body: [
-      "Todo personagem começa com $ 500. No Mercado, compre armas, armaduras, escudos, munição e itens do livro, e equipe o que o personagem usa. Armaduras somam na Resistência e armas e escudos somam no Aparar, automaticamente. Um item por espaço do corpo, e o peso acima de 2,5 × Força (em kg) tira Movimento.",
+      "Todo personagem começa com $ 500. No Mercado, compre armas, armaduras, escudos, munição e itens do livro, e equipe o que o personagem usa. Os itens comprados ficam no módulo Mochila da ficha. Armaduras somam na Resistência e armas e escudos somam no Aparar, automaticamente. Um item por espaço do corpo, e o peso acima de 2,5 × Força (em kg) tira Movimento.",
     ],
   },
   {

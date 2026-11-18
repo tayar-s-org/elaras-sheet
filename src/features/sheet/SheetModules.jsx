@@ -20,10 +20,13 @@ export const MODULES = [
   "Atributos",
   "Perícias",
   "Vantagens",
-  "Magia e bagagem",
+  "Magia",
   "História",
   "Livro e regras",
+  "Mochila",
 ];
+// Ordem em que os módulos aparecem (a Mochila fica logo depois da Magia; os índices acima não mudam).
+const ORDER = [0, 1, 2, 3, 4, 7, 5, 6];
 
 const ATTRIBUTE_ORDER = ["Agilidade", "Astúcia", "Espírito", "Força", "Vigor"];
 const excerpt = (text, max = 220) => {
@@ -44,6 +47,7 @@ const groupedAdvantages = list => {
 const bagItems = c => c.inventory.map(e => ({ ...e, name: resolveItem(e)?.name })).filter(e => e.name).sort((a, b) => Number(b.equipped) - Number(a.equipped));
 // Bônus de rolagem vindo de itens equipados, ex.: " (+2)".
 const bonusText = b => (b ? ` (${b > 0 ? `+${b}` : `−${Math.abs(b)}`})` : "");
+const kg = n => `${(Math.round(n * 100) / 100).toString().replace(".", ",")} kg`;
 const Empty = ({ children }) => <p className="mod-empty">{children}</p>;
 const Chip = ({ label, value, tone }) => <span className={`mod-chip${tone ? ` ${tone}` : ""}`}>{label}{value != null && <b>{value}</b>}</span>;
 const Stat = ({ label, value }) => <div className="mod-stat"><b>{value}</b><span>{label}</span></div>;
@@ -86,14 +90,19 @@ function Summary({ index, c, d }) {
         <h4 className="mod-sub">Complicações ({c.hindrances.length})</h4>
         {c.hindrances.length ? <div className="mod-chips">{c.hindrances.map((h, i) => <Chip key={i} label={h.name || "Sem nome"} value={h.severity} tone={h.severity === "Maior" ? "major" : "minor"} />)}</div> : <Empty>Nenhuma complicação.</Empty>}
       </>;
-    case 4: {
-      const bag = bagItems(c);
-      const bonus = [["Armadura", c.armor], ["Movimento", c.movementBonus], ["Aparar", c.parryBonus], ["Mana", c.manaBonus]].filter(([, v]) => v);
+    case 4:
       return <>
         <h4 className="mod-sub">Poderes ({c.powers.length})</h4>
         {c.powers.length ? <div className="mod-chips">{c.powers.map((p, i) => <Chip key={i} label={p.name || "Sem nome"} value={p.cost || null} tone="power" />)}</div> : <Empty>Nenhum poder.</Empty>}
-        <h4 className="mod-sub">Bagagem ({c.inventory.reduce((n, e) => n + e.qty, 0)})</h4>
+      </>;
+    case 7: {
+      const bag = bagItems(c);
+      const bonus = [["Armadura", c.armor], ["Movimento", c.movementBonus], ["Aparar", c.parryBonus], ["Mana", c.manaBonus]].filter(([, v]) => v);
+      const load = d.inventory;
+      return <>
+        <h4 className="mod-sub">Itens ({c.inventory.reduce((n, e) => n + e.qty, 0)})</h4>
         {bag.length ? <div className="mod-chips">{bag.map(e => <Chip key={e.id} label={e.name} value={e.qty > 1 ? `×${e.qty}` : null} tone={e.equipped ? "power" : ""} />)}</div> : <Empty>Nada na mochila. Compre equipamento no Mercado.</Empty>}
+        {bag.length > 0 && <p className="mod-facts">Carga {kg(load.weight)} / {kg(load.capacity)}{load.overload ? ` · sobrecarga −${load.overload} de Movimento` : ""} · itens em roxo estão equipados</p>}
         {bonus.length > 0 && <div className="mod-chips">{bonus.map(([k, v]) => <Chip key={k} label={`Bônus de ${k}`} value={v > 0 ? `+${v}` : v} />)}</div>}
       </>;
     }
@@ -118,6 +127,7 @@ function renderEditor(index, ctx) {
     case 4: return <MagicGearTab {...ctx} />;
     case 5: return <HistoryTab {...ctx} />;
     case 6: return <BookTab {...ctx} />;
+    case 7: return <MarketTab {...ctx} initialView="bag" />;
     case "guide": return <GuideTab {...ctx} />;
     case "market": return <MarketTab {...ctx} />;
     default: return null;
@@ -127,9 +137,9 @@ function renderEditor(index, ctx) {
 // Ficha completa só para leitura (usada na sala para ver a ficha de outro jogador): todos os módulos, sem editar.
 export function SheetOverview({ c, d }) {
   return <div className="sheet-modules">
-    {MODULES.map((name, i) => i === 6 ? null : (
-      <section key={name} className={`mod-card${i === 0 ? " wide" : ""}`} aria-label={name}>
-        <header className="mod-head"><h2><span className="mod-num">{String(i + 1).padStart(2, "0")}</span>{name}</h2></header>
+    {ORDER.map((i, pos) => i === 6 ? null : (
+      <section key={MODULES[i]} className={`mod-card${i === 0 ? " wide" : ""}`} aria-label={MODULES[i]}>
+        <header className="mod-head"><h2><span className="mod-num">{String(pos + 1).padStart(2, "0")}</span>{MODULES[i]}</h2></header>
         <div className="mod-body"><Summary index={i} c={c} d={d} /></div>
       </section>
     ))}
@@ -148,11 +158,11 @@ export default function SheetModules({ ctx, editing, setEditing }) {
 
   return <>
     <div className="sheet-modules">
-      {MODULES.map((name, i) => (
-        <section key={name} id={`sec-${i}`} className={`mod-card${i === 0 ? " wide" : ""}`} aria-labelledby={`mod-title-${i}`}>
+      {ORDER.map((i, pos) => (
+        <section key={MODULES[i]} id={`sec-${i}`} className={`mod-card${i === 0 ? " wide" : ""}`} aria-labelledby={`mod-title-${i}`}>
           <header className="mod-head">
-            <h2 id={`mod-title-${i}`}><span className="mod-num">{String(i + 1).padStart(2, "0")}</span>{name}</h2>
-            <button type="button" className="outline" onClick={() => setEditing(i)}>{i === 6 ? "Abrir" : "Editar"}</button>
+            <h2 id={`mod-title-${i}`}><span className="mod-num">{String(pos + 1).padStart(2, "0")}</span>{MODULES[i]}</h2>
+            <button type="button" className="outline" onClick={() => setEditing(i)}>{i === 6 || i === 7 ? "Abrir" : "Editar"}</button>
           </header>
           <div className="mod-body"><Summary index={i} c={c} d={d} /></div>
         </section>

@@ -30,8 +30,8 @@ function Stats({ item }) {
 }
 
 // Mercado: compra de equipamento do livro com o dinheiro da ficha; itens equipados somam à Resistência, ao Aparar e à carga.
-export default function MarketTab({ c, d, setC, setToast, cloudId }) {
-  const [view, setView] = useState("shop");
+export default function MarketTab({ c, d, setC, setToast, cloudId, initialView = "shop" }) {
+  const [view, setView] = useState(initialView);
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
   const money = normalizeMoney(c.money);
