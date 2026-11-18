@@ -188,8 +188,9 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
       break;
   }
 
-  const stamina = Math.min(stats.maxStamina, Math.max(0, state.stamina + dS));
-  const mana = Math.min(stats.maxMana, Math.max(0, state.mana + dM));
+  // O estado também fica arredondado (3 casas): assim a soma dos efeitos gravados é sempre igual ao estado final.
+  const stamina = round(Math.min(stats.maxStamina, Math.max(0, state.stamina + dS)));
+  const mana = round(Math.min(stats.maxMana, Math.max(0, state.mana + dM)));
   ev.staminaDelta = round(stamina - state.stamina);
   ev.manaDelta = round(mana - state.mana);
   ev.staminaAfter = round(stamina);
