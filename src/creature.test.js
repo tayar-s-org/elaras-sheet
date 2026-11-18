@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { MAX_HP, parseHp, newCreatureMeta, creatureOf, metaWithHp, metaWithMaxHp, hpTone, hpLabel } from './creature.js';
 
 const token = (hp, maxHp, extra = {}) => ({ id: 't', meta: { creature: true, hp, maxHp, ...extra } });
@@ -48,4 +49,12 @@ test('metaWithMaxHp nunca deixa a vida atual acima da nova máxima', () => {
 test('faixas de vida: tons e textos para os jogadores', () => {
   assert.deepEqual([1, 0.75, 0.5, 0.25, 0.1, 0].map(hpTone), ['ok', 'ok', 'warn', 'bad', 'bad', 'down']);
   assert.deepEqual([1, 0.75, 0.5, 0.25, 0].map(hpLabel), ['Ilesa', 'Ferida', 'Muito ferida', 'Quase derrotada', 'Derrotada']);
+});
+
+test('a moldura das criaturas existe como PNG 400x400 (o criador depende dela)', () => {
+  const png = readFileSync('public/assets/frames/creature-frame.png');
+  assert.equal(png.subarray(1, 4).toString('latin1'), 'PNG');
+  assert.equal(png.readUInt32BE(16), 400);   // largura (chunk IHDR)
+  assert.equal(png.readUInt32BE(20), 400);   // altura
+  assert.ok(png.length < 200 * 1024, 'moldura deveria ser leve');
 });

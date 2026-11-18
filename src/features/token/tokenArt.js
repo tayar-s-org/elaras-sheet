@@ -19,6 +19,15 @@ export const FRAMES = [
   { id: 'none', label: 'Sem moldura', colors: null },
 ];
 
+// Moldura em imagem (criaturas): PNG quadrado com transparência; o retrato fica no buraco central.
+export const FRAME_IMAGE_HOLE = 0.3; // raio do buraco da moldura, em fração do lado do token
+export const loadFrameImage = url => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.onload = () => resolve(img);
+  img.onerror = () => reject(new Error('Não foi possível carregar a moldura.'));
+  img.src = url;
+});
+
 export const defaultDesign = () => ({
   shape: 'circle',
   frame: 'gold',
@@ -81,12 +90,14 @@ export function drawToken(canvas, size, design, image) {
   ctx.clearRect(0, 0, size, size);
   const c = size / 2;
   const R = c - 2; // folga para o antisserrilhado da borda
-  const fw = d.frame === 'none' ? 0 : Math.max(0.02, d.frameWidth / 100) * R;
-  const inner = R - fw;
+  const imgFrame = d.frameImage || null;
+  const shape = imgFrame ? 'circle' : d.shape;
+  const fw = imgFrame || d.frame === 'none' ? 0 : Math.max(0.02, d.frameWidth / 100) * R;
+  const inner = imgFrame ? size * FRAME_IMAGE_HOLE : R - fw;
 
   // Fundo + retrato recortados na forma interna.
   ctx.save();
-  shapePath(ctx, d.shape, c, c, inner);
+  shapePath(ctx, shape, c, c, inner);
   ctx.clip();
   ctx.fillStyle = d.bg;
   ctx.fillRect(0, 0, size, size);
@@ -115,6 +126,12 @@ export function drawToken(canvas, size, design, image) {
     ctx.fillRect(0, 0, size, size);
   }
   ctx.restore();
+
+  // Moldura em imagem: desenhada por cima do retrato, ocupando o token inteiro.
+  if (imgFrame) {
+    ctx.drawImage(imgFrame, 0, 0, size, size);
+    return;
+  }
 
   // Moldura: anel entre a forma externa e a interna (regra even-odd).
   const stroke = frameStyle(ctx, d.frame, size);

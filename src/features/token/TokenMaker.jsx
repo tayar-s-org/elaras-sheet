@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { SHAPES, FRAMES, defaultDesign, drawToken, canvasToBlob } from './tokenArt.js';
+import { SHAPES, FRAMES, defaultDesign, drawToken, canvasToBlob, loadFrameImage } from './tokenArt.js';
 import { TOKEN_SIZE } from '../../lib/tokens.js';
 import { CREATURE_FRAME, CREATURE_BG, parseHp, MAX_HP } from '../../creature.js';
 import './token.css';
 
 const PREVIEW = 320;
+const CREATURE_FRAME_URL = `${import.meta.env.BASE_URL}assets/frames/creature-frame.png`;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_BYTES = 8 * 1024 * 1024;
 const BG_COLORS = ['#2a2a35', '#7a4dff', '#b3382c', '#2e9e5b', '#2f7fd0', '#d9a21b', '#f1ece0', '#000000'];
@@ -26,12 +27,21 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   const patch = p => setDesign(d => ({ ...d, ...p }));
   const [cName, setCName] = useState(creature?.name || '');
   const [cHp, setCHp] = useState(creature?.hp ? String(creature.hp) : '');
+  const [frameImg, setFrameImg] = useState(null);
+  const [frameFailed, setFrameFailed] = useState(false);
+  // Moldura das criaturas: imagem única. Se não carregar, cai na moldura vermelha desenhada.
+  useEffect(() => {
+    if (!creature) return undefined;
+    let alive = true;
+    loadFrameImage(CREATURE_FRAME_URL).then(img => alive && setFrameImg(img)).catch(() => alive && setFrameFailed(true));
+    return () => { alive = false; };
+  }, [Boolean(creature)]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = creature
-    ? { ...design, shape: 'circle', frame: CREATURE_FRAME, frameWidth: 8, double: true, bg: CREATURE_BG, shine: true, initials: initialsOf(cName) }
+    ? { ...design, shape: 'circle', frame: CREATURE_FRAME, frameWidth: 8, double: true, bg: CREATURE_BG, shine: true, initials: initialsOf(cName), frameImage: frameImg || undefined }
     : design;
-  const creatureReady = !creature || (cName.trim().length > 0 && parseHp(cHp) !== null);
+  const creatureReady = !creature || ((frameImg || frameFailed) && cName.trim().length > 0 && parseHp(cHp) !== null);
 
-  useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, shown, image); }, [design, image, creature, cName]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, shown, image); }, [design, image, creature, cName, frameImg]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape' && !busy) onClose(); };
