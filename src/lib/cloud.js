@@ -3,7 +3,7 @@ import { validateCharacter } from '../rules.js';
 
 export class ConflictError extends Error {
   constructor() {
-    super('A ficha mudou na nuvem. Abra a versão mais recente em "Minhas fichas" para comparar.');
+    super('A ficha mudou na nuvem. Feche esta aba e recarregue a página para abrir a versão mais recente.');
     this.name = 'ConflictError';
   }
 }

@@ -36,7 +36,7 @@ export function useAutosave(session, setSession, enabled) {
         } catch (error) {
           if (error instanceof ConflictError) {
             blocked.current.add(sheet.id);
-            setStatus({ state: 'error', message: 'Esta ficha mudou em outro lugar. Feche a aba e abra a versão da nuvem em "Minhas fichas".' });
+            setStatus({ state: 'error', message: 'Esta ficha mudou em outro lugar. Feche esta aba da ficha e recarregue a página (F5): a versão da nuvem abre de novo como aba.' });
           } else {
             failed.current.set(sheet.id, json);
             setTimeout(() => { if (failed.current.get(sheet.id) === json) { failed.current.delete(sheet.id); setRetry(n => n + 1); } }, RETRY);
