@@ -54,7 +54,7 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   return <article className="party-card">
     <div className="party-head">
       <h4>{row.name || 'Sem nome'}</h4>
-      <button type="button" className="outline view-sheet-btn" onClick={() => setViewing(true)}>Ver ficha</button>
+      {canEdit && <button type="button" className="outline view-sheet-btn" onClick={() => setViewing(true)}>Ver ficha</button>}
     </div>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
     <MoneyTag value={row.data?.money} />
@@ -99,6 +99,7 @@ function XpGrant({ tableId, targets, label }) {
 }
 
 export default function PartyPanel({ tableId, me, isGm, members, characters, states, patchState, closed }) {
+  const [picked, setPicked] = useState(null);
   const rows = members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]);
   const mine = rows.filter(m => m.user_id === me);
   const shown = isGm ? rows : rows;
@@ -110,7 +111,21 @@ export default function PartyPanel({ tableId, me, isGm, members, characters, sta
       <MoneyGrant tableId={tableId} targets={moneyTargets} label="Dinheiro para cada um" button="Dar a todos" removeButton="Remover de todos" /></section>}
     {isGm && !closed && playerTargets.length > 1 && <section className="party-card"><h4>XP para todos os jogadores</h4>
       <XpGrant tableId={tableId} targets={playerTargets} label="XP para cada um" /></section>}
-    {[...mine, ...shown.filter(m => m.user_id !== me)].map(m => <CharacterCard key={m.user_id} member={m} row={characters[m.character_id]}
-      state={states[m.character_id]} canEdit={isGm || m.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} />)}
+    {(() => {
+      // Uma aba por ficha da mesa (a sua primeiro), com o primeiro nome do personagem; só a ficha da aba escolhida aparece.
+      const ordered = [...mine, ...shown.filter(m => m.user_id !== me)];
+      const current = ordered.find(m => m.user_id === picked) || ordered[0];
+      const firstName = m => (characters[m.character_id].name || '').trim().split(/\s+/)[0] || (m.profiles?.display_name || 'Jogador').split(/\s+/)[0];
+      return <>
+        <div className="tabs-row party-tabs" role="tablist" aria-label="Fichas da mesa">
+          {ordered.map(m => <button key={m.user_id} type="button" role="tab" aria-selected={m.user_id === current.user_id}
+            className={m.user_id === current.user_id ? 'primary' : 'outline'}
+            title={`${characters[m.character_id].name || 'Sem nome'} · ${m.profiles?.display_name || 'Jogador'}`}
+            onClick={() => setPicked(m.user_id)}>{firstName(m)}{m.user_id === me ? ' (você)' : ''}</button>)}
+        </div>
+        <CharacterCard key={current.user_id} member={current} row={characters[current.character_id]}
+          state={states[current.character_id]} canEdit={isGm || current.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} />
+      </>;
+    })()}
   </div>;
 }

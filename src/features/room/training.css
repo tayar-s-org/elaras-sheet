@@ -145,3 +145,14 @@
 .tr-table td, .tr-table tbody th { line-height: 1.3; }
 .tr-table td.tr-act { padding-top: 1px; padding-bottom: 1px; }
 .tr-table td.tr-act .tr-act-row select, .tr-table td.tr-act .tr-act-row input { padding: 1px 6px; line-height: 1.25; height: auto; }
+
+/* Varias rotinas por jogador e calendario */
+.tr-views { margin: 8px 0 12px; }
+.tr-routines { display: grid; gap: 14px; }
+.tr-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tr-routine { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.tr-routine.on { border-color: var(--accent); background: var(--selection); }
+.tr-routine .tr-badge { margin-left: 0; }
+.tr-editor { display: grid; gap: 10px; }
+.tr-name input { font-size: 1.05rem; font-weight: 700; }
+.tr-delete { margin-left: auto; }

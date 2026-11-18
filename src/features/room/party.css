@@ -8,3 +8,6 @@
 .party-head h4 { min-width: 0; overflow-wrap: anywhere; }
 .view-sheet-btn { flex: none; padding: 4px 12px; font-size: .85rem; }
 .view-owner { font-family: var(--font-body); font-size: .9rem; font-weight: 400; color: var(--muted); }
+
+.party-tabs { margin-bottom: 4px; }
+.party-tabs button { padding: 5px 12px; font-size: .88rem; }

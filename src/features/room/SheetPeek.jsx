@@ -32,7 +32,8 @@ const grouped = list => {
 };
 
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
-export default function SheetPeek({ data, state, onClose }) {
+// limited: visão dos outros jogadores (só nome, descrição e barras de Vida, Stamina e Mana; sem dinheiro nem o resto da ficha).
+export default function SheetPeek({ data, state, onClose, limited = false }) {
   let c, d;
   try { c = validateCharacter(data); d = calculate(c); } catch { return null; }
   const max = safeMaxima(data);
@@ -43,7 +44,7 @@ export default function SheetPeek({ data, state, onClose }) {
     <button type="button" className="peek-close" aria-label="Fechar resumo da ficha" onClick={onClose}>×</button>
     <h4>{c.name || 'Sem nome'}</h4>
     <p className="muted">{[c.race, c.concept, `Nível ${d.level}`, `${c.xp} XP`].filter(Boolean).join(' · ')}</p>
-    <MoneyTag value={c.money} />
+    {!limited && <MoneyTag value={c.money} />}
     <div className="peek-vitals">
       {RESOURCES.map(([k, label]) => {
         const mana = k === 'mana';
@@ -59,6 +60,7 @@ export default function SheetPeek({ data, state, onClose }) {
         </div>;
       })}
     </div>
+    {limited ? null : <>
     <IncapPanel state={state} max={max} baseMovement={d.movement} compact />
     <div className="peek-stats">
       {[['Movimento', effectiveMovement(d.movement, inc.movePenalty)], ['Aparar', d.parry], ['Resistência', d.toughness]].map(([k, v]) => <span key={k}><small>{k}</small><b>{v}</b></span>)}
@@ -89,6 +91,7 @@ export default function SheetPeek({ data, state, onClose }) {
     {c.powers.length > 0 && <>
       <h5>Poderes</h5>
       <div className="peek-pills">{c.powers.map((p, i) => <Pill key={i} label={p.name || 'Sem nome'} value={p.cost} tone="power" />)}</div>
+    </>}
     </>}
   </aside>;
 }
