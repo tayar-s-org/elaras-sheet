@@ -2,7 +2,7 @@ import { supabase } from './supabase.js';
 
 const fail = error => { if (error) throw new Error(error.message || 'Erro ao acessar a nuvem.'); };
 const BOARD_COLS = 'id,table_id,name,map_path,width,height,grid,settings';
-const TOKEN_COLS = 'id,board_id,table_id,kind,name,character_id,x,y,size,color,hidden,image_path';
+const TOKEN_COLS = 'id,board_id,table_id,kind,name,character_id,x,y,size,color,hidden,image_path,meta';
 const MARK_COLS = 'id,board_id,kind,x,y,text,color,created_by';
 
 export const MAP_TYPES = ['image/png', 'image/jpeg', 'image/webp'];

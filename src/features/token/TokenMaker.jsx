@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SHAPES, FRAMES, defaultDesign, drawToken, canvasToBlob } from './tokenArt.js';
 import { TOKEN_SIZE } from '../../lib/tokens.js';
+import { CREATURE_FRAME, CREATURE_BG, parseHp, MAX_HP } from '../../creature.js';
 import './token.css';
 
 const PREVIEW = 320;
@@ -12,7 +13,8 @@ const initialsOf = name => (name || '').trim().split(/\s+/).slice(0, 2).map(w =>
 
 // Criador de tokens: envie um retrato, enquadre, escolha forma/moldura e salve (ou baixe o PNG).
 // onSave(blob) devolve uma promessa; o modal fecha quando ela resolve.
-export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Salvar token' }) {
+// Modo criatura (mestre): moldura, forma e cor são únicas; escolhe-se só nome, foto e vida. onSave(blob, { name, hp }).
+export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Salvar token', creature }) {
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const drag = useRef(null);
@@ -22,8 +24,14 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   const [error, setError] = useState('');
   const [over, setOver] = useState(false);
   const patch = p => setDesign(d => ({ ...d, ...p }));
+  const [cName, setCName] = useState(creature?.name || '');
+  const [cHp, setCHp] = useState(creature?.hp ? String(creature.hp) : '');
+  const shown = creature
+    ? { ...design, shape: 'circle', frame: CREATURE_FRAME, frameWidth: 8, double: true, bg: CREATURE_BG, shine: true, initials: initialsOf(cName) }
+    : design;
+  const creatureReady = !creature || (cName.trim().length > 0 && parseHp(cHp) !== null);
 
-  useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, design, image); }, [design, image]);
+  useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, shown, image); }, [design, image, creature, cName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape' && !busy) onClose(); };
@@ -69,10 +77,10 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
 
   async function render() {
     const out = document.createElement('canvas');
-    drawToken(out, TOKEN_SIZE, design, image);
+    drawToken(out, TOKEN_SIZE, shown, image);
     let blob = await canvasToBlob(out);
     if (blob.size > 900 * 1024) { // limite do bucket e 1 MB: reduz se a foto ficou pesada
-      drawToken(out, Math.round(TOKEN_SIZE * 0.7), design, image);
+      drawToken(out, Math.round(TOKEN_SIZE * 0.7), shown, image);
       blob = await canvasToBlob(out);
     }
     return blob;
@@ -83,7 +91,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
       const url = URL.createObjectURL(await render());
       const a = document.createElement('a');
       a.href = url;
-      a.download = `token-${(name || 'personagem').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-') || 'personagem'}.png`;
+      a.download = `token-${((creature ? cName : name) || 'personagem').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-') || 'personagem'}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setError(e.message); }
@@ -91,13 +99,13 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   async function save() {
     setBusy(true);
     setError('');
-    try { await onSave(await render()); onClose(); } catch (e) { setError(e.message); setBusy(false); }
+    try { await onSave(await render(), creature ? { name: cName.trim(), hp: parseHp(cHp) } : undefined); onClose(); } catch (e) { setError(e.message); setBusy(false); }
   }
 
   const frame = FRAMES.find(f => f.id === design.frame);
   return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
     <div className="modal token-maker" role="dialog" aria-modal="true" aria-labelledby="token-title">
-      <h2 id="token-title">Criador de token</h2>
+      <h2 id="token-title">{creature ? (creature.editing ? 'Editar criatura' : 'Criar criatura') : 'Criador de token'}</h2>
       <div className="token-maker-body">
         <div className="token-stage">
           <div className={`token-drop${over ? ' over' : ''}`}
@@ -113,6 +121,12 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
         </div>
 
         <div className="token-controls">
+          {creature && <div className="form-grid compact token-creature">
+            <label className="field"><span>Nome da criatura</span>
+              <input maxLength={60} value={cName} placeholder="Ex.: Goblin, Dragão Vermelho" onChange={e => setCName(e.target.value)} /></label>
+            <label className="field"><span>Vida</span>
+              <input type="number" min="1" max={MAX_HP} inputMode="numeric" value={cHp} placeholder="Ex.: 30" onChange={e => setCHp(e.target.value)} /></label>
+          </div>}
           <label className="field"><span>Zoom</span>
             <input type="range" min="0.3" max="4" step="0.01" value={design.zoom} disabled={!image} onChange={e => patch({ zoom: Number(e.target.value) })} /></label>
           <label className="field"><span>Rotação ({design.rotate}°)</span>
@@ -122,6 +136,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
             <button type="button" className="text-button" disabled={!image} onClick={() => patch({ zoom: 1, x: 0, y: 0, rotate: 0, flip: false })}>Recentralizar</button>
           </div>
 
+          {creature ? <p className="muted token-fixed">Moldura, forma e cor são as mesmas de todas as criaturas.</p> : <>
           <fieldset className="token-set"><legend>Forma</legend>
             <div className="tabs-row">{SHAPES.map(s => <button key={s.id} type="button" className={design.shape === s.id ? 'primary' : 'outline'} aria-pressed={design.shape === s.id} onClick={() => patch({ shape: s.id })}>{s.label}</button>)}</div>
           </fieldset>
@@ -145,6 +160,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
             {!image && <label className="field"><span>Iniciais (sem imagem)</span>
               <input maxLength={2} value={design.initials} onChange={e => patch({ initials: e.target.value })} /></label>}
           </fieldset>
+          </>}
         </div>
       </div>
       {error && <p role="alert" className="token-error">{error}</p>}
@@ -152,7 +168,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
         <button type="button" className="quiet" disabled={busy} onClick={onClose}>Cancelar</button>
         <span className="token-actions-right">
           <button type="button" className="outline" disabled={busy} onClick={download}>Baixar PNG</button>
-          {onSave && <button type="button" className="primary" disabled={busy || (!image && !design.initials)} onClick={save}>{busy ? 'Salvando…' : saveLabel}</button>}
+          {onSave && <button type="button" className="primary" disabled={busy || !creatureReady || (!creature && !image && !design.initials)} onClick={save}>{busy ? 'Salvando…' : saveLabel}</button>}
         </span>
       </div>
     </div>

@@ -2,7 +2,9 @@ import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo
 import { updateToken, addToken, addMark, removeMark, snapToGrid } from '../../lib/board.js';
 import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
 import TokenMaker from '../token/TokenMaker.jsx';
-import BoardTools from './BoardTools.jsx';
+import MasterModule from './MasterModule.jsx';
+import CreaturePeek from './CreaturePeek.jsx';
+import { creatureOf, metaWithHp, metaWithMaxHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import SheetPeek from './SheetPeek.jsx';
 
 const DiceStage = lazy(() => import('./DiceStage.jsx'));
@@ -41,6 +43,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const [selected, setSelected] = useState(null);
   const [maker, setMaker] = useState(null); // { token } para um token existente, { token: null } para o meu token ainda sem lugar
   const [busy, setBusy] = useState(false);
+  const [masterOpen, setMasterOpen] = useState(false);
   const gesture = useRef(null);
   const lastSend = useRef(0);
 
@@ -189,8 +192,30 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     setError('');
     try { await addMine(null); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
+  // Mestre: cria uma criatura (nome, foto e vida; moldura e cor unicas) ou troca imagem/nome/vida de uma existente.
+  const saveCreature = async (blob, extra) => {
+    const target = maker?.token;
+    const path = await uploadTokenImage(me, blob, target?.image_path && target.image_path.startsWith(`${me}/`) ? target.image_path : '');
+    if (target) {
+      const patch = { name: extra.name, image_path: path, meta: metaWithMaxHp(target, extra.hp) };
+      await updateToken(target.id, patch);
+      local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, ...patch } : t)));
+    } else {
+      const t = await addToken(board, { kind: 'npc', name: extra.name, color: CREATURE_COLOR, size: 1, image_path: path, meta: newCreatureMeta(extra.hp), ...place() });
+      local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev : [...prev, t]));
+      setSelected(t.id);
+    }
+  };
+  const adjustHp = async (token, delta) => {
+    const c = creatureOf(token);
+    if (!c) return;
+    const meta = metaWithHp(token, c.hp + delta);
+    local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, meta } : t)));
+    try { await updateToken(token.id, { meta }); } catch (err) { setError(err.message); local.reloadItems(); }
+  };
   // Envia a imagem do token; atualiza o token existente ou, se ainda nao ha token do jogador, cria um.
-  const saveTokenImage = async blob => {
+  const saveTokenImage = async (blob, extra) => {
+    if (maker?.creature) return saveCreature(blob, extra);
     const target = maker?.token;
     const path = await uploadTokenImage(me, blob, target?.image_path && target.image_path.startsWith(`${me}/`) ? target.image_path : '');
     if (target) {
@@ -230,6 +255,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         {!myToken && <button className="primary" disabled={busy} onClick={placeMine}>Colocar meu token</button>}
         <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken ? 'Trocar imagem do token' : 'Criar token'}</button>
       </div>}
+      {isGm && !closed && <div role="group" aria-label="Mestre" className="tabs-row">
+        <button type="button" className="outline" onClick={() => setMasterOpen(true)}>Módulo do mestre</button>
+      </div>}
     </div>
     <div className="board-wrap">
     <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img"
@@ -247,8 +275,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         const r = (gsize * t.size * tokenScale) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
         const src = imageOf(t);
+        const cr = creatureOf(t);
         return <g key={t.id} data-token={t.id} transform={`translate(${p.x} ${p.y})`}
-          className={`board-token${canMove(t) ? ' movable' : ''}${selected === t.id ? ' selected' : ''}${t.hidden ? ' hidden-token' : ''}`}>
+          className={`board-token${canMove(t) ? ' movable' : ''}${selected === t.id ? ' selected' : ''}${t.hidden ? ' hidden-token' : ''}${cr && cr.hp === 0 ? ' defeated' : ''}`}>
           {src ? <>
             <circle r={r} fill="rgba(0,0,0,0.001)" />
             <image href={src} x={-r - 3} y={-r - 3} width={(r + 3) * 2} height={(r + 3) * 2} pointerEvents="none" preserveAspectRatio="xMidYMid meet" />
@@ -256,18 +285,26 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
             <circle r={r} fill={t.color} stroke={mine ? '#fff' : '#000'} strokeWidth={mine ? 5 : 3} />
             <text textAnchor="middle" dominantBaseline="central" fontSize={r * 0.8} fill="#fff" pointerEvents="none">{initials(t.name)}</text>
           </>}
-          <text y={r + gsize * 0.28} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{t.name}</text>
+          {cr && <g pointerEvents="none">
+            <rect className="hp-track" x={-r} y={r + gsize * 0.05} width={r * 2} height={gsize * 0.11} rx={gsize * 0.05} />
+            <rect className={`hp-fill ${hpTone(cr.ratio)}`} x={-r} y={r + gsize * 0.05} width={Math.max(0, r * 2 * cr.ratio)} height={gsize * 0.11} rx={gsize * 0.05} />
+          </g>}
+          <text y={r + gsize * (cr ? 0.46 : 0.28)} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{t.name}</text>
         </g>;
       })}</g>
     </svg>
     {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek data={characters[sel.character_id].data} state={room.states[sel.character_id]} onClose={() => setSelected(null)} />}
+    {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onClose={() => setSelected(null)} />}
     <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>
     {logSlot}
     {error && <p role="alert" className="muted">{error}</p>}
-    {isGm && <BoardTools board={board} tokens={tokens} marks={marks} members={members} characters={characters}
-      selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} onEditImage={t => setMaker({ token: t })} />}
-    {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
+    {isGm && masterOpen && <MasterModule board={board} tokens={tokens} marks={marks} members={members} characters={characters}
+      selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} onClose={() => setMasterOpen(false)}
+      onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
+      onEditImage={t => { setMasterOpen(false); setMaker({ token: t, creature: Boolean(creatureOf(t)) }); }} />}
+    {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
+      creature={maker.creature ? { name: maker.token?.name || '', hp: creatureOf(maker.token)?.maxHp, editing: Boolean(maker.token) } : undefined}
       onSave={saveTokenImage} onClose={() => setMaker(null)} />}
   </div>;
 }
