@@ -10,6 +10,7 @@ import TableControls from '../tables/TableControls.jsx';
 import TableLog from './TableLog.jsx';
 import { setLastRoom, clearLastRoom } from '../../lib/lastRoom.js';
 import { useBoard } from './useBoard.js';
+import { useLiveCharacters } from './useLiveCharacters.js';
 
 const SETTINGS_KEY = 'elara-dice3d';
 const loadSettings = () => {
@@ -40,7 +41,8 @@ export default function RoomPage({ auth, id }) {
   }, []);
   const room = useRoom(id, auth.user, auth.profile?.display_name || auth.user?.email);
   const boardState = useBoard(id, auth.user, room);
-  const { table, members, messages, rolls, states, characters, online, connected, error } = room;
+  const { table, members, messages, rolls, states, characters: savedCharacters, online, connected, error } = room;
+  const characters = useLiveCharacters(id, members, savedCharacters, Boolean(room.ready));
   // Guarda esta sala como a sessao atual (o menu do topo oferece "Voltar a mesa"); esquece se a pessoa perdeu o acesso.
   const userId = auth.user?.id;
   const approved = members.find(m => m.user_id === userId)?.status === 'approved';
