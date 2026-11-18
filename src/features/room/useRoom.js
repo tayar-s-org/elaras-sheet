@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { getTable, getMembers } from '../../lib/tables.js';
-import { recentMessages, recentRolls, loadStates, loadCharacters } from '../../lib/room.js';
+import { recentMessages, recentRolls, recentStateLog, loadStates, loadCharacters } from '../../lib/room.js';
 
 // Carrega a mesa e mantem mensagens, estados, membros e presenca sincronizados em tempo real.
 export function useRoom(tableId, user, displayName) {
@@ -9,6 +9,7 @@ export function useRoom(tableId, user, displayName) {
   const [members, setMembers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [rolls, setRolls] = useState([]);
+  const [stateLog, setStateLog] = useState([]);
   const [ready, setReady] = useState(false);
   const [states, setStates] = useState({});
   const [characters, setCharacters] = useState({});
@@ -41,14 +42,18 @@ export function useRoom(tableId, user, displayName) {
         const list = await reloadMembers();
         const me = list.find(m => m.user_id === user.id);
         if (!me || me.status !== 'approved') return;
-        const [msgs, st, rl] = await Promise.all([recentMessages(tableId), loadStates(tableId), recentRolls(tableId)]);
+        const [msgs, st, rl, sl] = await Promise.all([recentMessages(tableId), loadStates(tableId), recentRolls(tableId), recentStateLog(tableId)]);
         if (!alive) return;
         setMessages(msgs);
         setStates(st);
         setRolls(rl);
+        setStateLog(sl || []);
         setReady(true);
         channel = supabase.channel(`table:${tableId}`, { config: { private: true, presence: { key: user.id } } });
         channelRef.current = channel;
+        // So assina o historico se a tabela existe (um binding para tabela inexistente derruba o canal inteiro).
+        if (sl) channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_state_log', filter: `table_id=eq.${tableId}` },
+          p => setStateLog(prev => prev.some(x => x.id === p.new.id) ? prev : [...prev, p.new]));
         channel
           .on('presence', { event: 'sync' }, () => setOnline(Object.values(channel.presenceState()).flat()))
           .on('broadcast', { event: 'drag' }, ({ payload }) => (listeners.current.drag || []).forEach(fn => fn(payload)))
@@ -95,5 +100,5 @@ export function useRoom(tableId, user, displayName) {
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
   const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
   const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
-  return { ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
+  return { stateLog, ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

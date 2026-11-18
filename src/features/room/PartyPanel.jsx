@@ -22,7 +22,7 @@ function CharacterCard({ member, row, state, canEdit, tableId, patchState, close
   const max = safeMaxima(row.data);
   const value = k => currentValue(state, max, k);
   async function change(k, v) {
-    const next = { life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v };
+    const next = { life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v, max }; // max permite ao servidor registrar a primeira alteracao
     patchState(row.id, next);
     setError('');
     try { await saveState(tableId, row.id, next); } catch (e) { setError(e.message); }

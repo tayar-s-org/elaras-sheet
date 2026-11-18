@@ -26,6 +26,14 @@ export async function saveState(tableId, characterId, state) {
     .upsert({ table_id: tableId, character_id: characterId, state }, { onConflict: 'table_id,character_id' });
   fail(error);
 }
+// Historico de vida/stamina/mana; devolve null se a tabela ainda nao existe (migration 0007 pendente).
+export async function recentStateLog(tableId, limit = 100) {
+  const { data, error } = await supabase.from('table_state_log')
+    .select('id,character_id,user_id,resource,old_value,new_value,created_at').eq('table_id', tableId)
+    .order('id', { ascending: false }).limit(limit);
+  if (error) return null;
+  return data.reverse();
+}
 export async function loadCharacters(ids) {
   if (!ids.length) return {};
   const { data, error } = await supabase.from('characters').select('id,name,data').in('id', ids);

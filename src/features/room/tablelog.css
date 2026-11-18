@@ -11,3 +11,10 @@
 .log-roll.bad .log-total { color: var(--danger); }
 .log-outcome { font-weight: 600; }
 .log-detail { color: var(--muted); font-size: .82rem; }
+.log-tabs { margin-bottom: 8px; }
+.log-vital { display: block; border-left: 3px solid var(--border); }
+.log-vital.up { border-left-color: var(--success); }
+.log-vital.down { border-left-color: var(--danger); }
+.log-delta { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; vertical-align: -2px; }
+.log-vital.up .log-delta { color: var(--success); }
+.log-vital.down .log-delta { color: var(--danger); }

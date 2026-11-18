@@ -74,7 +74,7 @@ export default function RoomPage({ auth, id }) {
     </aside>
     <section className="room-board" aria-label="Tabuleiro">
       <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating}
-        logSlot={<TableLog messages={messages} rolls={rolls} hidden={hidden} members={members} me={auth.user.id} />} />
+        logSlot={<TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} hidden={hidden} members={members} characters={characters} me={auth.user.id} />} />
     </section>
     <aside className="room-panel">
       <div className="tabs-row" role="tablist">

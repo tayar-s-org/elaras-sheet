@@ -9,7 +9,7 @@ import { makeDieMesh, DIE_COLORS } from '../../dice3d/mesh.js';
 import { describeRoll } from '../../diceRoll.js';
 
 const DURATION = 1900;      // ms de movimento por dado
-const HOLD = 7000;          // ms com os dados pousados antes de sumirem
+const HOLD = 5000;          // ms com os dados e o resultado visíveis antes de sumirem
 const easeOutCubic = p => 1 - (1 - p) ** 3;
 
 function click(audio) {
