@@ -3,7 +3,7 @@ import { creatureOf, hpTone, hpLabel } from '../../creature.js';
 import './master.css';
 
 // Painel ao clicar numa criatura: barra de vida para todos; o mestre vê os números e ajusta a vida com − e +.
-export default function CreaturePeek({ token, isGm, onAdjust, onClose }) {
+export default function CreaturePeek({ token, isGm, onAdjust, onRemove, onClose }) {
   const c = creatureOf(token);
   const [text, setText] = useState('1');
   if (!c) return null;
@@ -27,6 +27,7 @@ export default function CreaturePeek({ token, isGm, onAdjust, onClose }) {
         <input type="number" min="1" max="9999" inputMode="numeric" value={text} onChange={e => setText(e.target.value)}
           onBlur={() => setText(String(amount))} onFocus={e => e.target.select()} /></label>
       <button type="button" className="outline" aria-label={`Dar ${amount} de vida`} disabled={c.hp >= c.maxHp} onClick={() => onAdjust(amount)}>+</button>
+      {onRemove && <button type="button" className="outline creature-delete" aria-label={`Apagar o token ${token.name || 'da criatura'}`} title="Apagar este token do tabuleiro" onClick={onRemove}>🗑</button>}
     </div>}
   </aside>;
 }

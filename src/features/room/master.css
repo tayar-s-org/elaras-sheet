@@ -18,6 +18,7 @@
 .hp-word.warn { color: var(--warning); }
 .hp-word.bad, .hp-word.down { color: var(--danger); }
 .creature-controls { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.creature-delete { margin-left: auto; color: var(--danger); border-color: var(--danger); padding: 6px 10px; }
 .creature-controls input { width: 7ch; padding: 6px 8px; text-align: center; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }
 .hp-track { fill: rgba(0, 0, 0, 0.6); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .hp-fill.ok { fill: #2e9e5b; }
@@ -48,3 +49,9 @@
 .sfx-pads { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
 .sound-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
 .sound-item input[type=text] { flex: 1; min-width: 8ch; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }
+
+/* Botoes de musica (verde) e soundpad (amarelo) ao lado do modulo do mestre */
+.board-toolbar .music-button, .board-toolbar .music-button.outline { background: #2e9e5b; border-color: #2e9e5b; color: #fff; }
+.board-toolbar .music-button:hover, .board-toolbar .music-button.outline:hover { background: #237a46; border-color: #237a46; color: #fff; }
+.board-toolbar .sound-button, .board-toolbar .sound-button.outline { background: #e0b020; border-color: #e0b020; color: #231a00; }
+.board-toolbar .sound-button:hover, .board-toolbar .sound-button.outline:hover { background: #bf9314; border-color: #bf9314; color: #231a00; }

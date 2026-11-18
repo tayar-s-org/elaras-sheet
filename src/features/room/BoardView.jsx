@@ -1,10 +1,11 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { updateToken, addToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
+import { updateToken, removeToken, addToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
 import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
 import MusicPlayer from './MusicPlayer.jsx';
 import SoundBar from './SoundBar.jsx';
+import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
 import { creatureOf, metaWithHp, metaWithMaxHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
@@ -47,6 +48,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const [maker, setMaker] = useState(null); // { token } para um token existente, { token: null } para o meu token ainda sem lugar
   const [busy, setBusy] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
+  const [audioOpen, setAudioOpen] = useState(null);
   const gesture = useRef(null);
   const lastSend = useRef(0);
 
@@ -243,6 +245,15 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, meta } : t)));
     try { await updateToken(token.id, { meta }); } catch (err) { setError(err.message); local.reloadItems(); }
   };
+  // Apaga o token da criatura (so o mestre); pede confirmacao porque nao tem volta.
+  const removeCreature = async token => {
+    if (!window.confirm(`Apagar o token "${token.name || 'da criatura'}" do tabuleiro? Isso não pode ser desfeito.`)) return;
+    try {
+      await removeToken(token.id);
+      local.setTokens(prev => prev.filter(t => t.id !== token.id));
+      setSelected(null);
+    } catch (err) { setError(err.message); local.reloadItems(); }
+  };
   // Envia a imagem do token; atualiza o token existente ou, se ainda nao ha token do jogador, cria um.
   const saveTokenImage = async (blob, extra) => {
     if (maker?.creature) return saveCreature(blob, extra);
@@ -288,6 +299,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </div>}
         {isGm && <div role="group" aria-label="Mestre" className="tabs-row">
           <button type="button" className="outline master-button" onClick={() => setMasterOpen(true)}>Módulo do mestre</button>
+          <button type="button" className="outline music-button" onClick={() => setAudioOpen('music')}>Música</button>
+          <button type="button" className="outline sound-button" onClick={() => setAudioOpen('sound')}>Soundpad</button>
         </div>}
       </div>}
     </div>
@@ -331,13 +344,14 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       })}</g>
     </svg>
     {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek data={characters[sel.character_id].data} state={room.states[sel.character_id]} onClose={() => setSelected(null)} />}
-    {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onClose={() => setSelected(null)} />}
+    {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)} />}
     <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>
     {logSlot}
     {error && <p role="alert" className="muted">{error}</p>}
+    {isGm && audioOpen && <AudioModal kind={audioOpen} board={board} pad={pad} local={local} setError={setError} onClose={() => setAudioOpen(null)} />}
     {isGm && masterOpen && <MasterModule board={board} tokens={tokens} marks={marks} members={members} characters={characters}
-      selected={sel} onSelect={setSelected} room={room} pad={pad} local={local} setError={setError} onClose={() => setMasterOpen(false)}
+      selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} onClose={() => setMasterOpen(false)}
       onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
       onEditImage={t => { setMasterOpen(false); setMaker({ token: t, creature: Boolean(creatureOf(t)) }); }} />}
     {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
