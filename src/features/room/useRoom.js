@@ -14,6 +14,8 @@ export function useRoom(tableId, user, displayName) {
   const [online, setOnline] = useState([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
+  const channelRef = useRef(null);
+  const listeners = useRef({});
   const nameRef = useRef(displayName);
   nameRef.current = displayName;
 
@@ -43,8 +45,12 @@ export function useRoom(tableId, user, displayName) {
         setMessages(msgs);
         setStates(st);
         setRolls(rl);
-        channel = supabase.channel(`table:${tableId}`, { config: { private: true, presence: { key: user.id } } })
+        channel = supabase.channel(`table:${tableId}`, { config: { private: true, presence: { key: user.id } } });
+        channelRef.current = channel;
+        channel
           .on('presence', { event: 'sync' }, () => setOnline(Object.values(channel.presenceState()).flat()))
+          .on('broadcast', { event: 'drag' }, ({ payload }) => (listeners.current.drag || []).forEach(fn => fn(payload)))
+          .on('broadcast', { event: 'board_refresh' }, ({ payload }) => (listeners.current.board_refresh || []).forEach(fn => fn(payload)))
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_messages', filter: `table_id=eq.${tableId}` },
             p => setMessages(prev => prev.some(m => m.id === p.new.id) ? prev : [...prev, p.new]))
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_rolls', filter: `table_id=eq.${tableId}` },
@@ -64,11 +70,16 @@ export function useRoom(tableId, user, displayName) {
           });
       } catch (e) { if (alive) { setError(e.message); setTable(prev => (prev === undefined ? null : prev)); } }
     })();
-    return () => { alive = false; if (channel) supabase.removeChannel(channel); };
+    return () => { alive = false; channelRef.current = null; if (channel) supabase.removeChannel(channel); };
   }, [tableId, user?.id, reloadMembers]);
 
+  const sendBroadcast = useCallback((event, payload) => { channelRef.current?.send({ type: 'broadcast', event, payload }); }, []);
+  const onBroadcast = useCallback((event, fn) => {
+    (listeners.current[event] ||= []).push(fn);
+    return () => { listeners.current[event] = listeners.current[event].filter(f => f !== fn); };
+  }, []);
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
   const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
   const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
-  return { table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
+  return { sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

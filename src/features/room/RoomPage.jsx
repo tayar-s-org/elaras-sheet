@@ -5,10 +5,13 @@ import { useRoom } from './useRoom.js';
 import ChatPanel from './ChatPanel.jsx';
 import PartyPanel from './PartyPanel.jsx';
 import DicePanel, { RollHistory } from './DicePanel.jsx';
+import BoardView from './BoardView.jsx';
+import { useBoard } from './useBoard.js';
 
 export default function RoomPage({ auth, id }) {
   const [tab, setTab] = useState('chat');
   const room = useRoom(id, auth.user, auth.profile?.display_name || auth.user?.email);
+  const boardState = useBoard(id, auth.user, room);
   const { table, members, messages, rolls, states, characters, online, connected, error } = room;
 
   if (auth.loading) return <main className="page"><p className="muted">Verificando sessão…</p></main>;
@@ -43,10 +46,7 @@ export default function RoomPage({ auth, id }) {
       {error && <p role="alert" className="muted">{error}</p>}
     </aside>
     <section className="room-board" aria-label="Tabuleiro">
-      <div className="board-placeholder">
-        <p className="eyebrow">TABULEIRO</p>
-        <p>O mapa compartilhado, os tokens e as ferramentas do mestre chegam na próxima fase.</p>
-      </div>
+      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} />
     </section>
     <aside className="room-panel">
       <div className="tabs-row" role="tablist">
