@@ -27,7 +27,7 @@ export default function SheetSummary({ c, d, save }) {
             ))}
           </div>
           <div className="points">
-            <div className="row" data-deficit={d.remaining < 0}>
+            <div className="row" data-deficit={d.remaining < 0} data-ok={d.remaining === 0}>
               <h3>Pontos de criação</h3>
               <strong
                 className={

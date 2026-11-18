@@ -48,7 +48,7 @@ export default function AuthPage({ auth }) {
       <p role="status" className="muted">{message}</p>
       <button type="button" className="text-button" onClick={() => { setMode(register ? 'login' : 'register'); setMessage(''); }}>
         {register ? 'Já tenho conta' : 'Criar uma conta'}</button>
-      <button type="button" className="text-button" onClick={() => navigate('/')}>← Voltar às fichas</button>
+      <button type="button" className="text-button" onClick={() => navigate('/')}>← Voltar ao início</button>
     </form>
   </main>;
 }

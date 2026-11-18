@@ -22,7 +22,7 @@ export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen }) {
   if (!signedIn) {
     return <section className="server-sheets">
       <div className="sheet-tools">
-        <button className="primary" onClick={() => navigate('/entrar')}>Entrar para salvar na nuvem</button>
+        <button className="primary" onClick={() => { try { sessionStorage.setItem('elara-next', '/fichas'); } catch { /* sem storage */ } navigate('/entrar'); }}>Entrar para salvar na nuvem</button>
         <span className="muted">Suas fichas continuam salvas neste navegador e em PDF.</span>
       </div>
     </section>;

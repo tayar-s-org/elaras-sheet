@@ -9,12 +9,26 @@ function safeMaxima(data) {
   catch { return { life: 0, stamina: 0, mana: 0 }; }
 }
 
-function Counter({ label, value, max, canEdit, onChange }) {
-  return <div className="counter">
-    <span>{label}</span>
-    {canEdit && <button className="outline" aria-label={`Diminuir ${label}`} disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>}
-    <strong>{value}<small>/{max}</small></strong>
-    {canEdit && <button className="outline" aria-label={`Aumentar ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>}
+// Niveis de incapacitacao (Vida/Stamina) e exaustao (Mana) conforme as regras da mesa.
+const level = (cur, max, mana) => {
+  if (max <= 0) return 0;
+  if (mana) return cur <= max * 0.1 ? 3 : cur < max * 0.25 ? 2 : cur <= max / 2 ? 1 : 0;
+  return cur < max * 0.25 ? 2 : cur <= max / 2 ? 1 : 0;
+};
+const LEVEL_TEXT = { normal: ['OK', 'Incapacitação 1', 'Incapacitação 2'], mana: ['OK', 'Exaustão 1', 'Exaustão 2', 'Exaustão 3'] };
+
+function Counter({ id, label, value, max, canEdit, onChange }) {
+  const mana = id === 'mana';
+  const lvl = level(value, max, mana);
+  return <div className="counter-wrap">
+    <div className="counter">
+      <span>{label}</span>
+      <span className={`chip l${lvl}`}>{LEVEL_TEXT[mana ? 'mana' : 'normal'][lvl]}</span>
+      {canEdit && <button className="outline" aria-label={`Diminuir ${label}`} disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>}
+      <strong>{value}<small>/{max}</small></strong>
+      {canEdit && <button className="outline" aria-label={`Aumentar ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>}
+    </div>
+    <div className={`res-bar${mana ? ' mana' : ''}`} aria-hidden="true"><i style={{ width: `${max ? Math.min(100, (value / max) * 100) : 0}%` }} /></div>
   </div>;
 }
 
@@ -31,7 +45,7 @@ function CharacterCard({ member, row, state, canEdit, tableId, patchState, close
   return <article className="party-card">
     <h4>{row.name || 'Sem nome'}</h4>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
-    {RESOURCES.map(([k, label]) => <Counter key={k} label={label} value={value(k)} max={max[k]} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
+    {RESOURCES.map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
     {error && <p role="alert" className="muted">{error}</p>}
   </article>;
 }

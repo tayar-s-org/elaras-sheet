@@ -12,6 +12,7 @@ import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
 import InvitePage from "./features/tables/InvitePage.jsx";
 import RoomPage from "./features/room/RoomPage.jsx";
+import HomePage from "./features/home/HomePage.jsx";
 import Dice from "./Dice.jsx";
 import TopBar from "./features/sheet/TopBar.jsx";
 import SheetSummary from "./features/sheet/SheetSummary.jsx";
@@ -117,12 +118,13 @@ export default function App() {
     }
   }
   const ctx = { c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
-  const page = route === "/entrar" ? <AuthPage auth={auth} />
+  const page = route === "/fichas" ? null
+    : route === "/entrar" ? <AuthPage auth={auth} />
     : route === "/mesas" ? <TablesPage auth={auth} />
     : route.startsWith("/mesa/") ? <TablePage auth={auth} id={route.slice(6)} />
     : route.startsWith("/sala/") ? <RoomPage auth={auth} id={route.slice(6)} />
     : route.startsWith("/convite/") ? <InvitePage auth={auth} code={route.slice(9)} />
-    : null;
+    : <HomePage auth={auth} />;
   if (page) return <><TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} />{page}</>;
   return (
     <>
