@@ -358,7 +358,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </g>;
       })}</g>
     </svg>
-    {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
+    {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
     {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)} />}
     <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>
