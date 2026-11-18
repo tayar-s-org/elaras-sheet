@@ -325,6 +325,7 @@ begin
     m_d := coalesce((ev ->> 'manaDelta')::numeric, 0);
     -- Limites de sanidade de uma hora (o maior custo e 8, a maior recuperacao e 6; mana vai de -2 a +1).
     s_min := -8; m_min := -2; xp_max := 1; is_work := false;
+    select * into jr from public.routine_requests where false; -- registro sempre atribuído (evita erro ao ler campos de um registro vazio)
     if coalesce(ev ->> 'activity', '') = 'trabalhar' and coalesce((ev ->> 'ok')::boolean, true) then
       -- Trabalhar: o trabalho precisa estar aprovado e ser desta ficha; custos e XP nunca passam do que o mestre configurou.
       select * into jr from public.routine_requests where id = nullif(ev -> 'row' ->> 'job', '')::uuid;
