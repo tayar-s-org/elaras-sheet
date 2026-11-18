@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { cloudConfigured } from '../../lib/supabase.js';
-import { navigate } from '../../lib/router.js';
+import { loginThen } from '../../lib/router.js';
 import { createCharacter, updateCharacter, listMine, getCharacter, deleteCharacter } from '../../lib/cloud.js';
 
-export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen }) {
+export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen, status }) {
   const [list, setList] = useState([]);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const cloud = sheet.cloud;
   const dirty = cloud && JSON.stringify(sheet.character) !== cloud.base;
   const signedIn = Boolean(auth.user);
@@ -15,14 +15,14 @@ export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen }) {
   async function refresh() {
     try { setList(await listMine()); } catch (e) { setMessage(e.message); }
   }
-  useEffect(() => { if (expanded && signedIn) refresh(); }, [expanded, signedIn]);
+  useEffect(() => { if (expanded && signedIn) refresh(); }, [expanded, signedIn, cloud?.id, cloud?.revision]);
 
   if (!cloudConfigured) return null;
   if (auth.loading) return <section className="server-sheets"><p className="muted">Verificando sessão…</p></section>;
   if (!signedIn) {
     return <section className="server-sheets">
       <div className="sheet-tools">
-        <button className="primary" onClick={() => { try { sessionStorage.setItem('elara-next', '/fichas'); } catch { /* sem storage */ } navigate('/entrar'); }}>Entrar para salvar na nuvem</button>
+        <button className="primary" onClick={() => loginThen('/fichas')}>Entrar para salvar na nuvem</button>
         <span className="muted">Suas fichas continuam salvas neste navegador e em PDF.</span>
       </div>
     </section>;
@@ -63,12 +63,10 @@ export default function CloudSheets({ auth, sheet, sheets, onSaved, onOpen }) {
 
   return <section className="server-sheets">
     <div className="sheet-tools">
-      <span className="muted">{auth.profile?.display_name || auth.user.email}</span>
-      <button className="primary" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar na nuvem'}</button>
+      <button className="primary" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar agora'}</button>
       <button className="outline" disabled={busy} onClick={saveAll}>Enviar todas as abas</button>
       <button className="outline" aria-expanded={expanded} onClick={() => setExpanded(v => !v)}>Minhas fichas</button>
-      <button className="quiet" onClick={() => auth.signOut()}>Sair</button>
-      {cloud && <span className="muted">Na nuvem · versão {cloud.revision}{dirty ? ' · alterações locais pendentes' : ''}</span>}
+      <span className={`save-status ${status?.state || 'idle'}`} role="status">{status?.state === 'saving' ? 'Salvando…' : status?.state === 'error' ? status.message : dirty ? 'Alterações serão salvas sozinhas…' : cloud ? `Salvo na nuvem · versão ${cloud.revision}` : 'Ficha em branco (salva ao editar)'}</span>
     </div>
     <p role="status" className="muted">{message}</p>
     {expanded && <div className="cloud-list">

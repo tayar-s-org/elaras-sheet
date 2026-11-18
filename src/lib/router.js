@@ -12,3 +12,9 @@ export function useHashRoute() {
   return route;
 }
 export const navigate = path => { window.location.hash = path; };
+
+// Vai para o login e volta para `next` depois de entrar.
+export function loginThen(next = '/') {
+  try { sessionStorage.setItem('elara-next', next); } catch { /* sem storage: volta ao inicio */ }
+  navigate('/entrar');
+}

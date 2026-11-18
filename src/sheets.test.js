@@ -56,7 +56,7 @@ test('fechar aba seleciona vizinha e sempre mantém uma ficha utilizável',()=>{
 test('ficha da nuvem mantém vínculo, não duplica abas e sobrevive ao recarregamento',()=>{
   const id='22222222-2222-4222-8222-222222222222';
   const row={id,revision:3,character:elaraCharacter()};
-  let s=openCloudSheet(openSheet({sheets:[],activeId:''},newCharacter(),'a'),row);
+  let s=openCloudSheet(openSheet({sheets:[],activeId:''},{...newCharacter(),name:'Base'},'a'),row);
   assert.equal(s.sheets.length,2);
   assert.equal(s.sheets[1].cloud.id,id);
   const opened=s.activeId;
@@ -73,4 +73,16 @@ test('ficha da nuvem mantém vínculo, não duplica abas e sobrevive ao recarreg
   assert.equal(s.sheets[1].cloud.revision,6);
   const data=new Map([[SHEETS_STORAGE,JSON.stringify(s)]]);
   assert.deepEqual(restoreSheets({getItem:k=>data.get(k)??null}),s);
+});
+
+test('abrir ficha da nuvem substitui a única aba em branco',()=>{
+  const id='33333333-3333-4333-8333-333333333333';
+  const row={id,revision:2,character:{...elaraCharacter(),name:'Da nuvem'}};
+  let s=openCloudSheet(openSheet({sheets:[],activeId:''},newCharacter(),'a'),row);
+  assert.equal(s.sheets.length,1);
+  assert.equal(s.sheets[0].id,'a');
+  assert.equal(s.sheets[0].character.name,'Da nuvem');
+  assert.equal(s.sheets[0].cloud.id,id);
+  s=openCloudSheet(openSheet({sheets:[],activeId:''},{...newCharacter(),name:'Rascunho'},'b'),row);
+  assert.equal(s.sheets.length,2);
 });

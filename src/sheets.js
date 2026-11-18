@@ -19,6 +19,9 @@ export function openCloudSheet(session,row) {
   const existing=session.sheets.find(s=>s.cloud?.id===row.id);
   const cloud={id:row.id,revision:row.revision,base:JSON.stringify(row.character)};
   if(existing) return {...session,activeId:existing.id,sheets:session.sheets.map(s=>s.id===existing.id && JSON.stringify(s.character)===s.cloud.base?{...s,character:row.character,cloud}:s)};
+  // Uma unica aba em branco e intocada e substituida em vez de ficar sobrando ao lado.
+  const only=session.sheets.length===1 && !session.sheets[0].cloud && JSON.stringify(session.sheets[0].character)===JSON.stringify(newCharacter());
+  if(only) return {...session,activeId:session.sheets[0].id,sheets:[{...session.sheets[0],character:row.character,cloud}]};
   const next=openSheet(session,row.character);
   return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,cloud}:s)};
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { navigate } from '../../lib/router.js';
+import { navigate, loginThen } from '../../lib/router.js';
 import { cloudConfigured } from '../../lib/supabase.js';
 import { listMine } from '../../lib/cloud.js';
 import { myMemberships, STATUS_LABEL } from '../../lib/tables.js';
@@ -118,6 +118,8 @@ export default function HomePage({ auth }) {
   const [step, setStep] = useState(0);
   const loggedIn = Boolean(auth.user);
   const cur = STEPS[step];
+  const goSheets = () => (cloudConfigured && !loggedIn ? loginThen('/fichas') : navigate('/fichas'));
+  const go = path => (path === '/fichas' ? goSheets() : navigate(path));
   return <main className="home">
     <section className="hero">
       <div className="hero-copy">
@@ -125,10 +127,10 @@ export default function HomePage({ auth }) {
         <h1>Sua mesa de RPG, <em>onde você estiver</em></h1>
         <p className="lead">Fichas de Savage Worlds, salas em tempo real, dados que ninguém pode forjar e um tabuleiro para o grupo inteiro. Tudo no navegador, sem instalar nada.</p>
         <div className="cta-row">
-          <button className="primary big" onClick={() => navigate('/fichas')}>{loggedIn ? 'Abrir minhas fichas' : 'Criar minha ficha'}</button>
+          <button className="primary big" onClick={goSheets}>{loggedIn ? 'Abrir minhas fichas' : 'Criar minha ficha'}</button>
           {cloudConfigured && (loggedIn
             ? <button className="outline big" onClick={() => navigate('/mesas')}>Minhas mesas</button>
-            : <button className="outline big" onClick={() => navigate('/entrar')}>Entrar ou criar conta</button>)}
+            : <button className="outline big" onClick={() => loginThen('/')}>Entrar ou criar conta</button>)}
         </div>
         <ul className="hero-facts" aria-label="Destaques">
           <li><b>Grátis</b><span>sem instalar</span></li>
@@ -151,7 +153,7 @@ export default function HomePage({ auth }) {
         </div>
         <div className="step-panel" role="tabpanel" key={step}>
           <p>{cur.text}</p>
-          <button className="primary" onClick={() => navigate(cur.go)}>{cur.cta} →</button>
+          <button className="primary" onClick={() => go(cur.go)}>{cur.cta} →</button>
         </div>
       </Reveal>
     </section>
@@ -164,7 +166,7 @@ export default function HomePage({ auth }) {
             <span className="rune" aria-hidden="true">{f.rune}</span>
             <h3>{f.title}</h3>
             <p>{f.text}</p>
-            <button className="text-button" onClick={() => navigate(f.go)}>{f.cta} →</button>
+            <button className="text-button" onClick={() => go(f.go)}>{f.cta} →</button>
           </article>
         </Reveal>)}
       </div>
@@ -174,8 +176,8 @@ export default function HomePage({ auth }) {
       <h2>Chame o grupo. A mesa está posta.</h2>
       <p>Crie sua conta em segundos e monte a primeira sala hoje.</p>
       <div className="cta-row">
-        <button className="primary big" onClick={() => navigate(loggedIn ? '/mesas' : '/entrar')}>{loggedIn ? 'Criar uma mesa' : 'Começar agora'}</button>
-        <button className="outline big" onClick={() => navigate('/fichas')}>Só quero a ficha</button>
+        <button className="primary big" onClick={() => (loggedIn ? navigate('/mesas') : loginThen('/mesas'))}>{loggedIn ? 'Criar uma mesa' : 'Começar agora'}</button>
+        <button className="outline big" onClick={goSheets}>Ver as fichas</button>
       </div>
     </Reveal>
     <footer className="home-foot muted">Crônicas de Manrakora · ficha e mesa para Savage Worlds</footer>

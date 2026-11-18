@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
 import { exportPdf, importPdf } from "./pdf.js";
-import { SHEETS_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, setCloud } from "./sheets.js";
+import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, setCloud } from "./sheets.js";
 import SheetTabs from "./SheetTabs.jsx";
 import MasterView from "./MasterView.jsx";
 import CloudSheets from "./features/library/CloudSheets.jsx";
 import AuthPage from "./features/auth/AuthPage.jsx";
 import { useAuth } from "./features/auth/useAuth.js";
-import { useHashRoute } from "./lib/router.js";
+import { useHashRoute, navigate, loginThen } from "./lib/router.js";
+import { cloudConfigured } from "./lib/supabase.js";
+import { useAutosave } from "./features/library/useAutosave.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
 import InvitePage from "./features/tables/InvitePage.jsx";
@@ -49,6 +51,7 @@ export default function App() {
   const activeId = session.activeId;
   const auth = useAuth();
   const route = useHashRoute();
+  const autosave = useAutosave(session, setSession, Boolean(auth.user));
   const c = session.sheets.find(s => s.id === activeId).character;
   const setC = value => setSession(prev => editSheet(prev, activeId, value));
   const [master, setMaster] = useState(false);
@@ -117,19 +120,35 @@ export default function App() {
       setToast("Não foi possível gerar o PDF. " + error.message);
     }
   }
+  async function signOut() {
+    await auth.signOut();
+    // As fichas ficam na conta; limpa os rascunhos deste navegador para o proximo usuario.
+    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); } catch { /* sem storage */ }
+    setSession(restoreSheets({ getItem: () => null }));
+    setMaster(false);
+    setTab(0);
+    navigate("/");
+  }
   const ctx = { c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
-  const page = route === "/fichas" ? null
+  const sheetsLocked = cloudConfigured && route === "/fichas" && !auth.user;
+  const topbar = <TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} auth={auth} onSignOut={signOut} />;
+  const page = route === "/fichas" ? (sheetsLocked ? <main className="page">
+      <p className="eyebrow">SUAS FICHAS</p>
+      <h1>Entre para criar suas fichas</h1>
+      <p className="muted">{auth.loading ? "Verificando sessão…" : "Cada ficha pertence à sua conta e fica salva na nuvem, para você abrir em qualquer aparelho e levar às suas mesas."}</p>
+      {!auth.loading && <div className="cta-row"><button className="primary" onClick={() => loginThen("/fichas")}>Entrar ou criar conta</button><button className="outline" onClick={() => navigate("/")}>Voltar ao início</button></div>}
+    </main> : null)
     : route === "/entrar" ? <AuthPage auth={auth} />
     : route === "/mesas" ? <TablesPage auth={auth} />
     : route.startsWith("/mesa/") ? <TablePage auth={auth} id={route.slice(6)} />
     : route.startsWith("/sala/") ? <RoomPage auth={auth} id={route.slice(6)} />
     : route.startsWith("/convite/") ? <InvitePage auth={auth} code={route.slice(9)} />
     : <HomePage auth={auth} />;
-  if (page) return <><TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} />{page}</>;
+  if (page) return <>{topbar}{page}</>;
   return (
     <>
-      <TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} />
-      <CloudSheets auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} sheets={session.sheets}
+      {topbar}
+      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} sheets={session.sheets}
         onSaved={(id,row)=>setSession(prev=>setCloud(prev,id,row))}
         onOpen={row=>{setSession(prev=>openCloudSheet(prev,row));setMaster(false);setTab(0);}} />
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}

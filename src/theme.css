@@ -172,3 +172,12 @@ input, select, textarea { font-family: inherit; }
 .auth-card { border-radius: var(--radius); }
 .auth-card h1 { font-size: 2rem; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+.user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px 3px 4px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); }
+.user-chip .avatar { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--gold-soft); color: var(--gold); font-family: var(--font-display); font-weight: 700; }
+.user-name { max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 0.92rem; }
+.save-status { font-size: 0.86rem; color: var(--muted); }
+.save-status.saving { color: var(--warning); }
+.save-status.saved { color: var(--success); }
+.save-status.error { color: var(--danger); }
+@media (max-width: 760px) { .user-name { display: none; } }
