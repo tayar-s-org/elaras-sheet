@@ -10,14 +10,25 @@ import {
 
 // Escolha da ficha que representa a pessoa nesta mesa (vale para jogadores e para o mestre que quer jogar).
 function CharacterPicker({ table, me, reload, run }) {
-  const [characters, setCharacters] = useState([]);
-  // Só entram as fichas desta mesa ou as antigas, sem mesa (que passam a ser desta).
-  useEffect(() => { listMine().then(list => setCharacters(list.filter(c => !c.table_id || c.table_id === table.id))).catch(() => {}); }, [table.id]);
-  return <label className="field"><span>Sua ficha nesta mesa</span>
-    <select value={me.character_id || ''} onChange={e => run(async () => { await setMemberCharacter(table.id, e.target.value || null); await reload(); })}>
-      <option value="">Nenhuma</option>
-      {characters.map(c => <option key={c.id} value={c.id}>{c.name || 'Sem nome'}</option>)}
-    </select></label>;
+  const [all, setAll] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => { listMine().then(setAll).catch(e => { setAll([]); setError(e.message || 'Não foi possível carregar suas fichas.'); }); }, [table.id]);
+  // Só entram as fichas desta mesa ou as antigas, sem mesa (que passam a ser desta). As de outra mesa aparecem desativadas, para explicar a ausência.
+  const usable = (all || []).filter(c => !c.table_id || c.table_id === table.id);
+  const elsewhere = (all || []).filter(c => c.table_id && c.table_id !== table.id);
+  return <>
+    <label className="field"><span>Sua ficha nesta mesa</span>
+      <select value={me.character_id || ''} onChange={e => run(async () => { await setMemberCharacter(table.id, e.target.value || null); await reload(); })}>
+        <option value="">Nenhuma</option>
+        {usable.map(c => <option key={c.id} value={c.id}>{c.name || 'Sem nome'}</option>)}
+        {elsewhere.map(c => <option key={c.id} value={c.id} disabled>{c.name || 'Sem nome'} (criada para a mesa {c.tables?.name || 'outra mesa'})</option>)}
+      </select></label>
+    {error && <p role="alert" className="muted">{error}</p>}
+    {all && !usable.length && !error && <p className="muted">
+      {all.length ? 'Suas fichas foram criadas para outras mesas e não podem ser usadas aqui. Crie uma ficha nova para esta mesa na tela de fichas.'
+        : 'Você ainda não tem fichas salvas na sua conta. Crie uma ficha e aguarde o salvamento automático; ela aparece aqui.'}
+    </p>}
+  </>;
 }
 
 function GmPanel({ table, me, members, reload, run }) {
