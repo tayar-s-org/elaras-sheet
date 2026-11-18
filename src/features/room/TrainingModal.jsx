@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { calculate, validateCharacter } from '../../rules.js';
-import { loadRoutines, saveRoutine, loadRoutineStatuses, submitRoutine, setRoutineStatus, TRAINING_STATUS } from '../../lib/training.js';
+import { loadRoutines, saveRoutine, loadRoutineStatuses, loadReturnNotes, submitRoutine, setRoutineStatus, TRAINING_STATUS } from '../../lib/training.js';
 import {
-  ACTIVITIES, emptyRoutine, normalizeRoutine, simulateRoutine, maxMeditations, maxPracticeHours,
+  ACTIVITIES, averageRoll, emptyRoutine, normalizeRoutine, simulateRoutine, maxMeditations, maxPracticeHours,
   MANA_IMPROVEMENT_POINTS, blockedReason,
 } from '../../training/routine.js';
 import '../sheet/modules.css';
@@ -18,8 +18,8 @@ function statsOf(data) {
   try {
     const c = validateCharacter(data);
     const d = calculate(c);
-    return { maxStamina: d.stamina, maxMana: d.mana, spirit: c.attributes.Espírito, conjurar: c.skills.Conjurar || 0 };
-  } catch { return { maxStamina: 0, maxMana: 0, spirit: 4, conjurar: 0 }; }
+    return { maxStamina: d.stamina, maxMana: d.mana, spirit: c.attributes.Espírito, conjurar: c.skills.Conjurar || 0, meditar: c.skills.Meditar || 0 };
+  } catch { return { maxStamina: 0, maxMana: 0, spirit: 4, conjurar: 0, meditar: 0 }; }
 }
 
 function Rules({ stats }) {
@@ -36,15 +36,18 @@ function Rules({ stats }) {
 }
 
 // Rotina de treino: uma planilha por jogador com o que o personagem faz a cada hora entre as sessões.
-export default function TrainingModal({ tableId, me, isGm, members, characters, closed, onClose }) {
+export default function TrainingModal({ tableId, me, isGm, initial, members, characters, closed, onClose }) {
   const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]), [members, characters]);
-  const [selected, setSelected] = useState(() => (roster.some(m => m.user_id === me) ? me : roster[0]?.user_id));
+  const [selected, setSelected] = useState(() => (initial && roster.some(m => m.user_id === initial) ? initial : roster.some(m => m.user_id === me) ? me : roster[0]?.user_id));
   const [routines, setRoutines] = useState({}); // user_id -> rotina (a minha fica aqui também)
   const [available, setAvailable] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState('');
   const [statuses, setStatuses] = useState(null); // aprovação por jogador; null = migration 0017 pendente
   const [approvalBusy, setApprovalBusy] = useState(false);
+  const [notes, setNotes] = useState({});
+  const [returning, setReturning] = useState(false);
+  const [returnText, setReturnText] = useState('');
   const dirty = useRef(false);
 
   useEffect(() => {
@@ -57,8 +60,9 @@ export default function TrainingModal({ tableId, me, isGm, members, characters, 
   useEffect(() => {
     let alive = true;
     const pull = async () => {
-      const [all, st] = await Promise.all([loadRoutines(tableId), loadRoutineStatuses(tableId)]);
+      const [all, st, nt] = await Promise.all([loadRoutines(tableId), loadRoutineStatuses(tableId), loadReturnNotes(tableId)]);
       if (!alive) return;
+      setNotes(nt);
       setStatuses(prev => (dirty.current && prev ? { ...st, [me]: prev[me] } : st));
       if (all === null) { setAvailable(false); setLoaded(true); return; }
       setAvailable(true);
@@ -116,12 +120,16 @@ export default function TrainingModal({ tableId, me, isGm, members, characters, 
     setStatus('Enviada para o mestre');
     setStatuses(prev => ({ ...(prev || {}), [me]: 'pending' }));
   });
-  const review = next => act(async () => {
-    await setRoutineStatus(tableId, selected, next);
+  const review = (next, note) => act(async () => {
+    await setRoutineStatus(tableId, selected, next, note);
     setStatuses(prev => ({ ...(prev || {}), [selected]: next }));
+    setNotes(prev => { const copy = { ...prev }; if (note && note.trim()) copy[selected] = note.trim(); else delete copy[selected]; return copy; });
+    setReturning(false);
+    setReturnText('');
   });
   const shown = statuses ? (statuses[selected] || 'draft') : null;
   const owner = selected === me;
+  useEffect(() => { setReturning(false); setReturnText(''); }, [selected]);
 
   return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="mod-editor training-modal" role="dialog" aria-modal="true" aria-labelledby="training-title">
@@ -146,13 +154,22 @@ export default function TrainingModal({ tableId, me, isGm, members, characters, 
               {owner && editable && shown === 'draft' && <button type="button" className="primary" disabled={approvalBusy} onClick={submit}>Enviar para aprovação</button>}
               {owner && editable && shown === 'pending' && <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Retirar envio</button>}
               {owner && shown === 'approved' && <span className="muted">Aprovada pelo mestre. Se você editar, volta a rascunho.</span>}
-              {isGm && !owner && shown === 'pending' && <>
+              {isGm && shown === 'pending' && !returning && <>
                 <button type="button" className="primary" disabled={approvalBusy} onClick={() => review('approved')}>Aprovar</button>
-                <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Devolver ao jogador</button>
+                <button type="button" className="outline" disabled={approvalBusy} onClick={() => setReturning(true)}>Devolver ao jogador</button>
               </>}
-              {isGm && !owner && shown === 'approved' && <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Revogar aprovação</button>}
-              {isGm && !owner && shown === 'draft' && <span className="muted">O jogador ainda não enviou para aprovação.</span>}
+              {isGm && shown === 'approved' && !returning && <button type="button" className="outline" disabled={approvalBusy} onClick={() => setReturning(true)}>Revogar aprovação</button>}
+              {isGm && !owner && shown === 'draft' && <span className="muted">{notes[selected] ? 'Devolvida ao jogador.' : 'O jogador ainda não enviou para aprovação.'}</span>}
             </div>}
+            {shown && isGm && returning && <div className="tr-return">
+              <label className="field"><span>Por que está devolvendo? (o jogador vai ler)</span>
+                <textarea rows={3} maxLength={500} value={returnText} autoFocus onChange={e => setReturnText(e.target.value)} placeholder="Ex.: 8h de treino físico seguidas passam do limite; ajuste a partir das 14h." /></label>
+              <div className="tr-approval">
+                <button type="button" className="primary" disabled={approvalBusy || !returnText.trim()} onClick={() => review('draft', returnText)}>Devolver com este texto</button>
+                <button type="button" className="outline" disabled={approvalBusy} onClick={() => { setReturning(false); setReturnText(''); }}>Cancelar</button>
+              </div>
+            </div>}
+            {shown === 'draft' && notes[selected] && <p className="callout tr-note" role="note"><b>Devolvida pelo mestre:</b> {notes[selected]}</p>}
             <div className="tr-head">
               <label className="field"><span>Data do período</span>
                 <input value={routine.period} maxLength={60} disabled={!editable} placeholder="Ex.: Dia 3 da semana" onChange={e => edit({ period: e.target.value })} /></label>
@@ -162,8 +179,12 @@ export default function TrainingModal({ tableId, me, isGm, members, characters, 
                 <input type="number" min="0" max={stats.maxStamina} disabled={!editable} value={routine.startStamina ?? stats.maxStamina} onChange={e => edit({ startStamina: e.target.value === '' ? null : Number(e.target.value) })} /></label>
               <label className="field"><span>Mana inicial (máx. {stats.maxMana})</span>
                 <input type="number" min="0" max={stats.maxMana} disabled={!editable} value={routine.startMana ?? stats.maxMana} onChange={e => edit({ startMana: e.target.value === '' ? null : Number(e.target.value) })} /></label>
-              <label className="field"><span>Rolagem de Meditar (0 a 12)</span>
-                <input type="number" min="0" max="12" disabled={!editable} value={routine.meditRoll} onChange={e => edit({ meditRoll: Number(e.target.value) })} /></label>
+              <div className="field"><span>Rolagem de Meditar (0 a 12)</span>
+                <div className="tr-roll-row">
+                <input type="number" min="0" max="12" disabled={!editable || routine.meditAvg} value={routine.meditAvg ? sim.roll : routine.meditRoll} onChange={e => edit({ meditRoll: Number(e.target.value) })} />
+                <label className="check tr-avg" title="Em vez de rolar, usa o valor médio do dado de Meditar da ficha (sem explosão)">
+                  <input type="checkbox" checked={routine.meditAvg} disabled={!editable} onChange={e => edit({ meditAvg: e.target.checked })} /> Usar média{routine.meditAvg ? ` (${stats.meditar ? `d${stats.meditar}` : 'd4−2'})` : ''}</label>
+                </div></div>
               <label className="check tr-fed"><input type="checkbox" checked={routine.fed} disabled={!editable} onChange={e => edit({ fed: e.target.checked })} /> Alimentado (necessário para recuperar fadiga)</label>
             </div>
 
@@ -179,21 +200,21 @@ export default function TrainingModal({ tableId, me, isGm, members, characters, 
 
             <div className="tr-scroll">
               <table className="tr-table">
-                <thead><tr><th>Hora</th><th>Estm.</th><th>Mana</th><th>Atividade</th><th>Efeitos</th><th>V.E.</th><th>V.M.</th></tr></thead>
+                <thead><tr><th>Hora</th><th>Estamina</th><th>Mana</th><th>Atividades</th><th>Efeitos</th><th>Valor de estamina</th><th>Valor de mana</th></tr></thead>
                 <tbody>
                   {sim.rows.map((row, i) => <tr key={row.hour} className={`${row.a ? 'on' : ''}${row.blocked ? ' blocked' : ''}`}>
                     <th scope="row">{row.hour}</th>
-                    <td className="tr-estm">{fmt(row.stamina)}{row.incap > 0 && <small className={`tr-level l${row.incap}`}>Incapacitação {row.incap}</small>}</td>
-                    <td>{fmt(row.mana)}{row.exhaustion > 0 && <small className={`tr-level l${row.exhaustion}`}>Exaustão {row.exhaustion}</small>}</td>
+                    <td className="tr-estm">{fmt(row.stamina)}{row.incap > 0 && <small className={`tr-level l${row.incap}`} title={`Incapacitação ${row.incap}`}>Incap. {row.incap}</small>}</td>
+                    <td>{fmt(row.mana)}{row.exhaustion > 0 && <small className={`tr-level l${row.exhaustion}`} title={`Exaustão ${row.exhaustion}`}>Exaust. {row.exhaustion}</small>}</td>
                     <td className="tr-act">
-                      {editable ? <>
-                        <select aria-label={`Atividade às ${row.hour}`} value={row.a} onChange={e => editRow(i, { a: e.target.value })}>{ACTIVITIES.map(a => <option key={a.id} value={a.id} disabled={a.id !== row.a && Boolean(blockedReason(a.id, row.staminaBefore, row.manaBefore))}>{a.label}</option>)}</select>
-                        <input aria-label={`Observação às ${row.hour}`} value={row.n} maxLength={200} placeholder="O que o personagem faz" onChange={e => editRow(i, { n: e.target.value })} />
-                      </> : <>
+                      {editable ? <div className="tr-act-row">
+                        <select aria-label={`Atividade às ${row.hour}`} title={ACTIVITIES.find(x => x.id === row.a)?.label} value={row.a} onChange={e => editRow(i, { a: e.target.value })}>{ACTIVITIES.map(a => <option key={a.id} value={a.id} disabled={a.id !== row.a && Boolean(blockedReason(a.id, row.staminaBefore, row.manaBefore))}>{a.label}</option>)}</select>
+                        <input aria-label={`Observação às ${row.hour}`} value={row.n} maxLength={200} placeholder="Observação" onChange={e => editRow(i, { n: e.target.value })} />
+                      </div> : <>
                         <b>{row.a ? ACTIVITIES.find(a => a.id === row.a)?.label : ''}</b>{row.n && <span> {row.n}</span>}
                       </>}
                     </td>
-                    <td className="tr-effect">{row.effect}</td>
+                    <td className="tr-effect" title={row.effect}>{row.effect}</td>
                     <td className={row.ve < 0 ? 'neg' : row.ve > 0 ? 'pos' : ''}>{signed(row.ve)}</td>
                     <td className={row.vm < 0 ? 'neg' : row.vm > 0 ? 'pos' : ''}>{signed(row.vm)}</td>
                   </tr>)}

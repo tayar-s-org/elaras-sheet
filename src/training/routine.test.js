@@ -105,3 +105,15 @@ test('estamina ou mana em 1 bloqueia atividades que as consomem', async () => {
   assert.equal(sim.rows[0].exhaustion, 3);            // mana 1 de 10: no limite de 10%
   assert.equal(sim.warnings.length, 2);
 });
+
+test('Usar média: a rolagem de Meditar vira a média do dado da ficha', async () => {
+  const { averageRoll, simulateRoutine, emptyRoutine } = await import('./routine.js');
+  assert.deepEqual([4, 6, 8, 10, 12].map(averageRoll), [2.5, 3.5, 4.5, 5.5, 6.5]);
+  assert.equal(averageRoll(0), 0.5);
+  const routine = { ...emptyRoutine(), meditRoll: 12, meditAvg: true };
+  const stats = { maxStamina: 10, maxMana: 10, spirit: 6, conjurar: 4, meditar: 8 };
+  const sim = simulateRoutine(routine, stats);
+  assert.equal(sim.roll, 4.5);
+  assert.equal(sim.rate, Math.round(100 / (4 - 4.5 / 4)) / 100);          // usa a média, não os 12 digitados
+  assert.equal(simulateRoutine({ ...routine, meditAvg: false }, stats).roll, 12);
+});

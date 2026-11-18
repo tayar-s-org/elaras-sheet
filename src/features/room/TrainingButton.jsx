@@ -16,7 +16,7 @@ export default function TrainingButton({ tableId, me, isGm, members, characters,
   }, [refresh]);
   useEffect(() => { if (!open) refresh(); }, [open, refresh]);
 
-  const pending = statuses ? Object.entries(statuses).filter(([uid, s]) => s === 'pending' && (isGm ? uid !== me : false)).length : 0;
+  const pending = statuses ? Object.entries(statuses).filter(([, s]) => s === 'pending' && isGm).length : 0;
   const mine = statuses?.[me];
   let badge = null;
   if (isGm && pending > 0) badge = <span className="tr-badge pending">{pending} pendente{pending > 1 ? 's' : ''}</span>;

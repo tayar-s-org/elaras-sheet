@@ -9,8 +9,8 @@ export const HOURS = [...Array.from({ length: 23 }, (_, i) => `${String(i + 1).p
 export const ACTIVITIES = [
   { id: '', label: '—' },
   { id: 'fisico', label: 'Treino físico' },
-  { id: 'estudo', label: 'Estudo mágico' },
-  { id: 'pratica', label: 'Prática mágica' },
+  { id: 'estudo', label: 'Estudo mágico (Criar novo feitiço ou novo conhecimento)' },
+  { id: 'pratica', label: 'Prática mágica (Aprimorar feitiços atuais)' },
   { id: 'meditar', label: 'Meditação' },
   { id: 'aprimorar', label: 'Aprimoramento de mana' },
   { id: 'descanso', label: 'Descanso completo (dormir)' },
@@ -33,6 +33,9 @@ export function meditationRate(roll) {
   const x = Math.min(12, Math.max(0, Number(roll) || 0));
   return 1 / (4 - x / 4);
 }
+// Média simples do dado de Meditar (sem explosão): d4 = 2,5 · d6 = 3,5 · d8 = 4,5 · d10 = 5,5 · d12 = 6,5.
+// Sem treino (die 0) o dado é d4−2, média 0,5.
+export const averageRoll = die => (die > 0 ? (die + 1) / 2 : 0.5);
 // Máximo de meditações por dia: 1/6 do Espírito, no mínimo 1.
 export const maxMeditations = spiritDie => Math.max(1, Math.floor((Number(spiritDie) || 0) / 6));
 // Prática mágica: no máximo metade do dado de Conjurar, em horas por dia.
@@ -49,7 +52,7 @@ export function blockedReason(activity, stamina, mana) {
 }
 
 export const emptyRoutine = () => ({
-  period: '', place: '', fed: true, meditRoll: 0, startStamina: null, startMana: null,
+  period: '', place: '', fed: true, meditRoll: 0, meditAvg: false, startStamina: null, startMana: null,
   rows: HOURS.map(() => ({ a: '', n: '' })),
 });
 
@@ -64,6 +67,7 @@ export function normalizeRoutine(raw) {
     place: String(raw.place || '').slice(0, 100),
     fed: raw.fed !== false,
     meditRoll: num(raw.meditRoll, 0, 12) ?? 0,
+    meditAvg: raw.meditAvg === true,
     startStamina: num(raw.startStamina, 0, 1000),
     startMana: num(raw.startMana, 0, 100000),
     rows: HOURS.map((_, i) => {
@@ -75,14 +79,15 @@ export function normalizeRoutine(raw) {
 
 const round = n => Math.round(n * 100) / 100;
 
-// stats: { maxStamina, maxMana, spirit (dado), conjurar (dado) }
+// stats: { maxStamina, maxMana, spirit (dado), conjurar (dado), meditar (dado) }
 export function simulateRoutine(routine, stats) {
   const r = normalizeRoutine(routine);
   const maxS = Math.max(0, stats.maxStamina || 0);
   const maxM = Math.max(0, stats.maxMana || 0);
   let stamina = Math.min(maxS, r.startStamina ?? maxS);
   let mana = Math.min(maxM, r.startMana ?? maxM);
-  const rate = meditationRate(r.meditRoll);
+  const roll = r.meditAvg ? averageRoll(stats.meditar || 0) : r.meditRoll;
+  const rate = meditationRate(roll);
   const sessionsMax = maxMeditations(stats.spirit);
   const practiceMax = maxPracticeHours(stats.conjurar);
   const count = { fisico: 0, pratica: 0, descanso: 0, simples: 0, aprimorar: 0, sessions: 0 };
@@ -187,6 +192,7 @@ export function simulateRoutine(routine, stats) {
     endStamina: round(stamina),
     endMana: round(mana),
     rate: round(rate),
+    roll: round(roll),
     sessionsMax,
     practiceMax,
     improvement: { hours: count.aprimorar, hoursPerPoint, progress: round(count.aprimorar / hoursPerPoint) },
