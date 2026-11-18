@@ -32,7 +32,7 @@ const grouped = list => {
 };
 
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
-// limited: visão dos outros jogadores (só nome, descrição e barras de Vida, Stamina e Mana; sem dinheiro nem o resto da ficha).
+// limited: visão dos jogadores (inclusive do próprio token) (só nome, descrição e barras de Vida, Stamina e Mana; sem dinheiro nem o resto da ficha).
 export default function SheetPeek({ data, state, onClose, limited = false }) {
   let c, d;
   try { c = validateCharacter(data); d = calculate(c); } catch { return null; }
