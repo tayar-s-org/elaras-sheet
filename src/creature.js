@@ -1,5 +1,6 @@
 // Criaturas do mestre no tabuleiro: token com vida. Ficam na coluna `meta` do token: { creature: true, hp, maxHp }.
-// Criatura "sem vida" ({ creature: true, noHp: true }) tem a mesma moldura, mas sem barra nem controle de vida.
+// Criatura com "vida oculta" ({ ..., hideHp: true }) tem vida normal para o mestre; os jogadores não veem barra nem números.
+// (Criaturas antigas "sem vida" — { creature: true, noHp: true } — continuam sem barra nem controle até o mestre dar uma vida.)
 // Moldura e cor são únicas para todas as criaturas (o mestre só escolhe nome, foto e vida).
 
 export const CREATURE_FRAME = 'blood';
@@ -18,7 +19,9 @@ export const parseHp = value => {
   return Number.isInteger(n) && n >= 1 && n <= MAX_HP ? n : null;
 };
 
-export const newCreatureMeta = hp => (hp === null || hp === undefined ? { creature: true, noHp: true } : { creature: true, hp, maxHp: hp });
+export const newCreatureMeta = (hp, hideHp = false) => (hp === null || hp === undefined
+  ? { creature: true, noHp: true }
+  : { creature: true, hp, maxHp: hp, ...(hideHp ? { hideHp: true } : {}) });
 
 // { hp, maxHp, ratio } de um token de criatura, ou null se não for criatura.
 export function creatureOf(token) {
@@ -27,10 +30,18 @@ export function creatureOf(token) {
   if (meta.noHp === true) return { hp: 1, maxHp: 1, ratio: 1, noHp: true };
   const maxHp = clampInt(meta.maxHp, 1, MAX_HP, 1);
   const hp = clampInt(meta.hp, 0, maxHp, maxHp);
-  return { hp, maxHp, ratio: hp / maxHp };
+  return { hp, maxHp, ratio: hp / maxHp, ...(meta.hideHp === true ? { hideHp: true } : {}) };
 }
 
-// Tira a vida da criatura (vira "sem vida"); metaWithMaxHp a devolve.
+// Mostra ou esconde a vida dos jogadores (o mestre sempre vê).
+export function metaWithHideHp(token, hide) {
+  const { hideHp: _old, ...rest } = token?.meta || {};
+  return hide ? { ...rest, hideHp: true } : rest;
+}
+// A barra e os números de vida aparecem para este espectador? (sem vida ou vida oculta: só o mestre, e criatura antiga sem vida nunca)
+export const hpVisible = (c, isGm) => Boolean(c) && !c.noHp && (isGm || !c.hideHp);
+
+// Tira a vida da criatura (vira "sem vida", formato antigo); metaWithMaxHp a devolve.
 export function metaWithoutHp(token) {
   const { hp: _hp, maxHp: _max, ...rest } = token?.meta || {};
   return { ...rest, creature: true, noHp: true };

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
-import { creatureOf, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
+import { creatureOf, metaWithHideHp, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
 import { loadPresets, savePreset, deletePreset } from '../../lib/presets.js';
 import { tokenUrl } from '../../lib/tokens.js';
 import './master.css';
@@ -142,6 +142,8 @@ export default function MasterModule({ board, tokens, marks, members, characters
               <label className="field"><span>Vida máxima</span>
                 <input type="number" min="1" max={MAX_HP} defaultValue={creature.maxHp} key={`mx-${selected.id}-${creature.maxHp}`}
                   onBlur={e => { const v = parseHp(e.target.value); if (v && v !== creature.maxHp) patchToken(selected, { meta: metaWithMaxHp(selected, v) }); }} /></label>
+              <label className="check token-nohp"><input type="checkbox" checked={Boolean(creature.hideHp)} disabled={busy}
+                onChange={e => patchToken(selected, { meta: metaWithHideHp(selected, e.target.checked) })} /> Não mostrar vida aos jogadores</label>
             </>}
           </div>
           <div className="row master-actions">

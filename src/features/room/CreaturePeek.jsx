@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { creatureOf, hpTone, hpLabel } from '../../creature.js';
+import { creatureOf, hpTone, hpLabel, hpVisible } from '../../creature.js';
 import './master.css';
 
 // Painel ao clicar numa criatura: barra de vida para todos; o mestre vê os números e ajusta a vida com − e +.
@@ -13,9 +13,9 @@ export default function CreaturePeek({ token, isGm, onAdjust, onRemove, onClose 
     <button type="button" className="peek-close" aria-label="Fechar painel da criatura" onClick={onClose}>×</button>
     <h4>{token.name || 'Criatura'}</h4>
     <p className="muted">Criatura{token.hidden ? ' · oculta dos jogadores' : ''}</p>
-    {c.noHp ? <p className="muted">Sem vida</p> : <div className="creature-hp">
+    {c.noHp ? <p className="muted">Sem vida</p> : !hpVisible(c, isGm) ? null : <div className="creature-hp">
       <div className="creature-hp-head">
-        <span>Vida</span>
+        <span>Vida{isGm && c.hideHp ? ' · oculta dos jogadores' : ''}</span>
         {isGm ? <strong>{c.hp}<small>/{c.maxHp}</small></strong> : <strong className={`hp-word ${tone}`}>{hpLabel(c.ratio)}</strong>}
       </div>
       <div className="res-bar" role="progressbar" aria-label="Vida da criatura" aria-valuemin={0} aria-valuemax={isGm ? c.maxHp : 100}

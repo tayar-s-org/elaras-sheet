@@ -27,7 +27,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   const patch = p => setDesign(d => ({ ...d, ...p }));
   const [cName, setCName] = useState(creature?.name || '');
   const [cHp, setCHp] = useState(creature?.hp ? String(creature.hp) : '');
-  const [noHp, setNoHp] = useState(Boolean(creature?.noHp)); // criatura sem vida: sem barra nem controle de vida
+  const [hideHp, setHideHp] = useState(Boolean(creature?.hideHp)); // vida oculta dos jogadores (o mestre sempre vê)
   const [frameImg, setFrameImg] = useState(null);
   const [frameFailed, setFrameFailed] = useState(false);
   // Moldura das criaturas: imagem única. Se não carregar, cai na moldura vermelha desenhada.
@@ -40,7 +40,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   const shown = creature
     ? { ...design, shape: 'circle', frame: CREATURE_FRAME, frameWidth: 8, double: true, bg: CREATURE_BG, shine: true, initials: initialsOf(cName), frameImage: frameImg || undefined }
     : design;
-  const creatureReady = !creature || ((frameImg || frameFailed) && cName.trim().length > 0 && (noHp || parseHp(cHp) !== null));
+  const creatureReady = !creature || ((frameImg || frameFailed) && cName.trim().length > 0 && parseHp(cHp) !== null);
 
   useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, shown, image); }, [design, image, creature, cName, frameImg]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -110,7 +110,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   async function save() {
     setBusy(true);
     setError('');
-    try { await onSave(await render(), creature ? { name: cName.trim(), hp: noHp ? null : parseHp(cHp) } : undefined); onClose(); } catch (e) { setError(e.message); setBusy(false); }
+    try { await onSave(await render(), creature ? { name: cName.trim(), hp: parseHp(cHp), hideHp } : undefined); onClose(); } catch (e) { setError(e.message); setBusy(false); }
   }
 
   const frame = FRAMES.find(f => f.id === design.frame);
@@ -136,8 +136,8 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
             <label className="field"><span>Nome da criatura</span>
               <input maxLength={60} value={cName} placeholder="Ex.: Goblin, Dragão Vermelho" onChange={e => setCName(e.target.value)} /></label>
             <label className="field"><span>Vida</span>
-              <input type="number" min="1" max={MAX_HP} inputMode="numeric" value={noHp ? '' : cHp} disabled={noHp} placeholder={noHp ? 'Sem vida' : 'Ex.: 30'} onChange={e => setCHp(e.target.value)} /></label>
-            <label className="check token-nohp"><input type="checkbox" checked={noHp} onChange={e => setNoHp(e.target.checked)} /> Sem vida (sem barra nem controle de vida)</label>
+              <input type="number" min="1" max={MAX_HP} inputMode="numeric" value={cHp} placeholder="Ex.: 30" onChange={e => setCHp(e.target.value)} /></label>
+            <label className="check token-nohp"><input type="checkbox" checked={hideHp} onChange={e => setHideHp(e.target.checked)} /> Não mostrar vida (só o mestre vê a barra e os números)</label>
           </div>}
           <label className="field"><span>Zoom</span>
             <input type="range" min="0.3" max="4" step="0.01" value={design.zoom} disabled={!image} onChange={e => patch({ zoom: Number(e.target.value) })} /></label>

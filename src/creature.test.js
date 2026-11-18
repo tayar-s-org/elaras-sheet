@@ -67,16 +67,31 @@ test('uniqueName acrescenta (2), (3)... sem diferenciar maiúsculas', () => {
   assert.ok(uniqueName('a'.repeat(60), ['a'.repeat(60)]).length <= 60);
 });
 
-test('criatura sem vida: mesma moldura, sem números de vida, e dá para devolver a vida', async () => {
-  const { newCreatureMeta, creatureOf, metaWithoutHp, metaWithMaxHp, metaWithHp } = await import('./creature.js');
-  const meta = newCreatureMeta(null);
-  assert.deepEqual(meta, { creature: true, noHp: true });
+test('criatura com vida oculta: o mestre vê, os jogadores não, e a vida segue funcionando', async () => {
+  const { newCreatureMeta, creatureOf, metaWithHideHp, metaWithHp, metaWithMaxHp, hpVisible } = await import('./creature.js');
+  const meta = newCreatureMeta(30, true);
+  assert.deepEqual(meta, { creature: true, hp: 30, maxHp: 30, hideHp: true });
   const token = { meta };
-  assert.equal(creatureOf(token).noHp, true, 'continua sendo criatura');
-  assert.equal(creatureOf({ meta: newCreatureMeta(30) }).noHp, undefined);
-  const withHp = { meta: newCreatureMeta(30) };
-  assert.deepEqual(metaWithoutHp(withHp), { creature: true, noHp: true });
-  const back = metaWithMaxHp(token, 12);
+  const c = creatureOf(token);
+  assert.equal(c.hp, 30);
+  assert.equal(c.hideHp, true);
+  assert.equal(hpVisible(c, true), true, 'o mestre sempre vê a vida');
+  assert.equal(hpVisible(c, false), false, 'jogador não vê');
+  assert.equal(hpVisible(creatureOf({ meta: newCreatureMeta(30) }), false), true, 'sem ocultar, todos veem');
+  // ajustar a vida e a vida máxima não revela a vida
+  assert.equal(metaWithHp(token, 12).hideHp, true);
+  assert.equal(metaWithMaxHp(token, 50).hideHp, true);
+  // ligar e desligar a ocultação
+  assert.equal('hideHp' in metaWithHideHp(token, false), false);
+  assert.equal(metaWithHideHp({ meta: newCreatureMeta(8) }, true).hideHp, true);
+});
+
+test('criatura antiga sem vida continua sem barra e volta a ter vida ao receber uma', async () => {
+  const { newCreatureMeta, creatureOf, metaWithMaxHp, hpVisible } = await import('./creature.js');
+  const old = { meta: newCreatureMeta(null) };
+  assert.deepEqual(old.meta, { creature: true, noHp: true });
+  assert.equal(creatureOf(old).noHp, true);
+  assert.equal(hpVisible(creatureOf(old), true), false, 'sem vida: nem o mestre vê barra');
+  const back = metaWithMaxHp(old, 12);
   assert.deepEqual(back, { creature: true, maxHp: 12, hp: 12 });
-  assert.equal(metaWithHp({ meta: back }, 5).hp, 5);
 });
