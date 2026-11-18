@@ -61,9 +61,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
   // O token inteiro (nao so o centro) fica dentro do tabuleiro.
   // Tokens de criatura aparecem com o dobro do tamanho dos demais.
-  // Barra de vida dos tokens de jogador (por enquanto so no modo de desenvolvimento).
+  // Barra de vida dos tokens de jogador (vida atual da ficha, visivel a todos na mesa).
   const pcLife = t => {
-    if (!import.meta.env.DEV || !t.character_id) return null;
+    if (!t.character_id) return null;
     const data = characters[t.character_id]?.data;
     if (!data) return null;
     try {
