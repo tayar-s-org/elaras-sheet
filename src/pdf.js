@@ -130,6 +130,7 @@ export function createPdfBlob(character) {
     }
   }
   line(`XP: ${c.xp} | Nível: ${d.level} | Pontos de progressão: +${d.progressionPoints}`);
+  line(`Dinheiro: $${c.money}`);
   section("Conferência de pontos");
   line(
     `Atributos ${d.attributeCost} | Perícias ${d.skillCost} | Vantagens ${d.advantageCost} | Outros ${c.rules.spentElsewhere}`,

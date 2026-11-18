@@ -3,6 +3,8 @@ import { saveState, sendMessage } from '../../lib/room.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue, baseMovement } from './vitals.js';
 import { incapacitation } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
+import MoneyTag from '../../ui/MoneyTag.jsx';
+import MoneyGrant from './MoneyGrant.jsx';
 import './party.css';
 
 function Counter({ id, label, value, max, amount, canEdit, onChange }) {
@@ -49,11 +51,13 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   return <article className="party-card">
     <h4>{row.name || 'Sem nome'}</h4>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
+    <MoneyTag value={row.data?.money} />
     {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
       <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}
         onChange={e => setAmountText(e.target.value)} onBlur={() => setAmountText(String(amount))} onFocus={e => e.target.select()} /></label>}
     {RESOURCES.map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} amount={amount} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
     <IncapPanel state={state} max={max} baseMovement={baseMovement(row.data)} isGm={isGm} closed={closed} onFaint={setFaint} />
+    {isGm && !closed && <MoneyGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} />}
     {error && <p role="alert" className="muted">{error}</p>}
   </article>;
 }
@@ -63,7 +67,10 @@ export default function PartyPanel({ tableId, me, isGm, members, characters, sta
   const mine = rows.filter(m => m.user_id === me);
   const shown = isGm ? rows : rows;
   if (!shown.length) return <p className="muted">Nenhuma ficha vinculada à mesa ainda. Escolha a sua em "Gerenciar mesa".</p>;
+  const moneyTargets = shown.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
   return <div className="party">
+    {isGm && !closed && moneyTargets.length > 1 && <section className="party-card"><h4>Dinheiro para todos os jogadores</h4>
+      <MoneyGrant tableId={tableId} targets={moneyTargets} label="Dinheiro para cada um" button="Dar a todos" /></section>}
     {[...mine, ...shown.filter(m => m.user_id !== me)].map(m => <CharacterCard key={m.user_id} member={m} row={characters[m.character_id]}
       state={states[m.character_id]} canEdit={isGm || m.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} />)}
   </div>;

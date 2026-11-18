@@ -10,6 +10,7 @@ import { useAuth } from "./features/auth/useAuth.js";
 import { useHashRoute, navigate, loginThen } from "./lib/router.js";
 import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
+import { useMoneyClaims } from "./features/library/useMoneyClaims.js";
 import { listMine, getCharacter, deleteCharacter } from "./lib/cloud.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
@@ -60,6 +61,7 @@ export default function App() {
   const addCharacter = character => {setSession(prev => openSheet(prev, character));setMaster(false);setTab(0);};
   const [tab, setTab] = useState(0);
   const [toast, setToast] = useState("");
+  useMoneyClaims(session, setSession, auth.user, setToast);
   const [storageError, setStorageError] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [requestedPage, setRequestedPage] = useState(null);

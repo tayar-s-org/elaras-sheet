@@ -3,6 +3,7 @@ import { ATTRIBUTES, calculate, validateCharacter } from '../../rules.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals.js';
 import { incapacitation, steppedDie, effectiveMovement } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
+import MoneyTag from '../../ui/MoneyTag.jsx';
 
 // "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; perícia abaixo de d4 vira "d4−2".
 function DieText({ die, steps, kind }) {
@@ -23,6 +24,7 @@ export default function SheetPeek({ data, state, onClose }) {
     <button type="button" className="peek-close" aria-label="Fechar resumo da ficha" onClick={onClose}>×</button>
     <h4>{c.name || 'Sem nome'}</h4>
     <p className="muted">{[c.race, c.concept, `Nível ${d.level}`].filter(Boolean).join(' · ')}</p>
+    <MoneyTag value={c.money} />
     <div className="peek-vitals">
       {RESOURCES.map(([k, label]) => {
         const mana = k === 'mana';

@@ -1,4 +1,5 @@
 import { racialEffects } from "./templates.js";
+import { START_MONEY, normalizeMoney } from "./money.js";
 export const ATTRIBUTES = [
   "Agilidade",
   "Astúcia",
@@ -90,6 +91,7 @@ export function newCharacter() {
     name: "",
     player: "",
     xp: 0,
+    money: START_MONEY,
     dice: {weaponName:'', weaponDie:0, weaponCount:1, damageBonus:0},
     concept: "",
     race: "Humano",
@@ -221,6 +223,7 @@ export function validateCharacter(raw) {
     throw new Error("Formato de ficha incompatível.");
   const c = newCharacter();
   c.xp = integer(raw.xp, 0, 1000000);
+  c.money = normalizeMoney(raw.money);
   c.dice = {
     weaponName: string(raw.dice?.weaponName, 100),
     weaponDie: DICE.includes(raw.dice?.weaponDie) ? raw.dice.weaponDie : 0,

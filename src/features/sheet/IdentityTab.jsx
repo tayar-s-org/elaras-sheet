@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Field, NumberField } from "../../ui/Field.jsx";
 import Templates from "../../Templates.jsx";
 import { stageForXP } from "../../catalogRules.js";
+import { MAX_MONEY } from "../../money.js";
 import TokenMaker from "../token/TokenMaker.jsx";
 import { uploadTokenImage, tokenUrl } from "../../lib/tokens.js";
 
@@ -89,6 +90,8 @@ export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm
               <div className="form-grid">
                 <NumberField label="Experiência (XP)" value={c.xp} max={1000000} onChange={v => update("xp", v)} hint="A cada 5 XP, sobe um nível e recebe 2 pontos." />
                 <Field label="Nível calculado"><output>{d.level} · +{d.progressionPoints} pontos de progressão</output></Field>
+                <div className="wide"><NumberField label="Dinheiro ($)" value={c.money} max={MAX_MONEY} onChange={v => update("money", v)}
+                  hint="Toda ficha começa com 500. O mestre pode adicionar dinheiro; registre aqui o que você gastar." /></div>
               </div>
               <h3>Acordos de criação</h3>
               <p className="muted">

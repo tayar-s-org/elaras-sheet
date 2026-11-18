@@ -1,4 +1,5 @@
 import React from "react";
+import MoneyTag from "../../ui/MoneyTag.jsx";
 
 export default function SheetSummary({ c, d, save }) {
   return (
@@ -8,6 +9,7 @@ export default function SheetSummary({ c, d, save }) {
             ✧
           </div>
           <h2>{c.name || "Seu personagem"}</h2>
+          <MoneyTag value={c.money} />
           <p className="muted">
             {c.race} · {c.village}
           </p>
