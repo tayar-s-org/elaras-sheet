@@ -292,7 +292,7 @@ export default function App() {
           {activeSheet && auth.user && <TableBinding key={activeSheet.id} sheet={activeSheet} onBind={bindSheetTable} />}
           <SheetModules ctx={ctx} editing={editing} setEditing={setEditing} />
         </section>
-        <SheetSummary c={c} d={d} />
+        <SheetSummary c={c} d={d} tableId={activeSheet?.tableId} cloudId={activeSheet?.cloud?.id} />
       </main>}
       <Toast toast={toast} onClose={() => setToast("")} />
       <ConfirmModal confirm={confirm} onClose={() => setConfirm(null)} />

@@ -1,8 +1,10 @@
 import React from "react";
 import { tokenUrl } from "../../lib/tokens.js";
 import MoneyTag from "../../ui/MoneyTag.jsx";
+import LiveVitals from "./LiveVitals.jsx";
 
-export default function SheetSummary({ c, d }) {
+// tableId e cloudId: a ficha já vinculada a uma mesa mostra Vida, Stamina e Mana atuais como no token.
+export default function SheetSummary({ c, d, tableId, cloudId }) {
   return (
         <aside className="summary">
           <p className="eyebrow">FICHA EM TEMPO REAL</p>
@@ -15,21 +17,23 @@ export default function SheetSummary({ c, d }) {
           <p className="muted">
             {c.race} · {c.village}
           </p>
-          <div className="stats">
-            {[
-              ["Vida", d.life, "health"],
-              ["Stamina", d.stamina, "health"],
-              ["Mana", d.mana, "mana"],
-              ["Movimento", d.movement],
-              ["Aparar", d.parry],
-              ["Resistência", d.toughness],
-            ].map(([name, v, resource]) => (
-              <div key={name} data-resource={resource}>
-                <strong>{v}</strong>
-                <span>{name}</span>
-              </div>
-            ))}
-          </div>
+          {tableId && cloudId
+            ? <LiveVitals d={d} tableId={tableId} cloudId={cloudId} />
+            : <div className="stats">
+              {[
+                ["Vida", d.life, "health"],
+                ["Stamina", d.stamina, "health"],
+                ["Mana", d.mana, "mana"],
+                ["Movimento", d.movement],
+                ["Aparar", d.parry],
+                ["Resistência", d.toughness],
+              ].map(([name, v, resource]) => (
+                <div key={name} data-resource={resource}>
+                  <strong>{v}</strong>
+                  <span>{name}</span>
+                </div>
+              ))}
+            </div>}
           <div className="points">
             <div className="row" data-deficit={d.remaining < 0} data-ok={d.remaining === 0}>
               <h3>Pontos de criação</h3>

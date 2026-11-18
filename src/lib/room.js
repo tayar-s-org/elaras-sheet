@@ -21,6 +21,11 @@ export async function loadStates(tableId) {
   fail(error);
   return Object.fromEntries(data.map(r => [r.character_id, r.state]));
 }
+// Estado atual (vida, stamina, mana) de uma ficha na mesa; null se ainda nao foi alterado ou nao ha acesso.
+export async function loadCharacterState(tableId, characterId) {
+  const { data, error } = await supabase.from('table_character_state').select('state').eq('table_id', tableId).eq('character_id', characterId).maybeSingle();
+  return error ? null : data?.state ?? null;
+}
 export async function saveState(tableId, characterId, state) {
   const { error } = await supabase.from('table_character_state')
     .upsert({ table_id: tableId, character_id: characterId, state }, { onConflict: 'table_id,character_id' });

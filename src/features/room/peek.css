@@ -22,3 +22,6 @@
 .peek-pill.minor b { color: var(--warning); }
 .peek-load { font-size: .78rem; margin: 6px 0 0; }
 .peek-bonus { color: var(--gold); font-weight: 700; }
+
+.live-vitals { display: grid; gap: 4px; margin-top: 4px; }
+.live-vitals .incap { margin-top: 8px; }

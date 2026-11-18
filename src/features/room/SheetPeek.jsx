@@ -1,6 +1,7 @@
 import React from 'react';
 import { ATTRIBUTES, calculate, validateCharacter } from '../../rules.js';
-import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals.js';
+import { safeMaxima } from './vitals.js';
+import VitalBars from './VitalBars.jsx';
 import { incapacitation, steppedDie, effectiveMovement } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
@@ -47,21 +48,7 @@ export default function SheetPeek({ data, state, onClose, limited = false, mine 
     <h4>{c.name || 'Sem nome'}</h4>
     <p className="muted">{[c.race, c.concept, `Nível ${d.level}`, `${c.xp} XP`].filter(Boolean).join(' · ')}</p>
     {!limited && <MoneyTag value={c.money} />}
-    <div className="peek-vitals">
-      {RESOURCES.filter(([k]) => !limited || mine || k !== 'mana').map(([k, label]) => {
-        const mana = k === 'mana';
-        const value = currentValue(state, max, k);
-        const lvl = level(value, max[k], mana);
-        return <div key={k} className="peek-vital">
-          <div className="peek-vital-head">
-            <span>{label}</span>
-            <span className={`chip l${lvl}`}>{LEVEL_TEXT[mana ? 'mana' : 'normal'][lvl]}</span>
-            <strong>{value}<small>/{max[k]}</small></strong>
-          </div>
-          <div className={`res-bar${mana ? ' mana' : ''}`} aria-hidden="true"><i style={{ width: `${max[k] ? Math.min(100, (value / max[k]) * 100) : 0}%` }} /></div>
-        </div>;
-      })}
-    </div>
+    <VitalBars state={state} max={max} showMana={!limited || mine} />
     {limited ? null : <>
     <IncapPanel state={state} max={max} baseMovement={d.movement} compact />
     <div className="peek-stats">
