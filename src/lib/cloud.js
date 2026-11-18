@@ -18,12 +18,12 @@ async function myId() {
 }
 
 export async function listMine() {
-  const { data, error } = await supabase.from('characters').select('id,name,revision,updated_at,table_id,tables(name)').eq('owner_id', await myId()).order('updated_at', { ascending: false });
+  const { data, error } = await supabase.from('characters').select('id,name,revision,updated_at,table_id,tables!table_id(name)').eq('owner_id', await myId()).order('updated_at', { ascending: false });
   fail(error);
   return data;
 }
 export async function getCharacter(id) {
-  const { data, error } = await supabase.from('characters').select('id,revision,data,table_id,tables(name)').eq('id', id).eq('owner_id', await myId()).single();
+  const { data, error } = await supabase.from('characters').select('id,revision,data,table_id,tables!table_id(name)').eq('id', id).eq('owner_id', await myId()).single();
   fail(error);
   return { id: data.id, revision: data.revision, character: validateCharacter(data.data), tableId: data.table_id || null, tableName: data.tables?.name || '' };
 }
