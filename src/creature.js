@@ -41,7 +41,19 @@ export function metaWithMaxHp(token, maxHp) {
   return { ...(token?.meta || {}), creature: true, maxHp: max, hp: Math.min(c ? c.hp : max, max) };
 }
 
-export const hpTone = ratio => (ratio <= 0 ? 'down' : ratio <= 0.25 ? 'bad' : ratio <= 0.5 ? 'warn' : 'ok');
+// Nome único numa lista: "Goblin" -> "Goblin (2)" se já existir (sem diferenciar maiúsculas).
+export function uniqueName(base, names) {
+  const taken = new Set((names || []).map(n => String(n).trim().toLowerCase()));
+  const clean = String(base || '').trim().slice(0, 60);
+  if (!taken.has(clean.toLowerCase())) return clean;
+  for (let i = 2; ; i++) {
+    const suffix = ` (${i})`;
+    const name = clean.slice(0, 60 - suffix.length) + suffix;
+    if (!taken.has(name.toLowerCase())) return name;
+  }
+}
+
+export const hpTone =ratio => (ratio <= 0 ? 'down' : ratio <= 0.25 ? 'bad' : ratio <= 0.5 ? 'warn' : 'ok');
 
 // Texto para quem não é o mestre (os números ficam só com o mestre).
 export const hpLabel = ratio => (ratio <= 0 ? 'Derrotada' : ratio <= 0.25 ? 'Quase derrotada' : ratio <= 0.5 ? 'Muito ferida' : ratio < 1 ? 'Ferida' : 'Ilesa');

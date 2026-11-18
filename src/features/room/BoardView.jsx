@@ -3,6 +3,7 @@ import { updateToken, addToken, addMark, removeMark, snapToGrid, updateBoard, lo
 import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
+import MusicPlayer from './MusicPlayer.jsx';
 import CreaturePeek from './CreaturePeek.jsx';
 import { creatureOf, metaWithHp, metaWithMaxHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import SheetPeek from './SheetPeek.jsx';
@@ -220,7 +221,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   // Mestre: cria uma criatura (nome, foto e vida; moldura e cor unicas) ou troca imagem/nome/vida de uma existente.
   const saveCreature = async (blob, extra) => {
     const target = maker?.token;
-    const path = await uploadTokenImage(me, blob, target?.image_path && target.image_path.startsWith(`${me}/`) ? target.image_path : '');
+    // Sem apagar a imagem anterior: ela pode estar em uso por uma predefinição ou outro token.
+    const path = await uploadTokenImage(me, blob, '');
     if (target) {
       const patch = { name: extra.name, image_path: path, meta: metaWithMaxHp(target, extra.hp) };
       await updateToken(target.id, patch);
@@ -286,6 +288,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </div>}
       </div>}
     </div>
+    {board.settings?.music && <MusicPlayer board={board} isGm={isGm} local={local} setError={setError} />}
     <div className="board-wrap">
     <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img"
       aria-label="Tabuleiro compartilhado" onPointerDown={onPointerDown} onPointerMove={onPointerMove}

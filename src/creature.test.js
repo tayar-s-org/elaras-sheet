@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MAX_HP, parseHp, newCreatureMeta, creatureOf, metaWithHp, metaWithMaxHp, hpTone, hpLabel } from './creature.js';
+import { MAX_HP, parseHp, newCreatureMeta, creatureOf, metaWithHp, metaWithMaxHp, hpTone, hpLabel, uniqueName } from './creature.js';
 
 const token = (hp, maxHp, extra = {}) => ({ id: 't', meta: { creature: true, hp, maxHp, ...extra } });
 
@@ -57,4 +57,12 @@ test('a moldura das criaturas existe como PNG 400x400 (o criador depende dela)',
   assert.equal(png.readUInt32BE(16), 400);   // largura (chunk IHDR)
   assert.equal(png.readUInt32BE(20), 400);   // altura
   assert.ok(png.length < 200 * 1024, 'moldura deveria ser leve');
+});
+
+test('uniqueName acrescenta (2), (3)... sem diferenciar maiúsculas', () => {
+  assert.equal(uniqueName('Goblin', []), 'Goblin');
+  assert.equal(uniqueName('Goblin', ['Goblin']), 'Goblin (2)');
+  assert.equal(uniqueName(' goblin ', ['Goblin', 'Goblin (2)']), 'goblin (3)');
+  assert.equal(uniqueName('Orc', ['Goblin']), 'Orc');
+  assert.ok(uniqueName('a'.repeat(60), ['a'.repeat(60)]).length <= 60);
 });

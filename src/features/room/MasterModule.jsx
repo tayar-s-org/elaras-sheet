@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
-import { creatureOf, metaWithHp, metaWithMaxHp, parseHp, MAX_HP } from '../../creature.js';
+import { creatureOf, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
+import { loadPresets, savePreset, deletePreset } from '../../lib/presets.js';
+import { uploadMusic, removeMusicFile } from '../../lib/music.js';
+import { newMusic, musicTitle, musicFileError } from '../../music.js';
+import { tokenUrl } from '../../lib/tokens.js';
 import './master.css';
 
 const COLORS = ['#7a4dff', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
@@ -9,6 +13,9 @@ const COLORS = ['#7a4dff', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
 // token selecionado e marcadores. Substitui o antigo bloco "Ferramentas do mestre" que ficava abaixo do registro.
 export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, setError, onClose, onCreateCreature, onEditImage }) {
   const fileRef = useRef(null);
+  const musicRef = useRef(null);
+  const [presets, setPresets] = useState(null);
+  const [presetNote, setPresetNote] = useState('');
   const [busy, setBusy] = useState(false);
   const grid = board.grid || { size: 70, visible: true };
   const creature = selected ? creatureOf(selected) : null;
@@ -33,6 +40,22 @@ export default function MasterModule({ board, tokens, marks, members, characters
     local.setBoard({ ...board, grid: next });
     await updateBoard(board.id, { grid: next });
   });
+
+  useEffect(() => {
+    let alive = true;
+    loadPresets(board.table_id).then(p => { if (alive) setPresets(p); }).catch(e => { if (alive) { setPresets([]); setPresetNote(e.message); } });
+    return () => { alive = false; };
+  }, [board.table_id]);
+
+  const music = board.settings?.music;
+  const setMusic = async next => {
+    const settings = { ...(board.settings || {}) };
+    if (next) settings.music = next; else delete settings.music;
+    local.setBoard({ ...board, settings });
+    await updateBoard(board.id, { settings });
+  };
+  const nameTaken = () => tokens.map(t => t.name);
+  const placeAt = n => ({ x: board.width / 2 + (n % 5) * 20, y: board.height / 2 + (n % 5) * 20 });
 
   const withoutToken = members.filter(m => m.status === 'approved' && m.role === 'player' && m.character_id && characters[m.character_id]
     && !tokens.some(t => t.character_id === m.character_id));
@@ -90,6 +113,38 @@ export default function MasterModule({ board, tokens, marks, members, characters
         </>}
       </section>
 
+      <section className="master-section" aria-labelledby="m-presets">
+        <h3 id="m-presets">Predefinições de criaturas</h3>
+        <p className="muted">Criaturas salvas ficam guardadas nesta mesa. Use para colocar no mapa de novo, quantas vezes quiser.</p>
+        {presetNote && <p role="alert" className="muted">{presetNote}</p>}
+        {presets === null && <p className="muted">Carregando…</p>}
+        {presets && !presets.length && !presetNote && <p className="muted">Nenhuma predefinição ainda. Selecione uma criatura no tabuleiro e use “Salvar como predefinição”.</p>}
+        <ul className="preset-list">
+          {(presets || []).map(p => <li key={p.id} className="preset-item">
+            {p.image_path ? <img src={tokenUrl(p.image_path)} alt="" width="36" height="36" /> : <span className="preset-dot" aria-hidden="true" />}
+            <span className="preset-name"><strong>{p.name}</strong> <small className="muted">vida {p.max_hp}</small></span>
+            <button type="button" className="outline" disabled={busy} onClick={() => run(async () => {
+              const t = await addToken(board, { kind: 'npc', name: uniqueName(p.name, nameTaken()), color: CREATURE_COLOR, size: p.size || 1, image_path: p.image_path, meta: newCreatureMeta(p.max_hp), ...placeAt(tokens.length) });
+              local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev : [...prev, t]));
+              onSelect(t.id);
+            })}>Colocar no mapa</button>
+            <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm(`Apagar a predefinição ${p.name}?`) && run(async () => { await deletePreset(p.id); setPresets(prev => prev.filter(x => x.id !== p.id)); })}>Apagar</button>
+          </li>)}
+        </ul>
+      </section>
+
+      <section className="master-section" aria-labelledby="m-music">
+        <h3 id="m-music">Música</h3>
+        <div className="row master-actions">
+          <button type="button" className="outline" disabled={busy} onClick={() => musicRef.current.click()}>{music ? 'Trocar música' : 'Enviar música'}</button>
+          {music && <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm('Remover a música da mesa?') && run(async () => { const path = music.path; await setMusic(null); await removeMusicFile(path); })}>Remover música</button>}
+          <input ref={musicRef} type="file" hidden accept="video/mp4,audio/mp4,audio/x-m4a,audio/mpeg,.mp4,.m4a,.mp3"
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; const bad = musicFileError(f); if (bad) { setError(bad); return; }
+              run(async () => { const path = await uploadMusic(board.table_id, f, music?.path); await setMusic(newMusic(path, musicTitle(f.name))); }); }} />
+        </div>
+        <p className="muted">{music ? `Carregada: ${music.name}. Use a barra de música acima do tabuleiro para tocar, pausar e parar.` : 'MP4, M4A ou MP3 até 30 MB. Toca para todos na mesa ao mesmo tempo; cada um ajusta o próprio volume.'}</p>
+      </section>
+
       <section className="master-section" aria-labelledby="m-selected">
         <h3 id="m-selected">Token selecionado</h3>
         {!selected && <p className="muted">Clique num token no tabuleiro para editá-lo, ocultá-lo ou removê-lo.</p>}
@@ -114,6 +169,10 @@ export default function MasterModule({ board, tokens, marks, members, characters
           <div className="row master-actions">
             <button type="button" className="outline" disabled={busy} onClick={() => onEditImage(selected)}>
               {creature ? 'Trocar imagem da criatura' : selected.image_path ? 'Trocar imagem' : 'Criar imagem do token'}</button>
+            {creature && <button type="button" className="outline" disabled={busy || !presets} onClick={() => run(async () => {
+              const p = await savePreset(board.table_id, { name: uniqueName(selected.name, (presets || []).map(x => x.name)), image_path: selected.image_path, max_hp: creature.maxHp, size: selected.size });
+              setPresets(prev => [...(prev || []), p]);
+            })}>Salvar como predefinição</button>}
             {!creature && selected.image_path && <button type="button" className="text-button" disabled={busy} onClick={() => patchToken(selected, { image_path: null })}>Tirar imagem</button>}
             <button type="button" className="outline" disabled={busy}
               onClick={() => run(async () => { const hidden = !selected.hidden; await updateToken(selected.id, { hidden }); local.setTokens(prev => prev.map(t => (t.id === selected.id ? { ...t, hidden } : t))); room.sendBroadcast('board_refresh', {}); })}>
