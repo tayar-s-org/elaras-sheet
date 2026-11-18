@@ -29,9 +29,21 @@ test('addMoney soma, respeita o limite e ignora valores inválidos', () => {
   assert.equal(addMoney(undefined, 100), 600);        // ficha sem o campo parte de 500
   assert.equal(addMoney(0, 1), 1);
   assert.equal(addMoney(MAX_MONEY - 5, 100), MAX_MONEY);
-  assert.equal(addMoney(500, -10), 500);
   assert.equal(addMoney(500, 'x'), 500);
+  assert.equal(addMoney(500, 0), 500);
   assert.equal(addMoney(500, 2.9), 502);
+});
+
+test('addMoney com valor negativo remove dinheiro e o saldo nunca fica abaixo de 0', () => {
+  assert.equal(addMoney(500, -200), 300);
+  assert.equal(addMoney(500, -500), 0);
+  assert.equal(addMoney(100, -500), 0);               // remover mais do que tem zera
+  assert.equal(addMoney(0, -5), 0);
+  assert.equal(addMoney(undefined, -100), 400);       // ficha sem o campo parte de 500
+  assert.equal(addMoney(500, -2.9), 498);
+  assert.equal(addMoney(1000, -1000 + 1), 1);
+  // soma de varias concessoes recolhidas juntas (+100 e -30 = +70)
+  assert.equal(addMoney(500, 100 + -30), 570);
 });
 
 test('formatMoney usa separador de milhar brasileiro', () => {

@@ -29,9 +29,12 @@ export function useMoneyClaims(session, setSession, user, notify) {
           if (!id || !alive) continue;
           try {
             const gained = await claimMoney(id);
-            if (gained > 0 && alive) {
+            if (gained !== 0 && alive) {
               setSession(prev => editSheet(prev, sheet.id, ch => ({ ...ch, money: addMoney(ch.money, gained) })));
-              notifyRef.current?.(`💰 Você recebeu $${formatMoney(gained)} do mestre${sheet.character.name ? ` para ${sheet.character.name}` : ''}.`);
+              const who = sheet.character.name ? ` de ${sheet.character.name}` : '';
+              notifyRef.current?.(gained > 0
+                ? `💰 Você recebeu $${formatMoney(gained)} do mestre${sheet.character.name ? ` para ${sheet.character.name}` : ''}.`
+                : `💸 O mestre removeu $${formatMoney(-gained)}${who}. Saldo: $${formatMoney(addMoney(sheet.character.money, gained))}.`);
             }
           } catch (error) {
             if (/migration 0012/i.test(error.message)) { disabled = true; return; }  // recurso ainda nao instalado: nao insiste

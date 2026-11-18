@@ -70,7 +70,7 @@ export default function PartyPanel({ tableId, me, isGm, members, characters, sta
   const moneyTargets = shown.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
   return <div className="party">
     {isGm && !closed && moneyTargets.length > 1 && <section className="party-card"><h4>Dinheiro para todos os jogadores</h4>
-      <MoneyGrant tableId={tableId} targets={moneyTargets} label="Dinheiro para cada um" button="Dar a todos" /></section>}
+      <MoneyGrant tableId={tableId} targets={moneyTargets} label="Dinheiro para cada um" button="Dar a todos" removeButton="Remover de todos" /></section>}
     {[...mine, ...shown.filter(m => m.user_id !== me)].map(m => <CharacterCard key={m.user_id} member={m} row={characters[m.character_id]}
       state={states[m.character_id]} canEdit={isGm || m.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} />)}
   </div>;

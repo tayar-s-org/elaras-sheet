@@ -11,6 +11,7 @@ export function normalizeMoney(raw) {
   return Math.min(MAX_MONEY, Math.trunc(n));
 }
 
-export const addMoney = (current, gained) => Math.min(MAX_MONEY, normalizeMoney(current) + Math.max(0, Math.trunc(Number(gained)) || 0));
+// Soma (valor positivo) ou remove (negativo) dinheiro; o saldo nunca fica abaixo de 0 nem acima do limite.
+export const addMoney = (current, delta) => Math.max(0, Math.min(MAX_MONEY, normalizeMoney(current) + (Math.trunc(Number(delta)) || 0)));
 
 export const formatMoney = value => normalizeMoney(value).toLocaleString('pt-BR');
