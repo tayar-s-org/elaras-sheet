@@ -8,7 +8,8 @@ export default function JoinForm({ onSubmit, submitLabel = 'Pedir para entrar', 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { listMine().then(setCharacters).catch(() => {}); }, []);
+  // A ficha vale numa mesa só: ao pedir para entrar, só as fichas que ainda não têm mesa (a escolhida passa a ser dessa mesa).
+  useEffect(() => { listMine().then(list => setCharacters(list.filter(c => !c.table_id))).catch(() => {}); }, []);
   async function submit(e) {
     e.preventDefault();
     setBusy(true);

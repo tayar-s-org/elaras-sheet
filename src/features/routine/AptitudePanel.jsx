@@ -11,7 +11,7 @@ const pct = b => `${Math.round(b * 100)}%`;
 const dateText = iso => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const uuid = () => globalThis.crypto.randomUUID();
 
-function Row({ kind, name, points, editable, available, onChange, accumulated }) {
+function Row({ kind, name, points, locked, editable, available, onChange, accumulated }) {
   const bonus = aptitudeBonus(kind, points);
   const cap = accumulationCap(kind, points);
   const maxed = points >= pointsForMax(kind);
@@ -20,10 +20,11 @@ function Row({ kind, name, points, editable, available, onChange, accumulated })
     <th scope="row">{name}</th>
     <td className="ap-ctl">
       {editable ? <>
-        <button type="button" className="outline" aria-label={`Tirar um ponto de ${name}`} disabled={points <= 0} onClick={() => onChange(points - 1)}>−</button>
-        <input type="number" min="0" max="1000" value={points} aria-label={`Pontos de Aptidão em ${name}`} onChange={e => onChange(Math.max(0, Math.trunc(Number(e.target.value) || 0)))} />
+        <button type="button" className="outline" aria-label={`Tirar um ponto de ${name}`} disabled={points <= locked} title={locked ? `${locked} ponto(s) já confirmado(s) não podem ser removidos` : ''} onClick={() => onChange(points - 1)}>−</button>
+        <input type="number" min={locked} max="1000" value={points} aria-label={`Pontos de Aptidão em ${name}`} onChange={e => onChange(Math.max(locked, Math.trunc(Number(e.target.value) || 0)))} />
         <button type="button" className="outline" aria-label={`Dar um ponto a ${name}`} disabled={available <= 0} onClick={() => onChange(points + 1)}>+</button>
       </> : <b>{points}</b>}
+      {locked > 0 && <small className="muted ap-lock" title="Pontos confirmados são permanentes"> 🔒 {locked}</small>}
     </td>
     <td data-label="Bônus de XP" className={bonus ? 'pos' : ''}>{bonus ? `+${pct(bonus)}` : '0%'}{maxed && points > 0 ? <small title="Limite de +100% atingido: pontos extras não rendem mais"> máx.</small> : null}</td>
     <td data-label="Bônus no limite" className={bonus ? 'pos' : ''}>{bonus ? `+${pct(bonus)}` : '0%'}</td>
@@ -49,12 +50,13 @@ export default function AptitudePanel({ tableId, characterId, owner, isGm, close
   const current = draft || saved;
   const summary = aptitudeSummary(grants, current);
   const confirmed = aptitudeSummary(grants, saved);
-  const problems = validateAllocation(current, summary.received, sheet);
+  const problems = validateAllocation(current, summary.received, sheet, saved);
   const dirty = JSON.stringify(cleanAllocation(current)) !== JSON.stringify(cleanAllocation(saved));
   const accumulatedOf = (kind, name) => Math.max(0, ...(progress || []).filter(p => p.kind === kind && p.name === name).map(p => p.available));
 
   const setPoints = (kind, name, value) => {
     const key = aptitudeKey(kind, name);
+    value = Math.max(value, pointsOf(saved, kind, name)); // pontos já confirmados são permanentes
     const next = { ...current, [key]: value };
     if (!value) delete next[key];
     // não deixa passar do que foi recebido: o botão "+" já bloqueia; digitar um número alto é cortado ao que sobra
@@ -66,6 +68,7 @@ export default function AptitudePanel({ tableId, characterId, owner, isGm, close
 
   const run = async fn => { setBusy(true); setMessage(''); try { await fn(); await refresh?.(); } catch (e) { setMessage(e.message); } finally { setBusy(false); } };
   const confirm = () => run(async () => {
+    if (!window.confirm('Depois de confirmados, os pontos distribuídos não podem ser removidos nem trocados de lugar. Confirmar a distribuição?')) return;
     const r = await saveAptitude(tableId, characterId, cleanAllocation(current));
     setDraft(null);
     setMessage(`Distribuição confirmada: ${r.distributed} ponto(s) distribuído(s), ${r.available} disponível(is).`);
@@ -86,7 +89,7 @@ export default function AptitudePanel({ tableId, characterId, owner, isGm, close
       </div>
       {summary.received === 0 && <p className="muted">Este personagem ainda não recebeu Aptidão. Só o mestre pode conceder uma rolagem de 1d100.</p>}
       {owner && confirmed.available > 0 && !draft && <p className="callout" role="status">Você tem <b>{confirmed.available}</b> ponto(s) de Aptidão para distribuir.</p>}
-      <p className="muted ap-rule">Cada ponto em um atributo dá +10% de XP e +10% no limite de acúmulo dele; em uma perícia, +5% e +5%. O máximo é +100% por atributo ou perícia (10 pontos em um atributo, 20 em uma perícia). A Aptidão vale só para o alvo em que foi distribuída e só para a XP ganha daqui para frente.</p>
+      <p className="muted ap-rule">Cada ponto em um atributo dá +10% de XP e +10% no limite de acúmulo dele; em uma perícia, +5% e +5%. O máximo é +100% por atributo ou perícia (10 pontos em um atributo, 20 em uma perícia). A Aptidão vale só para o alvo em que foi distribuída e só para a XP ganha daqui para frente. Os pontos que você confirma são permanentes: não podem ser removidos nem passados para outro alvo; só dá para acrescentar os que ainda estão disponíveis.</p>
     </section>
 
     {isGm && <section className="ap-gm" aria-label="Conceder Aptidão">
@@ -104,7 +107,7 @@ export default function AptitudePanel({ tableId, characterId, owner, isGm, close
       {!names.length ? <p className="muted">Nenhuma perícia treinada na ficha. Só se distribui Aptidão em perícias que a ficha possui.</p> : <div className="th-scroll">
         <table className="ap-table">
           <thead><tr><th>{kind === 'attribute' ? 'Atributo' : 'Perícia'}</th><th>Aptidão</th><th>Bônus de XP</th><th>Bônus no limite</th><th>Limite de acúmulo</th></tr></thead>
-          <tbody>{names.map(n => <Row key={n} kind={kind} name={n} points={pointsOf(current, kind, n)} editable={owner && !closed} available={summary.available}
+          <tbody>{names.map(n => <Row key={n} kind={kind} name={n} points={pointsOf(current, kind, n)} locked={pointsOf(saved, kind, n)} editable={owner && !closed} available={summary.available}
             onChange={v => setPoints(kind, n, v)} accumulated={accumulatedOf(kind, n)} />)}</tbody>
         </table>
       </div>}

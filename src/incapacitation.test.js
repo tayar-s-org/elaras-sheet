@@ -53,7 +53,7 @@ test('valor atual ausente conta como cheio e valores fora da faixa são limitado
   assert.equal(incapacitation({ life: -5, stamina: 99 }, max).levels.stamina, 0);
 });
 
-test('atributos nunca descem de d4; perícias abaixo de d4 perdem 2 por estágio', () => {
+test('o d4 é o menor dado possível: nem atributos nem perícias descem dele', () => {
   assert.deepEqual(steppedDie(8, 1), { die: 6, bonus: 0 });
   assert.deepEqual(steppedDie(8, 2), { die: 4, bonus: 0 });
   assert.deepEqual(steppedDie(12, 2), { die: 8, bonus: 0 });
@@ -61,13 +61,13 @@ test('atributos nunca descem de d4; perícias abaixo de d4 perdem 2 por estágio
   assert.deepEqual(steppedDie(4, 1), { die: 4, bonus: 0 });
   assert.deepEqual(steppedDie(4, 2), { die: 4, bonus: 0 });
   assert.deepEqual(steppedDie(8, 0), { die: 8, bonus: 0 });
-  assert.deepEqual(steppedDie(4, 1, 'skill'), { die: 4, bonus: -2 });
-  assert.deepEqual(steppedDie(4, 2, 'skill'), { die: 4, bonus: -4 });
+  assert.deepEqual(steppedDie(4, 1, 'skill'), { die: 4, bonus: 0 });
+  assert.deepEqual(steppedDie(4, 2, 'skill'), { die: 4, bonus: 0 });
   assert.deepEqual(steppedDie(6, 1, 'skill'), { die: 4, bonus: 0 });
-  assert.deepEqual(steppedDie(6, 2, 'skill'), { die: 4, bonus: -2 });   // d6 → d4 → d4−2
+  assert.deepEqual(steppedDie(6, 2, 'skill'), { die: 4, bonus: 0 });   // d6 → d4 e para aí
   assert.deepEqual(steppedDie(8, 2, 'skill'), { die: 4, bonus: 0 });
   assert.deepEqual(steppedDie(0, 0, 'skill'), { die: 4, bonus: -2 });   // sem treino: d4−2
-  assert.deepEqual(steppedDie(0, 1, 'skill'), { die: 4, bonus: -4 });
+  assert.deepEqual(steppedDie(0, 1, 'skill'), { die: 4, bonus: -2 });   // sem treino não piora com a incapacitação
 });
 
 test('movimentação nunca fica abaixo de 1', () => {
@@ -82,7 +82,7 @@ test('textos de estágio, efeitos e causa', () => {
   assert.equal(stageLabel(at(4, 4)), 'Incapacitação 2');
   assert.equal(stageLabel(at(1, 1, { fainted: true })), 'Incapacitação 5 · Desmaiado');
   assert.deepEqual(effectLines(at(8, 8)), []);
-  assert.deepEqual(effectLines(at(4, 8)), ['−1 estágio em todos os dados (atributos nunca abaixo de d4)']);
+  assert.deepEqual(effectLines(at(4, 8)), ['−1 estágio em todos os dados (nunca abaixo de d4)']);
   assert.equal(effectLines(at(1, 4)).length, 2);
   assert.match(effectLines(at(1, 4))[0], /−2 estágios/);
   assert.match(effectLines(at(1, 1, { fainted: true })).join('|'), /−6 de Movimentação.*Desmaiado/);

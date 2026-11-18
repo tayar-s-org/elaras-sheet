@@ -1,0 +1,6 @@
+.tb { margin-bottom: 14px; }
+.tb-bound { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.tb-bound small { color: var(--muted); }
+.tb-pick p { margin: 6px 0 10px; font-size: .9rem; }
+.tb-row { justify-content: flex-start; flex-wrap: wrap; }
+.tb-row select { min-width: 220px; }

@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { DICE, SKILLS } from "../../rules.js";
 import { racialEffects } from "../../templates.js";
+import CustomSkillForm from "./CustomSkillForm.jsx";
+import { removeCustomSkill } from "../../skills/custom.js";
 import "./skills.css";
 
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const GROUPS = [...new Set(SKILLS.map(([, attr]) => attr))];
 
 /* eslint-disable-next-line no-unused-vars */
-export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage }) {
+export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage, cloudId, tableId }) {
   const [query, setQuery] = useState("");
   const [skillTab, setSkillTab] = useState(() => (Object.values(c.skills).some(v => v > 0) ? "trained" : GROUPS[0]));
   const racialSkill = racialEffects(c).skill;
@@ -19,6 +21,9 @@ export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToa
   // Buscando, procura em todas as abas; sem busca, mostra so a aba escolhida.
   const visible = skill => (searching ? norm(skill[0]).includes(norm(query)) : inTab(skill));
   const count = attr => SKILLS.filter(([name, a]) => a === attr && c.skills[name] > 0).length;
+  // Perícias personalizadas (aprovadas pelo mestre): aparecem em "Treinadas" quando têm dado e na aba própria.
+  const customs = c.customSkills || [];
+  const customVisible = customs.filter(s => (searching ? norm(s.name).includes(norm(query)) : skillTab === "trained" ? c.skills[s.name] > 0 : skillTab === "custom"));
 
   return (
     <>
@@ -37,6 +42,7 @@ export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToa
       <div className="tabs-row skills2-tabs" role="tablist" aria-label="Perícias por atributo">
         <button type="button" role="tab" aria-selected={!searching && skillTab === "trained"} className={!searching && skillTab === "trained" ? "primary" : "outline"} onClick={() => { setQuery(""); setSkillTab("trained"); }}>Treinadas ({trained})</button>
         {GROUPS.map(attr => <button key={attr} type="button" role="tab" aria-selected={!searching && skillTab === attr} className={!searching && skillTab === attr ? "primary" : "outline"} onClick={() => { setQuery(""); setSkillTab(attr); }}>{attr} <span className="skills2-count">{count(attr)}/{SKILLS.filter(([, a]) => a === attr).length}</span></button>)}
+        <button type="button" role="tab" aria-selected={!searching && skillTab === "custom"} className={!searching && skillTab === "custom" ? "primary" : "outline"} onClick={() => { setQuery(""); setSkillTab("custom"); }}>Personalizadas <span className="skills2-count">{customs.length}</span></button>
       </div>
 
       {GROUPS.map(attr => {
@@ -61,7 +67,25 @@ export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToa
           </div>
         </section>;
       })}
-      {!SKILLS.some(visible) && <p className="muted">{searching ? "Nenhuma perícia encontrada." : skillTab === "trained" ? "Nenhuma perícia treinada ainda. Escolha um atributo acima para começar." : "Nenhuma perícia neste atributo."}</p>}
+      {customVisible.length > 0 && <section className="skills2-group" aria-label="Perícias personalizadas">
+        <h3>Personalizadas <span className="skills2-attr">aprovadas pelo mestre</span></h3>
+        <div className="skills2-list">
+          {customVisible.map(s => {
+            const die = c.skills[s.name] || 0;
+            return <div className={`skills2-row${die ? " on" : ""}`} key={s.id}>
+              <span className="skills2-name">{s.name}</span>
+              <div className="die-picker" role="radiogroup" aria-label={`Dado de ${s.name}`}>
+                <button type="button" role="radio" aria-checked={!die} className={!die ? "sel" : ""} onClick={() => setDie(s.name, 0)} title="Sem treino">—</button>
+                {DICE.map(v => <button key={v} type="button" role="radio" aria-checked={die === v} className={die === v ? "sel" : ""} onClick={() => setDie(s.name, v)}>d{v}</button>)}
+              </div>
+              <span className="skills2-cost" aria-label="Custo">{die ? `${cost(s.name, die)} pt` : ""}</span>
+              <button type="button" className="text-button danger" aria-label={`Tirar a perícia ${s.name} da ficha`} title="Tirar da ficha" onClick={() => window.confirm(`Tirar "${s.name}" da ficha? Para ter de novo, será preciso pedir ao mestre outra vez.`) && setC(prev => removeCustomSkill(prev, s.id))}>×</button>
+            </div>;
+          })}
+        </div>
+      </section>}
+      {!searching && skillTab === "custom" && <CustomSkillForm c={c} cloudId={cloudId} tableId={tableId} />}
+      {!SKILLS.some(visible) && !customVisible.length && skillTab !== "custom" && <p className="muted">{searching ? "Nenhuma perícia encontrada." : skillTab === "trained" ? "Nenhuma perícia treinada ainda. Escolha um atributo acima para começar." : "Nenhuma perícia neste atributo."}</p>}
 
       {(!c.skills.Nadar || !c.skills.Perceber) && (
         <div className="callout">

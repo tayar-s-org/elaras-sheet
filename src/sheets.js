@@ -15,15 +15,34 @@ export function openServerSheet(session,row) {
   const next=openSheet(session,row.character);
   return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,remote:{id:row.id,revision:row.revision,base:JSON.stringify(row.character),editToken:session.editKeys?.[row.id]||''}}:s)};
 }
+// Mesa da ficha (a ficha so vale nela). Fichas antigas da nuvem podem vir sem mesa.
+const tableOf=row=>({...(row.tableId?{tableId:row.tableId,tableName:row.tableName||''}:{})});
+// Atualiza a mesa de cada ficha aberta com o que a nuvem diz (listMine: { id, table_id, tables: { name } }).
+export function applyTables(session,rows) {
+  let changed=false;
+  const sheets=session.sheets.map(s=>{
+    const row=s.cloud && rows.find(r=>r.id===s.cloud.id);
+    if(!row) return s;
+    const tableId=row.table_id||'', tableName=tableId?(row.tables?.name||''):'';
+    if((s.tableId||'')===tableId && (s.tableName||'')===tableName) return s;
+    changed=true;
+    const {tableId:_id,tableName:_name,...rest}=s;
+    return tableId?{...rest,tableId,tableName}:rest;
+  });
+  return changed?{...session,sheets}:session;
+}
+export function setSheetTable(session,id,table) {
+  return {...session,sheets:session.sheets.map(s=>s.id===id?{...s,tableId:table.tableId,tableName:table.tableName||''}:s)};
+}
 export function openCloudSheet(session,row) {
   const existing=session.sheets.find(s=>s.cloud?.id===row.id);
   const cloud={id:row.id,revision:row.revision,base:JSON.stringify(row.character)};
-  if(existing) return {...session,activeId:existing.id,sheets:session.sheets.map(s=>s.id===existing.id && JSON.stringify(s.character)===s.cloud.base?{...s,character:row.character,cloud}:s)};
+  if(existing) return {...session,activeId:existing.id,sheets:session.sheets.map(s=>s.id===existing.id?(JSON.stringify(s.character)===s.cloud.base?{...s,character:row.character,cloud,...tableOf(row)}:{...s,...tableOf(row)}):s)};
   // Uma unica aba em branco e intocada e substituida em vez de ficar sobrando ao lado.
   const only=session.sheets.length===1 && !session.sheets[0].cloud && JSON.stringify(session.sheets[0].character)===JSON.stringify(newCharacter());
-  if(only) return {...session,activeId:session.sheets[0].id,sheets:[{...session.sheets[0],character:row.character,cloud}]};
+  if(only) return {...session,activeId:session.sheets[0].id,sheets:[{...session.sheets[0],character:row.character,cloud,...tableOf(row)}]};
   const next=openSheet(session,row.character);
-  return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,cloud}:s)};
+  return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,cloud,...tableOf(row)}:s)};
 }
 // Fichas abertas com alteracoes ainda nao salvas que a nuvem ja ultrapassou (a sincronizacao as descartaria).
 export function sheetsLosingChanges(session,rows) {
@@ -37,7 +56,7 @@ export function syncCloudSheets(session,rows) {
     const row=s.cloud && rows.find(r=>r.id===s.cloud.id);
     if(!row || row.revision<=s.cloud.revision) return s;
     updated.push(s.id);
-    return {...s,character:row.character,cloud:{id:row.id,revision:row.revision,base:JSON.stringify(row.character)}};
+    return {...s,character:row.character,cloud:{id:row.id,revision:row.revision,base:JSON.stringify(row.character)},...tableOf(row)};
   });
   let next={...session,sheets};
   const added=[];
@@ -72,7 +91,8 @@ export function restoreSheets(storage) {
         const character=validateCharacter(s.character);
         const cloud = s.cloud && /^[a-f0-9-]{36}$/.test(s.cloud.id) && Number.isInteger(s.cloud.revision) && s.cloud.revision>0
           ? {id:s.cloud.id,revision:s.cloud.revision,base:typeof s.cloud.base==='string'?s.cloud.base:JSON.stringify(character)} : undefined;
-        return {id:s.id,character,...(remote?{remote}:{}),...(cloud?{cloud}:{})};
+        const tableId = typeof s.tableId==='string' && /^[a-f0-9-]{36}$/.test(s.tableId) ? s.tableId : '';
+        return {id:s.id,character,...(remote?{remote}:{}),...(cloud?{cloud}:{}),...(tableId?{tableId,tableName:typeof s.tableName==='string'?s.tableName.slice(0,100):''}:{})};
       });
       const editKeys=Object.fromEntries(Object.entries(raw.editKeys||{}).filter(([id,key])=>/^[a-f0-9-]{36}$/.test(id) && typeof key==='string' && /^[a-f0-9]{64}$/.test(key)));
       for(const s of sheets)if(s.remote?.editToken)editKeys[s.remote.id]=s.remote.editToken;

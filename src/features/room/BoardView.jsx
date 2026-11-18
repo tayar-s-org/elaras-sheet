@@ -10,6 +10,7 @@ import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
 import { creatureOf, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import SheetPeek from './SheetPeek.jsx';
+import { useAptitudeFor } from '../routine/AptitudeSummary.jsx';
 import { safeMaxima, currentValue } from './vitals.js';
 
 const DiceStage = lazy(() => import('./DiceStage.jsx'));
@@ -295,6 +296,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     for (let y = 0; y <= H; y += gsize) lines.push(<line key={`h${y}`} x1={0} y1={y} x2={W} y2={y} />);
   }
   const sel = tokens.find(t => t.id === selected);
+  const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
 
   return <div className="board">
     <div className="board-toolbar">
@@ -358,7 +360,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </g>;
       })}</g>
     </svg>
-    {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
+    {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek aptitude={selectedAptitude} data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
     {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)} />}
     <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>

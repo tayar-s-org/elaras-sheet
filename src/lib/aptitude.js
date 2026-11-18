@@ -32,3 +32,17 @@ export async function saveAptitude(tableId, characterId, allocation) {
   fail(error, 'Não foi possível confirmar a distribuição.');
   return data;
 }
+
+// Aptidão de UM personagem (ficha, token e telas do mestre). Sem tableId junta o que a RLS libera (o dono vê as próprias
+// concessões de qualquer mesa). Devolve { allocation, received, distributed, available } ou null.
+export async function loadCharacterAptitude(characterId, tableId = null) {
+  let g = supabase.from('aptitude_grants').select('roll,table_id').eq('character_id', characterId);
+  let a = supabase.from('character_aptitude').select('allocation,table_id,updated_at').eq('character_id', characterId).order('updated_at', { ascending: false });
+  if (tableId) { g = g.eq('table_id', tableId); a = a.eq('table_id', tableId); }
+  const [gr, al] = await Promise.all([g, a]);
+  if (gr.error || al.error) return null;
+  const allocation = al.data[0]?.allocation || {};
+  const received = gr.data.reduce((s, r) => s + r.roll, 0);
+  const distributed = Object.values(allocation).reduce((s, v) => s + v, 0);
+  return { allocation, received, distributed, available: received - distributed };
+}

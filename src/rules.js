@@ -2,6 +2,7 @@ import { racialEffects } from "./templates.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
 import { inventoryEffects, itemById } from "./market/items.js";
 import { sanitizeCustom, isCustomId } from "./market/custom.js";
+import { sanitizeCustomSkills } from "./skills/custom.js";
 export const ATTRIBUTES = [
   "Agilidade",
   "Astúcia",
@@ -67,7 +68,7 @@ export const MASTER_RULES = [
   ],
   [
     "Vida e stamina",
-    "Cada reserva máxima é igual a Vigor. Incapacitação 1: vida ou stamina na metade, perde um estágio de todos os dados. Incapacitação 2: abaixo de 25%, perde 2 de Movimentação. Incapacitação 3: já estar no estágio 2 e sofrer nova incapacitação, perde dois estágios de todos os dados. Incapacitação 4: as duas reservas gerando estágio 2, perde 6 de Movimentação. Incapacitação 5: após “x horas” no estágio 4, desmaia. Atributos têm mínimo d4 e Movimentação mínima 1. As incapacitações somam: cada reserva vale 1 na metade e 2 abaixo de 25%, e a soma de Vida e Stamina é o estágio (1 em cada = Incapacitação 2). Cada tipo de efeito segue o estágio mais alto que o atinge: dados −1 nos estágios 1 e 2 e −2 nos estágios 3 e 4; Movimentação −2 nos estágios 2 e 3 e −6 no estágio 4 (não soma com o −2). O dado selvagem não muda. O mestre define as horas (X) do estágio 5.",
+    "Cada reserva máxima é igual a Vigor. Incapacitação 1: vida ou stamina na metade, perde um estágio de todos os dados. Incapacitação 2: abaixo de 25%, perde 2 de Movimentação. Incapacitação 3: já estar no estágio 2 e sofrer nova incapacitação, perde dois estágios de todos os dados. Incapacitação 4: as duas reservas gerando estágio 2, perde 6 de Movimentação. Incapacitação 5: após “x horas” no estágio 4, desmaia. Atributos e perícias têm mínimo d4 (a perícia sem treino continua d4−2) e Movimentação mínima 1. As incapacitações somam: cada reserva vale 1 na metade e 2 abaixo de 25%, e a soma de Vida e Stamina é o estágio (1 em cada = Incapacitação 2). Cada tipo de efeito segue o estágio mais alto que o atinge: dados −1 nos estágios 1 e 2 e −2 nos estágios 3 e 4; Movimentação −2 nos estágios 2 e 3 e −6 no estágio 4 (não soma com o −2). O dado selvagem não muda. O mestre define as horas (X) do estágio 5.",
   ],
   [
     "Mana e exaustão",
@@ -116,6 +117,7 @@ export function newCharacter() {
     notes: "",
     tokenImage: "",
     inventory: [],
+    customSkills: [],
     armor: 0,
     movementBonus: 0,
     parryBonus: 0,
@@ -300,10 +302,12 @@ export function validateCharacter(raw) {
       throw new Error("Atributo inválido no arquivo.");
     c.attributes[name] = raw.attributes[name];
   }
+  // Perícias personalizadas (aprovadas pelo mestre) guardam o dado em c.skills junto com as do livro.
+  c.customSkills = sanitizeCustomSkills(raw.customSkills, SKILLS.map(([name]) => name));
   c.skills = Object.fromEntries(
-    SKILLS.filter(([name]) => DICE.includes(raw.skills?.[name])).map(
-      ([name]) => [name, raw.skills[name]],
-    ),
+    [...SKILLS.map(([name]) => name), ...c.customSkills.map(s => s.name)]
+      .filter(name => DICE.includes(raw.skills?.[name]))
+      .map(name => [name, raw.skills[name]]),
   );
   // Bônus de d12+N e passos de evolução: só valem para traços que existem e (no caso do bônus) com dado d12.
   const counts = (source, group, names, max, only12) => {

@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { grantMoney } from '../../lib/money.js';
-import { sendMessage } from '../../lib/room.js';
 import { formatMoney } from '../../money.js';
 import '../../ui/money.css';
 
-// Mestre: adiciona ou remove dinheiro de um jogador (ou de todos). O jogador recebe na ficha; a mesa vê um aviso no chat.
+// Mestre: adiciona ou remove dinheiro de um jogador (ou de todos). O jogador recebe na ficha e a concessão fica no registro "XP e dinheiro" da mesa.
 export default function MoneyGrant({ tableId, targets, label = 'Dinheiro ($)', button = 'Dar dinheiro', removeButton = 'Remover dinheiro' }) {
   const [text, setText] = useState('100');
   const [busy, setBusy] = useState(false);
@@ -20,7 +19,6 @@ export default function MoneyGrant({ tableId, targets, label = 'Dinheiro ($)', b
     setMsg('');
     try {
       for (const t of targets) await grantMoney(tableId, t.id, sign * amount);
-      sendMessage(tableId, sign > 0 ? `💰 O mestre deu $${formatMoney(amount)} a ${who}.` : `💸 O mestre removeu $${formatMoney(amount)} de ${who}.`).catch(() => {});
       setMsg(`$${formatMoney(amount)} ${sign > 0 ? 'enviado' : 'removido'}${targets.length > 1 ? (sign > 0 ? ' a todos' : ' de todos') : ''}.`);
     } catch (err) { setMsg(err.message); }
     finally { setBusy(false); }

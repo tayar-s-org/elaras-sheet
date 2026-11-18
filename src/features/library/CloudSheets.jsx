@@ -13,13 +13,13 @@ export default function CloudSheets({ auth, sheet, status, onSync, syncing }) {
     return <section className="server-sheets">
       <div className="sheet-tools">
         <button className="primary" onClick={() => loginThen('/fichas')}>Entrar para salvar na nuvem</button>
-        <span className="muted">Suas fichas continuam salvas neste navegador e em PDF.</span>
+        <span className="muted">Suas fichas continuam salvas neste navegador.</span>
       </div>
     </section>;
   }
   return <section className="server-sheets">
     <div className="sheet-tools">
-      <span className={`save-status ${status?.state || 'idle'}`} role="status">{status?.state === 'saving' ? 'Salvando…' : status?.state === 'error' ? status.message : dirty ? 'Alterações serão salvas sozinhas…' : cloud ? `Salvo na nuvem · versão ${cloud.revision}` : 'Ficha em branco (salva ao editar)'}</span>
+      <span className={`save-status ${status?.state || 'idle'}`} role="status">{status?.state === 'saving' ? 'Salvando…' : status?.state === 'error' ? status.message : dirty ? 'Alterações serão salvas sozinhas…' : cloud ? `Salvo na nuvem · versão ${cloud.revision}` : sheet.tableId ? 'Ficha em branco (salva ao editar)' : 'Escolha a mesa para esta ficha ser salva'}</span>
       {onSync && <button type="button" className="outline" disabled={syncing} onClick={onSync}
         title="Traz a versão mais recente das suas fichas da nuvem e abre as que faltam">{syncing ? 'Sincronizando…' : 'Sincronizar com a nuvem'}</button>}
     </div>

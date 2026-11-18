@@ -95,8 +95,9 @@ begin
   return jsonb_build_object('id', g.id, 'roll', g.roll, 'fresh', fresh, 'received', public.aptitude_received(p_table, p_character), 'at', g.created_at);
 end $$;
 
--- Jogador: confirma a distribuição dos pontos (substitui a distribuição anterior). Só o dono da ficha, só alvos que
--- existem na ficha (atributos; perícias treinadas) e nunca mais pontos do que recebeu. Não mexe na XP já conquistada.
+-- Jogador: confirma a distribuição dos pontos. Só o dono da ficha, só alvos que existem na ficha (atributos; perícias
+-- treinadas) e nunca mais pontos do que recebeu. Pontos já confirmados são PERMANENTES: a nova distribuição nunca pode ter
+-- menos pontos em nenhum alvo do que a anterior (só dá para acrescentar). Não mexe na XP já conquistada.
 create or replace function public.set_aptitude(p_table uuid, p_character uuid, p_allocation jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
@@ -107,6 +108,8 @@ begin
   if not public.table_accepts_messages(p_table) then raise exception 'Esta mesa está encerrada.'; end if;
   if p_allocation is null or jsonb_typeof(p_allocation) <> 'object' then raise exception 'Distribuição inválida.'; end if;
   select data into cdata from public.characters where id = p_character;
+  insert into public.character_aptitude (table_id, character_id) values (p_table, p_character) on conflict do nothing;
+  select * into cur from public.character_aptitude where table_id = p_table and character_id = p_character for update;
   for k in select jk from jsonb_object_keys(p_allocation) jk loop
     n := n + 1;
     if n > 200 then raise exception 'Distribuição inválida.'; end if;
@@ -126,10 +129,14 @@ begin
     clean := jsonb_set(clean, array[k], to_jsonb(v::int));
     total := total + v::int;
   end loop;
+  -- Pontos já confirmados não podem ser removidos nem diminuídos.
+  for k in select jk from jsonb_object_keys(cur.allocation) jk loop
+    if coalesce((clean ->> k)::int, 0) < (cur.allocation ->> k)::int then
+      raise exception 'Pontos de Aptidão já confirmados não podem ser removidos (%).', split_part(k, ':', 2);
+    end if;
+  end loop;
   received := public.aptitude_received(p_table, p_character);
   if total > received then raise exception 'Você distribuiu % pontos, mas só recebeu %.', total, received; end if;
-  insert into public.character_aptitude (table_id, character_id) values (p_table, p_character) on conflict do nothing;
-  select * into cur from public.character_aptitude where table_id = p_table and character_id = p_character for update;
   if cur.allocation is distinct from clean then
     update public.character_aptitude set allocation = clean, revision = revision + 1, updated_at = now() where table_id = p_table and character_id = p_character;
     insert into public.aptitude_log (table_id, character_id, before_alloc, after_alloc, points_received) values (p_table, p_character, cur.allocation, clean, received);

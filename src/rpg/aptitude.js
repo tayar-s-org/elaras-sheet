@@ -42,7 +42,8 @@ export function aptitudeSummary(grants, allocation) {
 
 // Valida uma distribuição contra a ficha e o total recebido. Devolve uma lista de problemas (vazia = válida).
 // sheet = { attributes: [nomes], skills: [nomes que a ficha possui] }.
-export function validateAllocation(allocation, received, sheet) {
+// previous = distribuição já confirmada: os pontos dela são permanentes, então a nova nunca pode ter menos em nenhum alvo.
+export function validateAllocation(allocation, received, sheet, previous = {}) {
   const problems = [];
   if (!allocation || typeof allocation !== 'object' || Array.isArray(allocation)) return ['Distribuição inválida.'];
   let total = 0;
@@ -57,6 +58,9 @@ export function validateAllocation(allocation, received, sheet) {
     total += v;
   }
   if (total > received) problems.push(`Você distribuiu ${total} pontos, mas só recebeu ${received}.`);
+  for (const [key, was] of Object.entries(previous || {})) {
+    if ((Number(allocation[key]) || 0) < Number(was)) problems.push(`Os ${was} ponto(s) já confirmados em ${key.split(':').slice(1).join(':')} não podem ser removidos.`);
+  }
   return problems;
 }
 

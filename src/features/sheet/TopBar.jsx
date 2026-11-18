@@ -7,9 +7,8 @@ const current = (route, name) => (name === "home" ? route === "/"
   : name === "sheets" ? route === "/fichas"
     : /^\/(mesas|mesa\/|sala\/|convite\/)/.test(route)) ? "page" : undefined;
 
-export default function TopBar({ theme, setTheme, file, loadPdf, save, route = "/", auth, onSignOut }) {
+export default function TopBar({ theme, setTheme, route = "/", auth, onSignOut }) {
   const name = auth?.profile?.display_name || auth?.user?.email || "";
-  const onSheets = route === "/fichas";
   const lastRoom = auth?.user && !route.startsWith("/sala/") ? getLastRoom(auth.user.id) : null;
   return (
     <header className="topbar">
@@ -37,12 +36,7 @@ export default function TopBar({ theme, setTheme, file, loadPdf, save, route = "
             <button className="quiet" onClick={onSignOut}>Sair</button>
           </>
           : route !== "/entrar" && <button className="primary" onClick={() => loginThen(route === "/" ? "/" : route)}>Entrar</button>)}
-        {onSheets && auth?.user && <>
-          <button className="quiet" onClick={() => file.current.click()}>Abrir PDF</button>
-          <button className="primary" onClick={() => save()}>Salvar PDF <span aria-hidden="true">↗</span></button>
-        </>}
       </div>
-      <input ref={file} type="file" accept="application/pdf,.pdf" multiple hidden onChange={loadPdf} />
     </header>
   );
 }

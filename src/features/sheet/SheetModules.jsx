@@ -14,6 +14,8 @@ import GuideTab from "./GuideTab.jsx";
 import MarketTab from "./MarketTab.jsx";
 import { resolveItem } from "../../market/items.js";
 import "./modules.css";
+import AptitudeSummary, { useAptitudeFor } from "../routine/AptitudeSummary.jsx";
+import SheetAptitude from "../routine/SheetAptitude.jsx";
 
 export const MODULES = [
   "Identidade",
@@ -129,6 +131,7 @@ function renderEditor(index, ctx) {
     case 5: return <HistoryTab {...ctx} />;
     case 6: return <BookTab {...ctx} />;
     case 7: return <MarketTab {...ctx} initialView="bag" />;
+    case "aptitude": return <SheetAptitude cloudId={ctx.cloudId} c={ctx.c} />;
     case "guide": return <GuideTab {...ctx} />;
     case "market": return <MarketTab {...ctx} />;
     default: return null;
@@ -136,7 +139,7 @@ function renderEditor(index, ctx) {
 }
 
 // Ficha completa só para leitura (usada na sala para ver a ficha de outro jogador): todos os módulos, sem editar.
-export function SheetOverview({ c, d }) {
+export function SheetOverview({ c, d, apt }) {
   return <div className="sheet-modules">
     {ORDER.map((i, pos) => i === 6 ? null : (
       <section key={MODULES[i]} className={`mod-card${i === 0 ? " wide" : ""}`} aria-label={MODULES[i]}>
@@ -144,12 +147,14 @@ export function SheetOverview({ c, d }) {
         <div className="mod-body"><Summary index={i} c={c} d={d} /></div>
       </section>
     ))}
+    {apt && <section className="mod-card wide" aria-label="Aptidão"><header className="mod-head"><h2>Aptidão</h2></header><div className="mod-body"><AptitudeSummary apt={apt} always /></div></section>}
   </div>;
 }
 
 // Ficha em modulos: cada cartao resume a secao e o botao "Editar" abre o editor completo dela.
 export default function SheetModules({ ctx, editing, setEditing }) {
   const { c, d } = ctx;
+  const apt = useAptitudeFor({ characterId: ctx.cloudId });
   useEffect(() => {
     if (editing == null) return undefined;
     const onKey = e => { if (e.key === "Escape") setEditing(null); };
@@ -159,20 +164,37 @@ export default function SheetModules({ ctx, editing, setEditing }) {
 
   return <>
     <div className="sheet-modules">
-      {ORDER.map((i, pos) => (
-        <section key={MODULES[i]} id={`sec-${i}`} className={`mod-card${i === 0 ? " wide" : ""}`} aria-labelledby={`mod-title-${i}`}>
-          <header className="mod-head">
-            <h2 id={`mod-title-${i}`}><span className="mod-num">{String(pos + 1).padStart(2, "0")}</span>{MODULES[i]}</h2>
-            <button type="button" className="outline" onClick={() => setEditing(i)}>{i === 6 || i === 7 ? "Abrir" : "Editar"}</button>
-          </header>
-          <div className="mod-body"><Summary index={i} c={c} d={d} /></div>
-        </section>
-      ))}
+      {ORDER.flatMap((i, pos) => {
+        const card = (
+          <section key={MODULES[i]} id={`sec-${i}`} className={`mod-card${i === 0 ? " wide" : ""}`} aria-labelledby={`mod-title-${i}`}>
+            <header className="mod-head">
+              <h2 id={`mod-title-${i}`}><span className="mod-num">{String(pos + 1).padStart(2, "0")}</span>{MODULES[i]}</h2>
+              <button type="button" className="outline" onClick={() => setEditing(i)}>{i === 6 || i === 7 ? "Abrir" : "Editar"}</button>
+            </header>
+            <div className="mod-body"><Summary index={i} c={c} d={d} /></div>
+          </section>
+        );
+        // A janela de Aptidão fica sempre visível, logo acima do Livro, mesmo sem pontos recebidos.
+        if (i !== 6) return [card];
+        const free = apt?.available > 0;
+        return [
+          <section key="aptitude" id="sec-aptitude" className="mod-card wide" aria-labelledby="mod-title-aptitude">
+            <header className="mod-head">
+              <h2 id="mod-title-aptitude"><span className="mod-num">✦</span>Aptidão{free ? <span className="tr-badge pending">{apt.available} para distribuir</span> : null}</h2>
+              <button type="button" className={free ? "primary" : "outline"} onClick={() => setEditing("aptitude")}>{free ? "Distribuir pontos" : "Abrir"}</button>
+            </header>
+            <div className="mod-body">
+              <AptitudeSummary apt={apt} always />
+            </div>
+          </section>,
+          card,
+        ];
+      })}
     </div>
     {editing != null && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setEditing(null); }}>
       <div className="mod-editor" role="dialog" aria-modal="true" aria-labelledby="mod-editor-title">
         <header className="mod-editor-head">
-          <h2 id="mod-editor-title">{editing === "guide" ? "Guia de criação" : editing === "market" ? "Mercado" : MODULES[editing]}</h2>
+          <h2 id="mod-editor-title">{editing === "guide" ? "Guia de criação" : editing === "market" ? "Mercado" : editing === "aptitude" ? "Aptidão" : MODULES[editing]}</h2>
           <button type="button" className="primary" onClick={() => setEditing(null)}>Concluir</button>
         </header>
         <div className="mod-editor-body">{renderEditor(editing, ctx)}</div>

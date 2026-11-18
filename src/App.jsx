@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
-import { exportPdf, importPdf } from "./pdf.js";
-import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, syncCloudSheets, sheetsLosingChanges } from "./sheets.js";
+import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, syncCloudSheets, sheetsLosingChanges, setSheetTable, applyTables } from "./sheets.js";
 import { fetchCloudRows } from "./features/library/syncCloud.js";
 import SheetTabs from "./SheetTabs.jsx";
 import MasterView from "./MasterView.jsx";
@@ -13,9 +12,11 @@ import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
 import { useMoneyClaims } from "./features/library/useMoneyClaims.js";
 import { useCustomItemClaims } from "./features/library/useCustomItemClaims.js";
+import { useCustomSkillClaims } from "./features/library/useCustomSkillClaims.js";
 import { useEvolutionClaims } from "./features/library/useEvolutionClaims.js";
 import { useAptitudeNotice } from "./features/library/useAptitudeNotice.js";
-import { listMine, getCharacter, deleteCharacter } from "./lib/cloud.js";
+import { listMine, getCharacter, deleteCharacter, bindCharacterTable } from "./lib/cloud.js";
+import TableBinding from "./features/sheet/TableBinding.jsx";
 import { claimXp } from "./lib/xp.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
@@ -77,12 +78,12 @@ export default function App() {
   const [toast, setToast] = useState("");
   useMoneyClaims(session, setSession, auth.user, setToast);
   useCustomItemClaims(session, setSession, auth.user, setToast);
+  useCustomSkillClaims(session, setSession, auth.user, setToast);
   useEvolutionClaims(session, setSession, auth.user, setToast);
   useAptitudeNotice(auth.user, setToast);
   const [storageError, setStorageError] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [requestedPage, setRequestedPage] = useState(null);
-  const file = useRef();
   const d = calculate(c);
   const update = (key, value) => setC((prev) => ({ ...prev, [key]: value }));
   const rule = (key, value) =>
@@ -124,7 +125,9 @@ export default function App() {
     let alive = true;
     (async () => {
       try {
-        for (const row of (await listMine()).slice(0, 30)) {
+        const mine = await listMine();
+        if (alive) setSession(prev => applyTables(prev, mine)); // mesa de cada ficha segundo a nuvem
+        for (const row of mine.slice(0, 30)) {
           if (!alive) return;
           if (sessionRef.current.sheets.some(s => s.cloud?.id === row.id)) continue;
           const full = await getCharacter(row.id);
@@ -191,32 +194,6 @@ export default function App() {
           : { name: "", description: "", cost: "" };
     update(key, [...c[key], item]);
   }
-  async function loadPdf(e) {
-    const selected = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (!selected.length) return;
-    let count = 0;
-    const errors = [];
-    for (const file of selected) {
-      try {
-        const loaded = await importPdf(file);
-        setSession(prev => openSheet(prev, loaded));
-        count++;
-      } catch (error) { errors.push(`${file.name}: ${error.message}`); }
-    }
-    if (count) {setMaster(false);setTab(0);}
-    setToast(`${count} ficha(s) aberta(s) em novas abas.${errors.length ? ' ' + errors.join(' ') : ''}`);
-  }
-  function save(character = c) {
-    try {
-      exportPdf(character);
-      setToast(
-        "PDF gerado com a ficha completa e os dados para reabrir neste aplicativo.",
-      );
-    } catch (error) {
-      setToast("Não foi possível gerar o PDF. " + error.message);
-    }
-  }
   async function signOut() {
     await auth.signOut();
     // As fichas ficam na conta; limpa os rascunhos deste navegador para o proximo usuario.
@@ -226,9 +203,15 @@ export default function App() {
     setTab(0);
     navigate("/");
   }
-  const ctx = { cloudId: session.sheets.find(s => s.id === activeId)?.cloud?.id, auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
+  const activeSheet = session.sheets.find(s => s.id === activeId);
+  // A ficha vale numa mesa só: ficha nova escolhe a mesa e a antiga (sem mesa) pode ser ligada a uma agora.
+  const bindSheetTable = async table => {
+    if (activeSheet.cloud) await bindCharacterTable(activeSheet.cloud.id, table.id);
+    setSession(prev => setSheetTable(prev, activeSheet.id, { tableId: table.id, tableName: table.name }));
+  };
+  const ctx = { cloudId: activeSheet?.cloud?.id, tableId: activeSheet?.tableId, auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
   const sheetsLocked = cloudConfigured && route === "/fichas" && !auth.user;
-  const topbar = <TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} auth={auth} onSignOut={signOut} />;
+  const topbar = <TopBar theme={theme} setTheme={setTheme} route={route} auth={auth} onSignOut={signOut} />;
   const page = route === "/fichas" ? (sheetsLocked ? <main className="page">
       <p className="eyebrow">SUAS FICHAS</p>
       <h1>Entre para criar suas fichas</h1>
@@ -252,13 +235,13 @@ export default function App() {
         onClose={id => {
           const sheet = session.sheets.find(s => s.id === id);
           setConfirm(sheet?.cloud
-            ? {title:"Apagar esta ficha?",text:"A ficha será apagada da sua conta e não poderá ser recuperada. Se ela estiver vinculada a uma mesa, o vínculo some também. Salve o PDF antes se quiser guardá-la.",action:async () => {
+            ? {title:"Apagar esta ficha?",text:"A ficha será apagada da sua conta e não poderá ser recuperada. Se ela estiver vinculada a uma mesa, o vínculo some também.",action:async () => {
               try { await deleteCharacter(sheet.cloud.id); setSession(prev => closeSheet(prev,id)); }
               catch (error) { setToast("Não foi possível apagar a ficha. " + error.message); }
             }}
-            : {title:"Fechar esta ficha?",text:"Ela ainda não foi salva na sua conta e será descartada. Salve o PDF antes de fechar se quiser guardá-la.",action:() => setSession(prev => closeSheet(prev,id))});
+            : {title:"Fechar esta ficha?",text:"Ela ainda não foi salva na sua conta e será descartada.",action:() => setSession(prev => closeSheet(prev,id))});
         }} />
-      {master ? <MasterView sheets={session.sheets} onEdit={id => {setSession(prev => ({...prev,activeId:id}));setMaster(false);}} onSave={save} /> : <main className="layout">
+      {master ? <MasterView sheets={session.sheets} onEdit={id => {setSession(prev => ({...prev,activeId:id}));setMaster(false);}} /> : <main className="layout">
         <aside className="sidebar">
           <p className="eyebrow">SEU PERSONAGEM</p>
           <h1>{c.name || "Uma nova história"}</h1>
@@ -300,16 +283,16 @@ export default function App() {
             <button className="text-button" onClick={() => addCharacter(newCharacter())}>Nova ficha em outra aba</button>
             <small>
               {storageError
-                ? "Rascunho local indisponível. Salve seu PDF."
-                : "Todas as abas salvas neste navegador."}
-              <br />O PDF permite levar sua ficha para outro computador.
+                ? "Rascunho local indisponível neste navegador."
+                : "As fichas ficam salvas na sua conta."}
             </small>
           </div>
         </aside>
         <section className="editor" key={activeId}>
+          {activeSheet && auth.user && <TableBinding key={activeSheet.id} sheet={activeSheet} onBind={bindSheetTable} />}
           <SheetModules ctx={ctx} editing={editing} setEditing={setEditing} />
         </section>
-        <SheetSummary c={c} d={d} save={save} />
+        <SheetSummary c={c} d={d} />
       </main>}
       <Toast toast={toast} onClose={() => setToast("")} />
       <ConfirmModal confirm={confirm} onClose={() => setConfirm(null)} />

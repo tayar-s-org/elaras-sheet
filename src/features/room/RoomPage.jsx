@@ -10,6 +10,8 @@ import TableControls from '../tables/TableControls.jsx';
 import TableLog from './TableLog.jsx';
 import TrainingButton from './TrainingButton.jsx';
 import ItemApprovals from './ItemApprovals.jsx';
+import SkillApprovals from './SkillApprovals.jsx';
+import { useCustomSkillRequests } from './useCustomSkillRequests.js';
 import TrainingApprovals from './TrainingApprovals.jsx';
 import { useTrainingApprovals } from './useTrainingApprovals.js';
 import RequestApprovals, { useRequests } from '../routine/RequestApprovals.jsx';
@@ -53,6 +55,7 @@ export default function RoomPage({ auth, id }) {
   const { table, members, messages, rolls, states, characters: savedCharacters, online, connected, error } = room;
   const characters = useLiveCharacters(id, members, savedCharacters, Boolean(room.ready));
   const itemRequests = useCustomItemRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
+  const skillRequests = useCustomSkillRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const clock = useClock(id, Boolean(room.ready));
   const requests = useRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const trainingRequests = useTrainingApprovals(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
@@ -100,20 +103,21 @@ export default function RoomPage({ auth, id }) {
     </aside>
     <section className="room-board" aria-label="Tabuleiro">
       <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating}
-        logSlot={<TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} hidden={hidden} members={members} characters={characters} me={auth.user.id} isGm={isGm} />} />
+        logSlot={<TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} rewards={room.rewards} hidden={hidden} members={members} characters={characters} me={auth.user.id} isGm={isGm} />} />
     </section>
     <aside className="room-panel">
       <div className="tabs-row" role="tablist">
         <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'primary' : 'outline'} onClick={() => setTab('chat')}>Chat</button>
         <button role="tab" aria-selected={tab === 'dice'} className={tab === 'dice' ? 'primary' : 'outline'} onClick={() => setTab('dice')}>Dados</button>
         <button role="tab" aria-selected={tab === 'party'} className={tab === 'party' ? 'primary' : 'outline'} onClick={() => setTab('party')}>{isGm ? 'Grupo' : 'Fichas'}</button>
-        {isGm && <button role="tab" aria-selected={tab === 'items'} className={tab === 'items' ? 'primary' : 'outline'} onClick={() => setTab('items')}>Aprovações{itemRequests.pending + trainingRequests.pending.length + requests.pending.length > 0 ? ` (${itemRequests.pending + trainingRequests.pending.length + requests.pending.length})` : ''}</button>}
+        {isGm && <button role="tab" aria-selected={tab === 'items'} className={tab === 'items' ? 'primary' : 'outline'} onClick={() => setTab('items')}>Aprovações{itemRequests.pending + trainingRequests.pending.length + requests.pending.length + skillRequests.pending > 0 ? ` (${itemRequests.pending + trainingRequests.pending.length + requests.pending.length + skillRequests.pending})` : ''}</button>}
         <button role="tab" aria-selected={tab === 'table'} className={tab === 'table' ? 'primary' : 'outline'} onClick={() => setTab('table')}>Mesa</button>
       </div>
       {closed && <p className="callout">Esta mesa foi encerrada. O histórico continua visível, mas ninguém pode escrever.</p>}
       {tab === 'items' && isGm ? <>
           <TrainingApprovals part="pending" tableId={id} me={auth.user.id} members={members} characters={characters} closed={closed} pending={trainingRequests.pending} approved={trainingRequests.approved} available={trainingRequests.available} refresh={trainingRequests.refresh} />
           <RequestApprovals requests={requests} members={members} characters={characters} closed={closed} />
+          <SkillApprovals items={skillRequests.items} available={skillRequests.available} refresh={skillRequests.refresh} members={members} characters={characters} />
           <ItemApprovals items={itemRequests.items} available={itemRequests.available} refresh={itemRequests.refresh} members={members} characters={characters} />
           <TrainingApprovals part="decided" tableId={id} me={auth.user.id} members={members} characters={characters} closed={closed} pending={trainingRequests.pending} approved={trainingRequests.approved} available={trainingRequests.available} refresh={trainingRequests.refresh} />
         </>

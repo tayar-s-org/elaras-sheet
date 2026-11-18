@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { saveState, sendMessage } from '../../lib/room.js';
 import SheetViewModal from './SheetViewModal.jsx';
+import { AptitudeGrant } from '../routine/AptitudeSummary.jsx';
 import { grantXp } from '../../lib/xp.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue, baseMovement } from './vitals.js';
 import { incapacitation } from '../../incapacitation.js';
@@ -58,7 +59,7 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     </div>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
     {canEdit && <MoneyTag value={row.data?.money} />}
-    {viewing && <SheetViewModal data={row.data} owner={member.profiles?.display_name} onClose={() => setViewing(false)} />}
+    {viewing && <SheetViewModal data={row.data} owner={member.profiles?.display_name} tableId={tableId} characterId={row.id} onClose={() => setViewing(false)} />}
     {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
       <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}
         onChange={e => setAmountText(e.target.value)} onBlur={() => setAmountText(String(amount))} onFocus={e => e.target.select()} /></label>}
@@ -66,6 +67,7 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     <IncapPanel state={state} max={max} baseMovement={baseMovement(row.data)} isGm={isGm} closed={closed} onFaint={setFaint} />
     {isGm && !closed && <MoneyGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} />}
     {isGm && !closed && <XpGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} label="Experiência (XP)" />}
+    {isGm && !closed && <AptitudeGrant tableId={tableId} characterId={row.id} name={row.name} />}
     {error && <p role="alert" className="muted">{error}</p>}
   </article>;
 }
@@ -84,8 +86,6 @@ function XpGrant({ tableId, targets, label }) {
     setMsg('');
     try {
       for (const t of targets) await grantXp(tableId, t.id, amount);
-      const who = targets.length === 1 ? (targets[0].name || 'um personagem') : 'todos os jogadores';
-      sendMessage(tableId, `✨ O mestre concedeu +${amount} XP a ${who}.`).catch(() => {});
       setMsg(`+${amount} XP enviado${targets.length > 1 ? ' a todos' : ''}.`);
     } catch (err) { setMsg(err.message); }
     finally { setBusy(false); }

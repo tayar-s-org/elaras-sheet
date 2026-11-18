@@ -39,6 +39,11 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
   const [error, setError] = useState('');
   const mine = members.find(m => m.user_id === me);
   const character = mine?.character_id ? characters[mine.character_id] : null;
+  // Perícias personalizadas aprovadas pelo mestre (guardam o dado em data.skills, que é onde o servidor lê para rolar).
+  const customSkillNames = (() => {
+    if (!character) return [];
+    try { return validateCharacter(character.data).customSkills.map(s => s.name); } catch { return []; }
+  })();
   // Bonus dos itens equipados (customizados) para o atributo ou pericia escolhido; entra no modificador da rolagem.
   const itemBonus = (() => {
     if (!character) return 0;
@@ -87,6 +92,7 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
           <select value={traitKey} onChange={e => setTraitKey(e.target.value)}>
             <optgroup label="Atributos">{ATTRIBUTES.map(a => <option key={a} value={`attribute:${a}`}>{a}</option>)}</optgroup>
             <optgroup label="Perícias">{SKILLS.map(([name]) => <option key={name} value={`skill:${name}`}>{name}</option>)}</optgroup>
+            {customSkillNames.length > 0 && <optgroup label="Perícias personalizadas">{customSkillNames.map(name => <option key={name} value={`skill:${name}`}>{name}</option>)}</optgroup>}
           </select></label>
         <div className="dice2-row2">
           <label className="dice2-label"><span>Modificador</span>

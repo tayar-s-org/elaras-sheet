@@ -29,3 +29,5 @@
 .skills2-count { font-size: .75rem; opacity: .75; margin-left: 2px; }
 
 .die-bonus { margin-left: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-size: .75rem; white-space: nowrap; align-self: center; }
+
+.skills2-row:has(> .text-button) { grid-template-columns: minmax(110px, 1fr) auto 46px 28px; }

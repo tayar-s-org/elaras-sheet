@@ -6,7 +6,7 @@ import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
 import { resolveItem } from '../../market/items.js';
 
-// "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; perícia abaixo de d4 vira "d4−2".
+// "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; o d4 é o menor dado (nunca vira d4−2).
 function DieText({ die, steps, kind }) {
   const eff = steppedDie(die, steps, kind);
   const label = `d${eff.die}${eff.bonus ? eff.bonus : ''}`.replace('-', '−');
@@ -14,6 +14,7 @@ function DieText({ die, steps, kind }) {
   return <b>{label}{Boolean(eff.die !== die || eff.bonus) && <small> (d{die})</small>}</b>;
 }
 import './peek.css';
+import AptitudeSummary from '../routine/AptitudeSummary.jsx';
 
 // Bônus de rolagem de itens equipados ao lado do dado.
 const Bonus = ({ value }) => (value ? <small className="peek-bonus"> ({value > 0 ? `+${value}` : `−${Math.abs(value)}`})</small> : null);
@@ -34,7 +35,7 @@ const grouped = list => {
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
 // limited: visão dos outros jogadores (só nome, descrição e barras de Vida, Stamina e Mana; sem dinheiro nem o resto da ficha).
 // mine: o token é do próprio jogador (só ele vê a própria mana; os outros jogadores não).
-export default function SheetPeek({ data, state, onClose, limited = false, mine = false }) {
+export default function SheetPeek({ data, state, onClose, limited = false, mine = false, aptitude = null }) {
   let c, d;
   try { c = validateCharacter(data); d = calculate(c); } catch { return null; }
   const max = safeMaxima(data);
@@ -94,6 +95,7 @@ export default function SheetPeek({ data, state, onClose, limited = false, mine 
       <div className="peek-pills">{c.powers.map((p, i) => <Pill key={i} label={p.name || 'Sem nome'} value={p.cost} tone="power" />)}</div>
       {c.powers.some(p => p.upgrades?.length) && <ul className="peek-upgrades">{c.powers.flatMap((p, i) => (p.upgrades || []).map(u => <li key={`${i}-${u.n}`}><b>{p.name || 'Feitiço'} · melhoria {u.n}:</b> {u.description}</li>))}</ul>}
     </>}
+    {!limited && <AptitudeSummary apt={aptitude} compact />}
     </>}
   </aside>;
 }

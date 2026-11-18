@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { navigate } from '../../lib/router.js';
 import { listMine } from '../../lib/cloud.js';
 import { clearLastRoom } from '../../lib/lastRoom.js';
+import DeleteTableDialog from './DeleteTableDialog.jsx';
 import {
   updateTable, deleteTable, decideMember, leaveTable, setMemberCharacter,
   getInviteCode, rotateInvite, inviteLink, STATUS_LABEL,
@@ -10,7 +11,8 @@ import {
 // Escolha da ficha que representa a pessoa nesta mesa (vale para jogadores e para o mestre que quer jogar).
 function CharacterPicker({ table, me, reload, run }) {
   const [characters, setCharacters] = useState([]);
-  useEffect(() => { listMine().then(setCharacters).catch(() => {}); }, []);
+  // Só entram as fichas desta mesa ou as antigas, sem mesa (que passam a ser desta).
+  useEffect(() => { listMine().then(list => setCharacters(list.filter(c => !c.table_id || c.table_id === table.id))).catch(() => {}); }, [table.id]);
   return <label className="field"><span>Sua ficha nesta mesa</span>
     <select value={me.character_id || ''} onChange={e => run(async () => { await setMemberCharacter(table.id, e.target.value || null); await reload(); })}>
       <option value="">Nenhuma</option>
@@ -19,6 +21,7 @@ function CharacterPicker({ table, me, reload, run }) {
 }
 
 function GmPanel({ table, me, members, reload, run }) {
+  const [deleting, setDeleting] = useState(false);
   const [code, setCode] = useState('');
   const [copied, setCopied] = useState(false);
   useEffect(() => { getInviteCode(table.id).then(setCode).catch(() => {}); }, [table.id]);
@@ -73,7 +76,13 @@ function GmPanel({ table, me, members, reload, run }) {
         <button className="text-button danger" onClick={() => window.confirm(`Remover ${m.profiles?.display_name} da mesa?`) && decide(m.user_id, 'kicked')}>Expulsar</button>
       </div>)}
     </section>
-    <button className="text-button danger" onClick={() => window.confirm('Apagar esta mesa e todos os vínculos? Isso não pode ser desfeito.') && run(async () => { await deleteTable(table.id); clearLastRoom(table.id); navigate('/mesas'); })}>Apagar mesa</button>
+    <section className="danger-zone" aria-label="Zona de perigo">
+      <h3>Zona de perigo</h3>
+      <p>Apagar a mesa remove tabuleiro, chat, rotinas e tudo o que ela guarda, para todos os jogadores. Antes de apagar, o app pede para você digitar o nome da mesa.</p>
+      <div><button type="button" className="outline danger" onClick={() => setDeleting(true)}>Apagar esta mesa…</button></div>
+    </section>
+    {deleting && <DeleteTableDialog table={table} onCancel={() => setDeleting(false)}
+      onConfirm={async () => { await deleteTable(table.id); clearLastRoom(table.id); navigate('/mesas'); }} />}
   </>;
 }
 

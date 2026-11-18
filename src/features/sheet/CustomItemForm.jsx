@@ -11,7 +11,7 @@ const newEffect = () => ({ kind: "attribute", target: ATTRIBUTES[0], bonus: 1 })
 const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace(".", ",")} kg`;
 
 // Item custom: o jogador descreve o item e escolhe a mesa; o mestre aprova na aba "Itens" da sala e o item cai na mochila.
-export default function CustomItemForm({ cloudId }) {
+export default function CustomItemForm({ cloudId, tableId: sheetTable }) {
   const [tables, setTables] = useState(null);
   const [mine, setMine] = useState(undefined); // undefined carregando; null migration pendente
   const [form, setForm] = useState({ name: "", weight: "", damage: "", description: "", tableId: "", effects: [] });
@@ -22,7 +22,8 @@ export default function CustomItemForm({ cloudId }) {
   const refresh = useCallback(async () => { setMine(await listMyCustomItems()); }, []);
   useEffect(() => {
     myMemberships().then(rows => {
-      const list = rows.filter(r => r.status === "approved").map(r => r.tables);
+      // A ficha vale numa mesa só: o item vai para a mesa da própria ficha.
+      const list = rows.filter(r => r.status === "approved" && (!sheetTable || r.tables.id === sheetTable)).map(r => r.tables);
       setTables(list);
       setForm(f => ({ ...f, tableId: f.tableId || list[0]?.id || "" }));
     }).catch(() => setTables([]));

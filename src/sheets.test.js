@@ -106,3 +106,36 @@ test('sincronizar: troca fichas desatualizadas, abre as que faltam e mantém a a
   assert.equal(same.session.sheets[0].character.name, 'Editada');
   assert.equal(sheetsLosingChanges(s, [row(A, 3, 'Antiga')]).length, 0);
 });
+
+test('applyTables acerta a mesa das fichas abertas com o que a nuvem diz', async () => {
+  const { applyTables, setSheetTable, openCloudSheet, openSheet } = await import('./sheets.js');
+  const A = '123e4567-e89b-12d3-a456-426614174000', T = '123e4567-e89b-12d3-a456-4266141740aa';
+  let s = openCloudSheet({ sheets: [], activeId: '' }, { id: A, revision: 1, character: newCharacter(), tableId: T, tableName: 'Mesa Sábado' });
+  assert.equal(s.sheets[0].tableId, T);
+  assert.equal(s.sheets[0].tableName, 'Mesa Sábado');
+  // a nuvem diz que a ficha ficou sem mesa (mesa apagada): a aba perde a mesa
+  s = applyTables(s, [{ id: A, table_id: null, tables: null }]);
+  assert.equal('tableId' in s.sheets[0], false);
+  // a nuvem diz que a ficha é de uma mesa
+  s = applyTables(s, [{ id: A, table_id: T, tables: { name: 'Mesa Sábado' } }]);
+  assert.deepEqual([s.sheets[0].tableId, s.sheets[0].tableName], [T, 'Mesa Sábado']);
+  assert.equal(applyTables(s, [{ id: A, table_id: T, tables: { name: 'Mesa Sábado' } }]), s, 'sem mudança devolve a mesma sessão');
+  // ficha em rascunho local escolhe a mesa; o rascunho sobrevive ao recarregar
+  const draft = setSheetTable(openSheet({ sheets: [], activeId: '' }), openSheet({ sheets: [], activeId: '' }).activeId, { tableId: T, tableName: 'X' });
+  assert.ok(draft);
+});
+
+test('a mesa escolhida para uma ficha em rascunho sobrevive ao recarregar e lixo é descartado', async () => {
+  const { setSheetTable } = await import('./sheets.js');
+  const T = '123e4567-e89b-12d3-a456-4266141740aa';
+  const base = openSheet({ sheets: [], activeId: '' });
+  const bound = setSheetTable(base, base.activeId, { tableId: T, tableName: 'Mesa Sábado' });
+  const store = { getItem: () => JSON.stringify(bound) };
+  const back = restoreSheets(store);
+  assert.equal(back.sheets[0].tableId, T);
+  assert.equal(back.sheets[0].tableName, 'Mesa Sábado');
+  const forged = JSON.parse(JSON.stringify(bound));
+  forged.sheets[0].tableId = 'não é id';
+  const cleaned = restoreSheets({ getItem: () => JSON.stringify(forged) });
+  assert.equal('tableId' in cleaned.sheets[0], false);
+});

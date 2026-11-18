@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { getTable, getMembers } from '../../lib/tables.js';
 import { recentMessages, recentRolls, recentStateLog, loadStates, loadCharacters } from '../../lib/room.js';
+import { recentRewards } from '../../lib/rewards.js';
 
 // Carrega a mesa e mantem mensagens, estados, membros e presenca sincronizados em tempo real.
 export function useRoom(tableId, user, displayName) {
@@ -10,6 +11,7 @@ export function useRoom(tableId, user, displayName) {
   const [messages, setMessages] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [stateLog, setStateLog] = useState([]);
+  const [rewards, setRewards] = useState({ xp: [], money: [] });
   const [ready, setReady] = useState(false);
   const [states, setStates] = useState({});
   const [characters, setCharacters] = useState({});
@@ -98,6 +100,16 @@ export function useRoom(tableId, user, displayName) {
     return () => clearInterval(timer);
   }, [user?.id, ready, members]);
 
+  // Historico de XP e dinheiro: consulta de tempos em tempos (as concessoes chegam pelo mestre, pelo mercado e pelo trabalho).
+  useEffect(() => {
+    if (!supabase || !user || !ready) return undefined;
+    let alive = true;
+    const load = () => recentRewards(tableId).then(next => alive && setRewards(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))).catch(() => {});
+    load();
+    const timer = setInterval(load, 8000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [tableId, user?.id, ready]);
+
   // Recarrega mesa e membros (usado pelos controles da mesa dentro da sala).
   const reload = useCallback(async () => {
     const t = await getTable(tableId);
@@ -113,5 +125,5 @@ export function useRoom(tableId, user, displayName) {
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
   const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
   const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
-  return { stateLog, ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
+  return { stateLog, rewards, ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

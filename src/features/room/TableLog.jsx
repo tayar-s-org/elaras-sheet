@@ -1,19 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { describeRoll } from '../../diceRoll.js';
+import { formatMoney } from '../../money.js';
+import { mergeRewards, rewardAmount } from './rewardsLog.js';
 import './tablelog.css';
 
 const time = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const LIMIT = 80;
 const RESOURCE_LABEL = { life: 'Vida', stamina: 'Stamina', mana: 'Mana' };
+// Avisos de XP e dinheiro que o app antigo postava no chat: agora ficam na aba propria.
+const OLD_REWARD_LINE = /^(✨ O mestre concedeu \+\d+ XP a |💰 O mestre deu \$|💸 O mestre removeu \$)/;
 
-// Registro da mesa sob o tabuleiro, em abas: dados/chat e alteracoes de vida, stamina e mana.
-export default function TableLog({ messages, rolls, stateLog, hidden, members, characters, me, isGm }) {
+// Registro da mesa sob o tabuleiro, em abas: dados/chat, vida/stamina/mana e concessoes de XP e dinheiro.
+export default function TableLog({ messages, rolls, stateLog, rewards, hidden, members, characters, me, isGm }) {
   const [tab, setTab] = useState('dice');
   const boxRef = useRef(null);
   const names = useMemo(() => Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador'])), [members]);
   const diceEntries = useMemo(() => {
     const list = [
-      ...messages.map(m => ({ key: `m${m.id}`, at: m.created_at, type: 'msg', m })),
+      ...messages.filter(m => !OLD_REWARD_LINE.test(m.body || '')).map(m => ({ key: `m${m.id}`, at: m.created_at, type: 'msg', m })),
       ...rolls.filter(r => !hidden?.has(r.id)).map(r => ({ key: `r${r.id}`, at: r.created_at, type: 'roll', r })),
     ];
     // Mais recente primeiro: a ultima acao fica no topo e as anteriores embaixo.
@@ -22,7 +26,8 @@ export default function TableLog({ messages, rolls, stateLog, hidden, members, c
   // Jogadores não veem as mudanças de mana dos outros (só as da própria ficha); o mestre vê tudo.
   const myCharacter = members.find(m => m.user_id === me)?.character_id;
   const vitalEntries = useMemo(() => [...(stateLog || [])].filter(v => isGm || v.resource !== 'mana' || v.character_id === myCharacter).sort((a, b) => b.id - a.id).slice(0, LIMIT), [stateLog, isGm, myCharacter]);
-  const newestKey = tab === 'dice' ? diceEntries[0]?.key : vitalEntries[0]?.id;
+  const rewardEntries = useMemo(() => mergeRewards(rewards?.xp, rewards?.money, LIMIT), [rewards]);
+  const newestKey = tab === 'dice' ? diceEntries[0]?.key : tab === 'vitals' ? vitalEntries[0]?.id : rewardEntries[0]?.key;
   // A novidade aparece no topo; volta o quadro (so ele, nao a pagina) para o inicio.
   useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = 0; }, [newestKey, tab]);
 
@@ -30,6 +35,7 @@ export default function TableLog({ messages, rolls, stateLog, hidden, members, c
     <div className="tabs-row log-tabs" role="tablist">
       <button role="tab" aria-selected={tab === 'dice'} className={tab === 'dice' ? 'primary' : 'outline'} onClick={() => setTab('dice')}>Dados</button>
       <button role="tab" aria-selected={tab === 'vitals'} className={tab === 'vitals' ? 'primary' : 'outline'} onClick={() => setTab('vitals')}>Vida, mana e stamina</button>
+      <button role="tab" aria-selected={tab === 'rewards'} className={tab === 'rewards' ? 'primary' : 'outline'} onClick={() => setTab('rewards')}>XP e dinheiro</button>
     </div>
     <div className="table-log-box" ref={boxRef} role="log" aria-live="polite">
       {tab === 'dice' ? <>
@@ -55,6 +61,17 @@ export default function TableLog({ messages, rolls, stateLog, hidden, members, c
             <span className="log-detail"> · {d.detail}</span>
           </p>;
         })}
+      </> : tab === 'rewards' ? <>
+        {!rewardEntries.length && <p className="muted">Nenhuma concessão de XP ou dinheiro ainda. Elas aparecem aqui quando o mestre dá ou remove XP e dinheiro, e quando o mercado e o trabalho pagam.</p>}
+        {rewardEntries.map(r => <p key={r.key} className={`log-line log-reward ${r.kind} ${Number(r.amount) < 0 ? 'down' : 'up'}`}>
+          <span className="log-time">{time(r.created_at)}</span>
+          <strong>{characters?.[r.character_id]?.name || 'Personagem'}</strong>
+          <span> · {r.kind === 'xp' ? 'XP' : 'Dinheiro'} </span>
+          <b className="log-delta">{rewardAmount(r, formatMoney)}</b>
+          {r.note && <span className="log-detail"> · {r.note}</span>}
+          {r.granted_by && <span className="log-detail"> · por {names[r.granted_by] || 'Mestre'}</span>}
+          {!r.claimed_at && <span className="log-detail"> · a caminho</span>}
+        </p>)}
       </> : <>
         {!vitalEntries.length && <p className="muted">Nenhuma alteração de Vida, Mana ou Stamina ainda. Elas aparecem aqui quando alguém ajusta os contadores na aba Fichas.</p>}
         {vitalEntries.map(v => {

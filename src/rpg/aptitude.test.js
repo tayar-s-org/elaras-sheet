@@ -116,3 +116,13 @@ test('o motor continua gerando o ganho-base (a Aptidão é aplicada uma única v
   const e = processHour({ dayNo: 0, row: { a: ACT.SKILL, skill: 'Atirar', mode: 'normal' }, stats, state: { stamina: 100, mana: 50 }, day: null, rng: s => s }).event;
   assert.deepEqual(e.xp.map(x => x.amount), [1, 0.5], 'sem bônus no evento: a Aptidão não é aplicada duas vezes');
 });
+
+test('pontos já confirmados são permanentes: só dá para acrescentar, nunca remover ou mover', () => {
+  const previous = { 'attribute:Força': 5, 'skill:Conjurar': 3 };
+  assert.deepEqual(validateAllocation({ 'attribute:Força': 5, 'skill:Conjurar': 3 }, 47, sheet, previous), [], 'igual ao confirmado: ok');
+  assert.deepEqual(validateAllocation({ 'attribute:Força': 8, 'skill:Conjurar': 3, 'skill:Atirar': 2 }, 47, sheet, previous), [], 'acrescentar é permitido');
+  assert.ok(validateAllocation({ 'attribute:Força': 4, 'skill:Conjurar': 3 }, 47, sheet, previous).some(p => /não podem ser removidos/.test(p)), 'tirar 1 ponto de Força');
+  assert.ok(validateAllocation({ 'skill:Conjurar': 3 }, 47, sheet, previous).some(p => /Força/.test(p)), 'remover o alvo inteiro');
+  assert.ok(validateAllocation({ 'attribute:Força': 0, 'skill:Conjurar': 3, 'skill:Atirar': 5 }, 47, sheet, previous).length > 0, 'mover pontos de Força para Atirar');
+  assert.deepEqual(validateAllocation({ 'attribute:Força': 1 }, 47, sheet, {}), [], 'sem distribuição anterior não há trava');
+});

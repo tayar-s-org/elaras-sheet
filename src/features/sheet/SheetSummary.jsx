@@ -2,7 +2,7 @@ import React from "react";
 import { tokenUrl } from "../../lib/tokens.js";
 import MoneyTag from "../../ui/MoneyTag.jsx";
 
-export default function SheetSummary({ c, d, save }) {
+export default function SheetSummary({ c, d }) {
   return (
         <aside className="summary">
           <p className="eyebrow">FICHA EM TEMPO REAL</p>
@@ -68,9 +68,6 @@ export default function SheetSummary({ c, d, save }) {
             O mestre confirma os requisitos, as regras raciais e os poderes.
             Revise a ficha antes de jogar.
           </p>
-          <button className="outline full" onClick={() => save()}>
-            Salvar ficha em PDF
-          </button>
         </aside>
   );
 }

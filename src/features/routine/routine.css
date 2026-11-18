@@ -169,3 +169,13 @@
   .ap-table td, .ap-table th { border-top: 0; padding: 2px 0; }
   .ap-table td[data-label]::before { content: attr(data-label) ': '; color: var(--muted); font-size: .72rem; }
 }
+
+/* Aptidao na ficha, no token e no cartao do mestre */
+.apt-sum { display: grid; gap: 4px; }
+.apt-sum h5 { margin: 0; font-family: var(--font-display); color: var(--accent); }
+.apt-sum p { margin: 0; font-size: .82rem; }
+.apt-sum ul { margin: 0; padding-left: 16px; display: grid; gap: 2px; font-size: .82rem; }
+.apt-sum.compact { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.apt-sum.compact ul { font-size: .76rem; }
+.apt-free { color: var(--gold); }
+.apt-grant { display: grid; gap: 4px; margin-top: 6px; }

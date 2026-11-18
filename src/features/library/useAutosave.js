@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createCharacter, updateCharacter, ConflictError } from '../../lib/cloud.js';
+import { createCharacter, updateCharacter, linkIfNoCharacter, ConflictError } from '../../lib/cloud.js';
 import { setCloud } from '../../sheets.js';
 import { newCharacter } from '../../rules.js';
 
@@ -21,6 +21,8 @@ export function useAutosave(session, setSession, enabled) {
     for (const sheet of session.sheets) {
       const json = JSON.stringify(sheet.character);
       const dirty = sheet.cloud ? json !== sheet.cloud.base : json !== BLANK;
+      // Ficha nova so vai para a nuvem depois de escolher a mesa para a qual ela e criada.
+      if (!sheet.cloud && !sheet.tableId) continue;
       if (!dirty || inflight.current.has(sheet.id) || blocked.current.has(sheet.id) || failed.current.get(sheet.id) === json) continue;
       timers.push(setTimeout(async () => {
         inflight.current.add(sheet.id);
@@ -28,7 +30,8 @@ export function useAutosave(session, setSession, enabled) {
         try {
           const row = sheet.cloud
             ? await updateCharacter(sheet.cloud.id, sheet.cloud.revision, sheet.character)
-            : await createCharacter(sheet.character);
+            : await createCharacter(sheet.character, sheet.tableId);
+          if (!sheet.cloud && sheet.tableId) linkIfNoCharacter(sheet.tableId, row.id).catch(() => {}); // vira a ficha do jogador nessa mesa, se ele ainda nao tinha uma
           failed.current.delete(sheet.id);
           // A base e o que foi enviado; se houve nova edicao durante o envio, a ficha continua "suja" e salva de novo.
           setSession(prev => setCloud(prev, sheet.id, { id: row.id, revision: row.revision, character: sheet.character }));

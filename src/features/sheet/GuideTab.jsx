@@ -103,7 +103,7 @@ export default function GuideTab({ c, setC, setConfirm }) {
       <p className="muted guide-note">Os valores são o custo total para chegar àquele dado, partindo do d4 do atributo ou do início da perícia. Complicação menor +3, maior +5; vantagens custam 1, 2, 3…</p>
 
       <h3 className="guide-shortcuts">Atalhos do livro</h3>
-      <Templates character={c} onChange={setC} onLoad={(title, action) => setConfirm({title, text:"A ficha atual será substituída. Salve seu PDF antes de continuar se quiser guardá-la.", action})} />
+      <Templates character={c} onChange={setC} onLoad={(title, action) => setConfirm({title, text:"A ficha atual será substituída.", action})} />
     </>
   );
 }

@@ -41,15 +41,14 @@ export function incapacitation(state, max) {
   };
 }
 
-// Dado depois de perder `steps` estágios. Atributos nunca ficam abaixo de d4;
-// perícias abaixo de d4 viram d4 com −2 por estágio a mais (die 0 = sem treino, que já é d4−2).
+// Dado depois de perder `steps` estágios. O d4 é o menor dado possível: atributos e perícias treinadas nunca descem dele
+// (sem −2). Perícia sem treino (die 0) segue como já era, d4−2, e a incapacitação não a piora.
 export function steppedDie(die, steps, kind = 'attribute') {
-  const index = die ? DIE_LADDER.indexOf(die) + 1 : 0;
-  if (die && index === 0) return { die, bonus: 0 };
+  if (!die) return kind === 'attribute' ? { die: 4, bonus: 0 } : { die: 4, bonus: -2 };
+  const index = DIE_LADDER.indexOf(die) + 1;
+  if (index === 0) return { die, bonus: 0 };
   const next = index - steps;
-  if (next >= 1) return { die: DIE_LADDER[next - 1], bonus: 0 };
-  if (kind === 'attribute') return { die: 4, bonus: 0 };
-  return { die: 4, bonus: -2 * (1 - next) };
+  return { die: DIE_LADDER[Math.max(1, next) - 1], bonus: 0 };
 }
 
 export const effectiveMovement = (base, penalty) => Math.max(1, base - penalty);
@@ -59,7 +58,7 @@ export const stageLabel = inc => (inc.fainted ? 'Incapacitação 5 · Desmaiado'
 
 export function effectLines(inc) {
   const lines = [];
-  if (inc.dieSteps) lines.push(`−${inc.dieSteps} estágio${inc.dieSteps > 1 ? 's' : ''} em todos os dados (atributos nunca abaixo de d4)`);
+  if (inc.dieSteps) lines.push(`−${inc.dieSteps} estágio${inc.dieSteps > 1 ? 's' : ''} em todos os dados (nunca abaixo de d4)`);
   if (inc.movePenalty) lines.push(`−${inc.movePenalty} de Movimentação (mínimo 1)`);
   if (inc.fainted) lines.push('Desmaiado: não age até ser reanimado');
   return lines;
