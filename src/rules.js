@@ -64,7 +64,7 @@ export const MASTER_RULES = [
   ],
   [
     "Vida e stamina",
-    "Cada reserva máxima é igual a Vigor. Incapacitação 1: vida ou stamina na metade, perde um estágio de todos os dados. Incapacitação 2: abaixo de 25%, perde 2 de Movimentação. Incapacitação 3: já estar no estágio 2 e sofrer nova incapacitação, perde dois estágios de todos os dados. Incapacitação 4: as duas reservas gerando estágio 2, perde 6 de Movimentação. Incapacitação 5: após “x horas” no estágio 4, desmaia. Atributos têm mínimo d4 e Movimentação mínima 1. A tabela não esclarece todos os acúmulos.",
+    "Cada reserva máxima é igual a Vigor. Incapacitação 1: vida ou stamina na metade, perde um estágio de todos os dados. Incapacitação 2: abaixo de 25%, perde 2 de Movimentação. Incapacitação 3: já estar no estágio 2 e sofrer nova incapacitação, perde dois estágios de todos os dados. Incapacitação 4: as duas reservas gerando estágio 2, perde 6 de Movimentação. Incapacitação 5: após “x horas” no estágio 4, desmaia. Atributos têm mínimo d4 e Movimentação mínima 1. As incapacitações somam: cada reserva vale 1 na metade e 2 abaixo de 25%, e a soma de Vida e Stamina é o estágio (1 em cada = Incapacitação 2). Cada tipo de efeito segue o estágio mais alto que o atinge: dados −1 nos estágios 1 e 2 e −2 nos estágios 3 e 4; Movimentação −2 nos estágios 2 e 3 e −6 no estágio 4 (não soma com o −2). O dado selvagem não muda. O mestre define as horas (X) do estágio 5.",
   ],
   [
     "Mana e exaustão",

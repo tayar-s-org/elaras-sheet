@@ -1,6 +1,15 @@
 import React from 'react';
 import { ATTRIBUTES, calculate, validateCharacter } from '../../rules.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals.js';
+import { incapacitation, steppedDie, effectiveMovement } from '../../incapacitation.js';
+import IncapPanel from './IncapPanel.jsx';
+
+// "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; perícia abaixo de d4 vira "d4−2".
+function DieText({ die, steps, kind }) {
+  const eff = steppedDie(die, steps, kind);
+  const label = `d${eff.die}${eff.bonus ? eff.bonus : ''}`.replace('-', '−');
+  return <b>{label}{(eff.die !== die || eff.bonus) && <small> (d{die})</small>}</b>;
+}
 import './peek.css';
 
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
@@ -8,6 +17,7 @@ export default function SheetPeek({ data, state, onClose }) {
   let c, d;
   try { c = validateCharacter(data); d = calculate(c); } catch { return null; }
   const max = safeMaxima(data);
+  const inc = incapacitation(state, max);
   const skills = Object.entries(c.skills).filter(([, die]) => die > 0);
   return <aside className="sheet-peek" aria-label={`Ficha de ${c.name || 'personagem'}`}>
     <button type="button" className="peek-close" aria-label="Fechar resumo da ficha" onClick={onClose}>×</button>
@@ -28,14 +38,15 @@ export default function SheetPeek({ data, state, onClose }) {
         </div>;
       })}
     </div>
+    <IncapPanel state={state} max={max} baseMovement={d.movement} compact />
     <div className="peek-stats">
-      {[['Movimento', d.movement], ['Aparar', d.parry], ['Resistência', d.toughness]].map(([k, v]) => <span key={k}><small>{k}</small><b>{v}</b></span>)}
+      {[['Movimento', effectiveMovement(d.movement, inc.movePenalty)], ['Aparar', d.parry], ['Resistência', d.toughness]].map(([k, v]) => <span key={k}><small>{k}</small><b>{v}</b></span>)}
     </div>
     <h5>Atributos</h5>
-    <div className="peek-grid">{ATTRIBUTES.map(n => <span key={n}>{n} <b>d{c.attributes[n]}</b></span>)}</div>
+    <div className="peek-grid">{ATTRIBUTES.map(n => <span key={n}>{n} <DieText die={c.attributes[n]} steps={inc.dieSteps} kind="attribute" /></span>)}</div>
     {skills.length > 0 && <>
       <h5>Perícias</h5>
-      <div className="peek-grid">{skills.map(([n, die]) => <span key={n}>{n} <b>d{die}</b></span>)}</div>
+      <div className="peek-grid">{skills.map(([n, die]) => <span key={n}>{n} <DieText die={die} steps={inc.dieSteps} kind="skill" /></span>)}</div>
     </>}
     {c.advantages.length > 0 && <>
       <h5>Vantagens</h5>

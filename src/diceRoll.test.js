@@ -43,3 +43,14 @@ test('describeRoll formata rolagens de dados com vantagem e de traço', () => {
   assert.equal(crit.outcome, 'Falha crítica!');
   assert.equal(crit.tone, 'bad');
 });
+
+test('describeRoll mostra quando a incapacitação reduziu o dado do traço', () => {
+  const base = { name: 'Lutar', die: 6, untrained: false, wild: true, traitRolls: [4], traitTotal: 4, wildRolls: [2], wildTotal: 2,
+    penalty: 0, modifier: 0, target: 4, criticalFailure: false, success: true, raises: 0 };
+  const hit = describeRoll({ formula: 'x', total: 4, result: { kind: 'trait', ...base, incap: { total: 3, steps: 2, baseDie: 10 } } });
+  assert.match(hit.detail, /Lutar d6 \(incapacitação 3: d10 → d6\): 4/);
+  const none = describeRoll({ formula: 'x', total: 4, result: { kind: 'trait', ...base, incap: { total: 0, steps: 0, baseDie: 6 } } });
+  assert.doesNotMatch(none.detail, /incapacitação/);
+  const legacy = describeRoll({ formula: 'x', total: 4, result: { kind: 'trait', ...base } });
+  assert.doesNotMatch(legacy.detail, /incapacitação/);
+});

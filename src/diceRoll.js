@@ -39,7 +39,8 @@ const signed = n => (n > 0 ? `+${n}` : String(n));
 export function describeRoll(roll) {
   const r = roll.result;
   if (r.kind === 'trait') {
-    const parts = [`${r.name} d${r.die}${r.untrained ? ' (sem treino)' : ''}: ${chainText(r.traitRolls)}`];
+    const incap = r.incap?.steps > 0 && r.incap.baseDie ? ` (incapacitação ${r.incap.total}: d${r.incap.baseDie} → d${r.die})` : '';
+    const parts = [`${r.name} d${r.die}${r.untrained ? ' (sem treino)' : ''}${incap}: ${chainText(r.traitRolls)}`];
     if (r.wild) parts.push(`dado selvagem d6: ${chainText(r.wildRolls)}`);
     const adjust = [r.penalty ? signed(r.penalty) : '', r.modifier ? signed(r.modifier) : ''].filter(Boolean).join(' ');
     const best = r.wild ? Math.max(r.traitTotal, r.wildTotal) : r.traitTotal;
