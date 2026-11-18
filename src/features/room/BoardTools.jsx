@@ -3,7 +3,7 @@ import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, 
 
 const COLORS = ['#7a4dff', '#b3382c', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
 
-export default function BoardTools({ board, tokens, marks, members, characters, selected, onSelect, room, local, setError }) {
+export default function BoardTools({ board, tokens, marks, members, characters, selected, onSelect, room, local, setError, onEditImage }) {
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [npc, setNpc] = useState({ name: '', color: COLORS[1], size: 1 });
@@ -38,6 +38,14 @@ export default function BoardTools({ board, tokens, marks, members, characters, 
       <label className="field"><span>Tamanho da célula (px)</span>
         <input type="number" min="20" max="400" defaultValue={grid.size} key={grid.size}
           onBlur={e => { const v = Math.min(400, Math.max(20, Number(e.target.value) || 70)); if (v !== grid.size) setGrid({ size: v }); }} /></label>
+      <label className="field"><span>Tamanho dos tokens</span>
+        <select value={String(board.settings?.tokenScale || 1.25)} onChange={e => run(async () => {
+          const settings = { ...(board.settings || {}), tokenScale: Number(e.target.value) };
+          local.setBoard({ ...board, settings });
+          await updateBoard(board.id, { settings });
+        })}>
+          <option value="0.8">Pequeno</option><option value="1">Igual à célula</option><option value="1.25">Grande</option>
+          <option value="1.5">Maior</option><option value="2">Enorme</option></select></label>
       <label className="field"><span><input type="checkbox" checked={Boolean(grid.visible)} onChange={e => setGrid({ visible: e.target.checked })} /> Mostrar grade e ajustar à grade</span></label>
     </div>
 
@@ -66,6 +74,8 @@ export default function BoardTools({ board, tokens, marks, members, characters, 
             <option value="0.5">Pequeno</option><option value="1">Médio</option><option value="2">Grande</option><option value="3">Enorme</option></select></label>
       </div>
       <div className="row">
+        <button className="outline" disabled={busy} onClick={() => onEditImage(selected)}>{selected.image_path ? 'Trocar imagem' : 'Criar imagem do token'}</button>
+        {selected.image_path && <button className="text-button" disabled={busy} onClick={() => run(async () => { await updateToken(selected.id, { image_path: null }); local.setTokens(prev => prev.map(t => t.id === selected.id ? { ...t, image_path: null } : t)); })}>Tirar imagem</button>}
         <button className="outline" disabled={busy} onClick={() => run(async () => { const hidden = !selected.hidden; await updateToken(selected.id, { hidden }); local.setTokens(prev => prev.map(t => t.id === selected.id ? { ...t, hidden } : t)); refreshOthers(); })}>
           {selected.hidden ? 'Revelar aos jogadores' : 'Ocultar dos jogadores'}</button>
         <button className="text-button danger" disabled={busy} onClick={() => window.confirm(`Remover o token ${selected.name}?`) && run(async () => { await removeToken(selected.id); local.setTokens(prev => prev.filter(t => t.id !== selected.id)); onSelect(null); })}>Remover token</button>

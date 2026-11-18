@@ -80,6 +80,13 @@ export function useRoom(tableId, user, displayName) {
     return () => clearInterval(timer);
   }, [tableId, user?.id, ready]);
 
+  // Recarrega mesa e membros (usado pelos controles da mesa dentro da sala).
+  const reload = useCallback(async () => {
+    const t = await getTable(tableId);
+    if (t) setTable(t);
+    await reloadMembers();
+  }, [tableId, reloadMembers]);
+
   const sendBroadcast = useCallback((event, payload) => { channelRef.current?.send({ type: 'broadcast', event, payload }); }, []);
   const onBroadcast = useCallback((event, fn) => {
     (listeners.current[event] ||= []).push(fn);
@@ -88,5 +95,5 @@ export function useRoom(tableId, user, displayName) {
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
   const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
   const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
-  return { ready, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
+  return { ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

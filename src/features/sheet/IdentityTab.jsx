@@ -1,10 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { Field, NumberField } from "../../ui/Field.jsx";
 import Templates from "../../Templates.jsx";
 import { stageForXP } from "../../catalogRules.js";
+import TokenMaker from "../token/TokenMaker.jsx";
+import { uploadTokenImage, tokenUrl } from "../../lib/tokens.js";
 
 /* eslint-disable-next-line no-unused-vars */
-export default function IdentityTab({ c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage }) {
+export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage }) {
+  const [maker, setMaker] = useState(false);
+  const userId = auth?.user?.id;
+  const tokenSrc = tokenUrl(c.tokenImage);
   return (
             <>
               <p className="intro">
@@ -58,6 +63,20 @@ export default function IdentityTab({ c, d, update, rule, setC, setConfirm, setT
                   </Field>
                 </div>
               </div>
+              <div className="item-card token-card">
+                {tokenSrc ? <img className="token-thumb" src={tokenSrc} alt={`Token de ${c.name || "personagem"}`} /> : <span className="token-thumb empty" aria-hidden="true">?</span>}
+                <div>
+                  <b>Token do personagem</b>
+                  <p className="muted">A imagem que representa você no tabuleiro da mesa. Crie com um retrato, forma e moldura.</p>
+                  <div className="row token-row">
+                    <button type="button" className="outline" disabled={!userId} onClick={() => setMaker(true)}>{c.tokenImage ? "Refazer token" : "Criar token"}</button>
+                    {c.tokenImage && <button type="button" className="text-button danger" onClick={() => update("tokenImage", "")}>Remover</button>}
+                  </div>
+                  {!userId && <p className="muted">Entre na sua conta para salvar o token.</p>}
+                </div>
+              </div>
+              {maker && <TokenMaker name={c.name} onClose={() => setMaker(false)}
+                onSave={async blob => { const path = await uploadTokenImage(userId, blob, c.tokenImage); update("tokenImage", path); setToast("Token salvo na ficha."); }} />}
               <Templates character={c} onChange={setC} onLoad={(title, action) => setConfirm({title, text:"A ficha atual será substituída. Salve seu PDF antes de continuar se quiser guardá-la.", action})} />
               <div className="callout">
                 <b>As florestas de Sylvargan</b>

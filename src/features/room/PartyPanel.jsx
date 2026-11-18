@@ -1,21 +1,6 @@
 import React, { useState } from 'react';
-import { calculate, validateCharacter } from '../../rules.js';
 import { saveState } from '../../lib/room.js';
-
-const RESOURCES = [['life', 'Vida'], ['stamina', 'Stamina'], ['mana', 'Mana']];
-
-function safeMaxima(data) {
-  try { const d = calculate(validateCharacter(data)); return { life: d.life, stamina: d.stamina, mana: d.mana }; }
-  catch { return { life: 0, stamina: 0, mana: 0 }; }
-}
-
-// Niveis de incapacitacao (Vida/Stamina) e exaustao (Mana) conforme as regras da mesa.
-const level = (cur, max, mana) => {
-  if (max <= 0) return 0;
-  if (mana) return cur <= max * 0.1 ? 3 : cur < max * 0.25 ? 2 : cur <= max / 2 ? 1 : 0;
-  return cur < max * 0.25 ? 2 : cur <= max / 2 ? 1 : 0;
-};
-const LEVEL_TEXT = { normal: ['OK', 'Incapacitação 1', 'Incapacitação 2'], mana: ['OK', 'Exaustão 1', 'Exaustão 2', 'Exaustão 3'] };
+import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals.js';
 
 function Counter({ id, label, value, max, canEdit, onChange }) {
   const mana = id === 'mana';
@@ -35,7 +20,7 @@ function Counter({ id, label, value, max, canEdit, onChange }) {
 function CharacterCard({ member, row, state, canEdit, tableId, patchState, closed }) {
   const [error, setError] = useState('');
   const max = safeMaxima(row.data);
-  const value = k => Math.min(max[k], Math.max(0, Number.isFinite(state?.[k]) ? state[k] : max[k]));
+  const value = k => currentValue(state, max, k);
   async function change(k, v) {
     const next = { life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v };
     patchState(row.id, next);

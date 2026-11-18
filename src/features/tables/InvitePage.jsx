@@ -16,7 +16,7 @@ export default function InvitePage({ auth, code }) {
     <h1>Convite para uma mesa</h1>
     <p className="muted">Código {code}. Escolha uma ficha (opcional) e envie seu pedido; o mestre pode precisar aprová-lo.</p>
     <JoinForm submitLabel="Entrar na mesa" onSubmit={async ({ message, characterId }) => {
-      navigate(`/mesa/${await joinByCode(code, message, characterId)}`);
+      navigate(`/sala/${await joinByCode(code, message, characterId)}`);
     }} />
   </main>;
 }

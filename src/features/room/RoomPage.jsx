@@ -6,6 +6,8 @@ import ChatPanel from './ChatPanel.jsx';
 import PartyPanel from './PartyPanel.jsx';
 import DicePanel, { RollHistory } from './DicePanel.jsx';
 import BoardView from './BoardView.jsx';
+import TableControls from '../tables/TableControls.jsx';
+import TableLog from './TableLog.jsx';
 import { useBoard } from './useBoard.js';
 
 const SETTINGS_KEY = 'elara-dice3d';
@@ -16,6 +18,7 @@ const loadSettings = () => {
 
 export default function RoomPage({ auth, id }) {
   const [tab, setTab] = useState('chat');
+  const [ctrlError, setCtrlError] = useState('');
   const [diceSettings, setDiceSettingsState] = useState(loadSettings);
   const setDiceSettings = useCallback(patch => setDiceSettingsState(prev => {
     const next = { ...prev, ...patch };
@@ -66,20 +69,27 @@ export default function RoomPage({ auth, id }) {
           {m.role === 'gm' && <span className="badge">Mestre</span>}
         </li>)}
       </ul>
-      <button className="outline" onClick={() => navigate(`/mesa/${id}`)}>Gerenciar mesa</button>
+      <button className="outline" onClick={() => navigate('/mesas')}>← Mesas</button>
       {error && <p role="alert" className="muted">{error}</p>}
     </aside>
     <section className="room-board" aria-label="Tabuleiro">
-      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating} />
+      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating}
+        logSlot={<TableLog messages={messages} rolls={rolls} hidden={hidden} members={members} me={auth.user.id} />} />
     </section>
     <aside className="room-panel">
       <div className="tabs-row" role="tablist">
         <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'primary' : 'outline'} onClick={() => setTab('chat')}>Chat</button>
         <button role="tab" aria-selected={tab === 'dice'} className={tab === 'dice' ? 'primary' : 'outline'} onClick={() => setTab('dice')}>Dados</button>
         <button role="tab" aria-selected={tab === 'party'} className={tab === 'party' ? 'primary' : 'outline'} onClick={() => setTab('party')}>{isGm ? 'Grupo' : 'Fichas'}</button>
+        <button role="tab" aria-selected={tab === 'table'} className={tab === 'table' ? 'primary' : 'outline'} onClick={() => setTab('table')}>Mesa</button>
       </div>
       {closed && <p className="callout">Esta mesa foi encerrada. O histórico continua visível, mas ninguém pode escrever.</p>}
-      {tab === 'dice' ? <>
+      {tab === 'table' ? <>
+        {ctrlError && <p role="alert" className="muted">{ctrlError}</p>}
+        <TableControls table={table} me={me} members={members} reload={room.reload} isGm={isGm}
+          run={async fn => { setCtrlError(''); try { await fn(); } catch (e) { setCtrlError(e.message); } }} />
+      </>
+        : tab === 'dice' ? <>
         <DicePanel tableId={id} me={auth.user.id} members={members} characters={characters} onRolled={room.addRoll} disabled={closed} settings={diceSettings} onSettings={setDiceSettings} />
         <h3>Histórico</h3>
         <RollHistory rolls={rolls} hidden={hidden} members={members} me={auth.user.id} />

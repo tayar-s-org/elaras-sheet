@@ -18,7 +18,7 @@ function MineTab() {
   if (!rows) return <p className="muted">Carregando…</p>;
   if (!rows.length) return <p className="muted">Você ainda não participa de nenhuma mesa. Crie uma ou procure em Descobrir.</p>;
   return <div className="table-list">
-    {rows.map(r => <button key={r.tables.id} className="table-card" onClick={() => navigate(`/mesa/${r.tables.id}`)}>
+    {rows.map(r => <button key={r.tables.id} className="table-card" onClick={() => navigate(r.status === 'approved' ? `/sala/${r.tables.id}` : `/mesa/${r.tables.id}`)}>
       <strong>{r.tables.name}</strong>
       <span className="muted">{r.role === 'gm' ? 'Você é o mestre' : MEMBER_LABEL[r.status]} · {STATUS_LABEL[r.tables.status]} · {r.tables.visibility === 'public' ? 'Pública' : 'Privada'}</span>
     </button>)}
@@ -44,7 +44,7 @@ function DiscoverTab() {
         <span className="muted">Mestre {t.gm_name} · {STATUS_LABEL[t.status]} · {t.player_count}/{t.max_players} jogadores</span>
         {t.description && <p>{t.description}</p>}
         {joining === t.id
-          ? <JoinForm onSubmit={async ({ message, characterId }) => { await joinPublic(t.id, message, characterId); navigate(`/mesa/${t.id}`); }} />
+          ? <JoinForm onSubmit={async ({ message, characterId }) => { const status = await joinPublic(t.id, message, characterId); navigate(status === 'approved' ? `/sala/${t.id}` : `/mesa/${t.id}`); }} />
           : <button className="outline" onClick={() => setJoining(t.id)}>Pedir para entrar</button>}
       </div>)}</div>}
   </>;
@@ -59,7 +59,7 @@ function CreateTab() {
     e.preventDefault();
     setBusy(true);
     setError('');
-    try { navigate(`/mesa/${await createTable(form)}`); }
+    try { navigate(`/sala/${await createTable(form)}`); }
     catch (err) { setError(err.message); setBusy(false); }
   }
   return <form className="join-form" onSubmit={submit}>
@@ -82,7 +82,7 @@ function CreateTab() {
 function CodeTab() {
   const [code, setCode] = useState('');
   return <JoinForm submitLabel="Entrar com o código" onSubmit={async ({ message, characterId }) => {
-    navigate(`/mesa/${await joinByCode(code, message, characterId)}`);
+    navigate(`/sala/${await joinByCode(code, message, characterId)}`);
   }}>
     <label className="field"><span>Código de convite</span>
       <input required maxLength={16} value={code} onChange={e => setCode(e.target.value)} autoCapitalize="characters" /></label>

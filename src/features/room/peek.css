@@ -1,0 +1,15 @@
+.sheet-peek { position: absolute; top: 8px; right: 8px; z-index: 5; width: 300px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 12px 40px var(--shadow, rgba(0,0,0,.4)); font-size: .9rem; }
+.peek-close { position: absolute; top: 6px; right: 8px; width: 28px; height: 28px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
+.sheet-peek h4 { margin: 0; font-family: var(--font-display); font-size: 1.25rem; }
+.sheet-peek h5 { margin: 12px 0 4px; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.sheet-peek p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.peek-stats { display: flex; gap: 8px; margin-top: 10px; }
+.peek-stats span { flex: 1; display: grid; justify-items: center; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.peek-stats small { color: var(--muted); font-size: .72rem; }
+.peek-stats b { font-size: 1.3rem; font-family: var(--font-display); color: var(--accent); }
+.peek-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 14px; }
+.peek-grid b { color: var(--accent); margin-left: 2px; }
+.peek-vitals { display: grid; gap: 8px; margin-top: 12px; }
+.peek-vital-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.peek-vital-head strong { margin-left: auto; }
+.peek-vital-head small { font-weight: 400; color: var(--muted); }

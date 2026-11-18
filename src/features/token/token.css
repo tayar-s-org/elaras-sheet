@@ -1,0 +1,30 @@
+.token-maker { max-width: 780px; max-height: calc(100vh - 48px); overflow: auto; }
+.token-maker-body { display: grid; grid-template-columns: 340px 1fr; gap: 24px; margin-top: 18px; }
+.token-stage { display: grid; gap: 10px; justify-items: center; align-content: start; }
+.token-drop { width: 100%; display: grid; place-items: center; padding: 8px; border: 2px dashed var(--border); border-radius: 10px;
+  background: repeating-conic-gradient(var(--surface-soft) 0 25%, var(--surface) 0 50%) 0 0 / 20px 20px; }
+.token-drop.over { border-color: var(--accent); }
+.token-drop canvas { width: 100%; max-width: 320px; aspect-ratio: 1; touch-action: none; }
+.token-drop canvas.draggable { cursor: grab; }
+.token-drop canvas.draggable:active { cursor: grabbing; }
+.token-controls { display: grid; gap: 12px; align-content: start; }
+.token-controls .field { margin: 0; }
+.token-set { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; margin: 0; }
+.token-set legend { font-size: .8rem; color: var(--muted); padding: 0 6px; }
+.token-swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.token-swatch { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; }
+.token-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.token-swatches input[type="color"] { width: 36px; height: 32px; padding: 0; border: 0; background: none; }
+.token-row { justify-content: flex-start; }
+.token-actions { margin-top: 18px; }
+.token-actions-right { display: flex; gap: 10px; }
+.token-error { color: var(--danger); margin: 12px 0 0; }
+.token-maker .check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+
+.token-card { display: flex; gap: 16px; align-items: center; }
+.token-thumb { width: 84px; height: 84px; flex: none; object-fit: contain; }
+.token-thumb.empty { display: grid; place-items: center; border-radius: 50%; border: 2px dashed var(--border); color: var(--muted); font-size: 2rem; }
+
+@media (max-width: 720px) {
+  .token-maker-body { grid-template-columns: 1fr; }
+}

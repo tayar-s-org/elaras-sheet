@@ -105,6 +105,7 @@ export function newCharacter() {
     equipment: "",
     history: "",
     notes: "",
+    tokenImage: "",
     armor: 0,
     movementBonus: 0,
     parryBonus: 0,
@@ -237,6 +238,7 @@ export function validateCharacter(raw) {
     "notes",
   ])
     c[name] = string(raw[name]);
+  c.tokenImage = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(raw.tokenImage) ? raw.tokenImage : "";
   c.raceId = ["Androide","Anão","Atlante","Aviano","Elfo","Humano","Meio-elfo","Meio-orc","Pequenino","Rakashano","Sáurio"].includes(raw.raceId) ? raw.raceId : "";
   c.raceChoice = raw.raceChoice === "Vantagem" ? "Vantagem" : "Agilidade";
   c.raceSkill = SKILLS.some(([name]) => name === raw.raceSkill) ? raw.raceSkill : "Conhecimento";

@@ -129,7 +129,7 @@ export default function App() {
     setTab(0);
     navigate("/");
   }
-  const ctx = { c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
+  const ctx = { auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
   const sheetsLocked = cloudConfigured && route === "/fichas" && !auth.user;
   const topbar = <TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} auth={auth} onSignOut={signOut} />;
   const page = route === "/fichas" ? (sheetsLocked ? <main className="page">

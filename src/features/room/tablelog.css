@@ -1,0 +1,13 @@
+.table-log-box { height: 190px; overflow: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); display: grid; gap: 6px; align-content: start; font-size: .92rem; }
+.log-line { margin: 0; padding: 6px 10px; line-height: 1.35; overflow-wrap: anywhere; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.log-line.mine strong { color: var(--accent); }
+.log-line.whisper { font-style: italic; border-left: 3px solid var(--gold); }
+.log-time { color: var(--muted); font-size: .78rem; margin-right: 8px; }
+.log-roll { display: block; border-left: 3px solid var(--border); }
+.log-roll.good { border-left-color: var(--success); }
+.log-roll.bad { border-left-color: var(--danger); }
+.log-total { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; line-height: 1; vertical-align: -2px; color: var(--accent); }
+.log-roll.good .log-total { color: var(--success); }
+.log-roll.bad .log-total { color: var(--danger); }
+.log-outcome { font-weight: 600; }
+.log-detail { color: var(--muted); font-size: .82rem; }
