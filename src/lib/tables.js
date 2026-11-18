@@ -27,8 +27,13 @@ export async function getTable(id) {
   return data;
 }
 export async function myMemberships() {
+  // A RLS deixa membros e mestre lerem as linhas de todos os participantes da mesa; aqui so interessam as do proprio usuario.
+  const { data: auth } = await supabase.auth.getSession();
+  const uid = auth.session?.user?.id;
+  if (!uid) throw new Error('Entre na sua conta para ver suas mesas.');
   const { data, error } = await supabase.from('table_members')
     .select(`role,status,requested_at,tables(${TABLE_COLS})`)
+    .eq('user_id', uid)
     .in('status', ['pending', 'approved'])
     .order('requested_at', { ascending: false });
   fail(error);

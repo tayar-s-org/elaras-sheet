@@ -9,13 +9,21 @@ export class ConflictError extends Error {
 }
 const fail = error => { if (error) throw new Error(error.message || 'Erro ao acessar a nuvem.'); };
 
+// A RLS tambem libera fichas de outros jogadores das mesas em comum (para a sala); a biblioteca so lista as do proprio usuario.
+async function myId() {
+  const { data } = await supabase.auth.getSession();
+  const id = data.session?.user?.id;
+  if (!id) throw new Error('Entre na sua conta para ver suas fichas.');
+  return id;
+}
+
 export async function listMine() {
-  const { data, error } = await supabase.from('characters').select('id,name,revision,updated_at').order('updated_at', { ascending: false });
+  const { data, error } = await supabase.from('characters').select('id,name,revision,updated_at').eq('owner_id', await myId()).order('updated_at', { ascending: false });
   fail(error);
   return data;
 }
 export async function getCharacter(id) {
-  const { data, error } = await supabase.from('characters').select('id,revision,data').eq('id', id).single();
+  const { data, error } = await supabase.from('characters').select('id,revision,data').eq('id', id).eq('owner_id', await myId()).single();
   fail(error);
   return { id: data.id, revision: data.revision, character: validateCharacter(data.data) };
 }

@@ -8,7 +8,7 @@ import CloudSheets from "./features/library/CloudSheets.jsx";
 import AuthPage from "./features/auth/AuthPage.jsx";
 import { useAuth } from "./features/auth/useAuth.js";
 import { useHashRoute, navigate, loginThen } from "./lib/router.js";
-import { cloudConfigured } from "./lib/supabase.js";
+import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
@@ -28,6 +28,7 @@ import BookTab from "./features/sheet/BookTab.jsx";
 import Toast from "./ui/Toast.jsx";
 import ConfirmModal from "./ui/ConfirmModal.jsx";
 
+const OWNER_KEY = "manrakora-sheets-owner";
 const TABS = [
   "Identidade",
   "Atributos",
@@ -74,6 +75,27 @@ export default function App() {
       setStorageError(true);
     }
   }, [session]);
+  // Os rascunhos locais pertencem a quem os criou: ao entrar com outra conta, comeca em branco em vez de enviar fichas alheias.
+  useEffect(() => {
+    const id = auth.user?.id;
+    if (!id) return;
+    let owner = null;
+    try { owner = localStorage.getItem(OWNER_KEY); } catch { /* sem storage */ }
+    if (owner && owner !== id) {
+      setSession(restoreSheets({ getItem: () => null }));
+      setMaster(false);
+      setTab(0);
+    }
+    try { localStorage.setItem(OWNER_KEY, id); } catch { /* sem storage */ }
+    // Abas ligadas a fichas de outra pessoa (abertas por um erro antigo da lista) saem daqui; so as da propria conta ficam.
+    const linked = [...new Set(session.sheets.filter(s => s.cloud).map(s => s.cloud.id))];
+    if (supabase && linked.length) {
+      supabase.from('characters').select('id,owner_id').in('id', linked).then(({ data }) => {
+        const foreign = new Set((data || []).filter(r => r.owner_id !== id).map(r => r.id));
+        if (foreign.size) setSession(prev => prev.sheets.filter(s => s.cloud && foreign.has(s.cloud.id)).reduce((acc, s) => closeSheet(acc, s.id), prev));
+      });
+    }
+  }, [auth.user?.id]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 6500);
@@ -123,7 +145,7 @@ export default function App() {
   async function signOut() {
     await auth.signOut();
     // As fichas ficam na conta; limpa os rascunhos deste navegador para o proximo usuario.
-    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); } catch { /* sem storage */ }
+    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); localStorage.removeItem(OWNER_KEY); } catch { /* sem storage */ }
     setSession(restoreSheets({ getItem: () => null }));
     setMaster(false);
     setTab(0);
