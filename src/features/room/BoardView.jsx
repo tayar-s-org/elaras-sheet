@@ -10,6 +10,7 @@ import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
 import { creatureOf, metaWithHp, metaWithMaxHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import SheetPeek from './SheetPeek.jsx';
+import { safeMaxima, currentValue } from './vitals.js';
 
 const DiceStage = lazy(() => import('./DiceStage.jsx'));
 
@@ -60,6 +61,18 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
   // O token inteiro (nao so o centro) fica dentro do tabuleiro.
   // Tokens de criatura aparecem com o dobro do tamanho dos demais.
+  // Barra de vida dos tokens de jogador (por enquanto so no modo de desenvolvimento).
+  const pcLife = t => {
+    if (!import.meta.env.DEV || !t.character_id) return null;
+    const data = characters[t.character_id]?.data;
+    if (!data) return null;
+    try {
+      const max = safeMaxima(data);
+      if (!(max.life > 0)) return null;
+      const hp = currentValue(room.states[t.character_id], max, 'life');
+      return { hp, maxHp: max.life, ratio: hp / max.life };
+    } catch { return null; }
+  };
   const unit = t => gsize * t.size * tokenScale * (creatureOf(t) ? 2 : 1);
   const tokenHalf = t => unit(t) / 2;
   const keepIn = (v, half, max) => (max <= half * 2 ? max / 2 : clamp(v, half, max - half));
@@ -325,7 +338,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         const r = unit(t) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
         const src = imageOf(t);
-        const cr = creatureOf(t);
+        const cr = creatureOf(t) || pcLife(t);
         // Token de personagem mostra o nome atual da ficha (o nome gravado no token é só o de quando foi colocado).
         const label = (t.character_id && characters[t.character_id]?.name) || t.name;
         return <g key={t.id} data-token={t.id} transform={`translate(${p.x} ${p.y})`}
