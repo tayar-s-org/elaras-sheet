@@ -181,3 +181,25 @@ input, select, textarea { font-family: inherit; }
 .save-status.saved { color: var(--success); }
 .save-status.error { color: var(--danger); }
 @media (max-width: 760px) { .user-name { display: none; } }
+
+.board-wrap { position: relative; }
+.dice-stage { position: absolute; inset: 0; pointer-events: none; border-radius: 8px; overflow: hidden; transition: opacity .6s ease; }
+.dice-stage.fading { opacity: 0; }
+.dice-canvas { width: 100%; height: 100%; display: block; }
+.dice-badge { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: grid; justify-items: center; gap: 0; min-width: 150px; max-width: 90%; padding: 8px 18px 10px; border-radius: 12px; background: color-mix(in srgb, var(--surface) 94%, transparent); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(0,0,0,.35); animation: badge-in .35s ease-out; text-align: center; }
+.dice-badge.good { border-color: var(--success); }
+.dice-badge.bad { border-color: var(--danger); }
+.dice-badge-who { font-size: 0.8rem; color: var(--muted); }
+.dice-badge-total { font-family: var(--font-display); font-weight: 700; font-size: 2.6rem; line-height: 1; color: var(--accent); }
+.dice-badge.good .dice-badge-total { color: var(--success); }
+.dice-badge.bad .dice-badge-total { color: var(--danger); }
+.dice-badge-outcome { font-weight: 700; font-size: 0.95rem; }
+.dice-badge-formula { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+@keyframes badge-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.dice-options { display: grid; gap: 2px; }
+
+@media (max-width: 980px) { .room { grid-template-columns: minmax(0, 1fr); } .room > * { min-width: 0; } }
+.board { grid-template-columns: minmax(0, 1fr); }
+.board > * { min-width: 0; }
+.board-tools .row, .board-toolbar { flex-wrap: wrap; }
+.board-tools input, .board-tools select { min-width: 0; max-width: 100%; }

@@ -1,11 +1,35 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { updateToken, addMark, removeMark, snapToGrid } from '../../lib/board.js';
 import BoardTools from './BoardTools.jsx';
+
+const DiceStage = lazy(() => import('./DiceStage.jsx'));
+
+// Anima no tabuleiro, para todos, cada rolagem nova que chega pelo servidor.
+function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
+  const [event, setEvent] = useState(null);
+  const last = useRef(null);
+  const seq = useRef(0);
+  useEffect(() => { if (settings.anim) import('./DiceStage.jsx'); }, [settings.anim]);
+  useLayoutEffect(() => {
+    if (!ready) return;
+    if (last.current === null) { last.current = rolls.reduce((m, r) => Math.max(m, r.id), 0); return; }
+    const fresh = rolls.filter(r => r.id > last.current);
+    if (!fresh.length) return;
+    last.current = Math.max(...fresh.map(r => r.id));
+    if (!settings.anim) return;
+    const roll = fresh[fresh.length - 1];
+    markAnimating(roll.id, true);
+    setEvent({ seq: ++seq.current, roll, who: names[roll.user_id] || 'Jogador' });
+  }, [rolls, ready, settings.anim]);
+  useEffect(() => { if (!settings.anim) markAnimating(null, false); }, [settings.anim]);
+  if (!settings.anim) return null;
+  return <Suspense fallback={null}><DiceStage event={event} settings={settings} onFinish={id => markAnimating(id, false)} /></Suspense>;
+}
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initials = name => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState }) {
+export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating }) {
   const { board, tokens, marks, mapSrc, drags, error, setError, local } = boardState;
   const svgRef = useRef(null);
   const [view, setView] = useState(null); // { x, y, w } em unidades do mapa
@@ -139,6 +163,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         <button className="outline" onClick={() => setView({ x: 0, y: 0, w: W })}>Enquadrar</button>
       </div>
     </div>
+    <div className="board-wrap">
     <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img"
       aria-label="Tabuleiro compartilhado" onWheel={onWheel} onPointerDown={onPointerDown} onPointerMove={onPointerMove}
       onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
@@ -161,6 +186,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </g>;
       })}</g>
     </svg>
+    <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
+    </div>
     {error && <p role="alert" className="muted">{error}</p>}
     {isGm && <BoardTools board={board} tokens={tokens} marks={marks} members={members} characters={characters}
       selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} />}

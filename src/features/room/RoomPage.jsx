@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { navigate } from '../../lib/router.js';
 import { STATUS_LABEL } from '../../lib/tables.js';
 import { useRoom } from './useRoom.js';
@@ -8,8 +8,32 @@ import DicePanel, { RollHistory } from './DicePanel.jsx';
 import BoardView from './BoardView.jsx';
 import { useBoard } from './useBoard.js';
 
+const SETTINGS_KEY = 'elara-dice3d';
+const loadSettings = () => {
+  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  try { return { anim: !reduced, sound: false, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { anim: !reduced, sound: false }; }
+};
+
 export default function RoomPage({ auth, id }) {
   const [tab, setTab] = useState('chat');
+  const [diceSettings, setDiceSettingsState] = useState(loadSettings);
+  const setDiceSettings = useCallback(patch => setDiceSettingsState(prev => {
+    const next = { ...prev, ...patch };
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch { /* sem storage */ }
+    return next;
+  }), []);
+  // Rolagens ainda em animacao ficam fora do historico para nao estragar a surpresa.
+  const [hidden, setHidden] = useState(() => new Set());
+  const markAnimating = useCallback((rollId, on) => {
+    setHidden(prev => {
+      if (rollId == null) return prev.size ? new Set() : prev;
+      if (on === prev.has(rollId)) return prev;
+      const next = new Set(prev);
+      if (on) next.add(rollId); else next.delete(rollId);
+      return next;
+    });
+    if (on && rollId != null) setTimeout(() => setHidden(prev => { if (!prev.has(rollId)) return prev; const next = new Set(prev); next.delete(rollId); return next; }), 10000);
+  }, []);
   const room = useRoom(id, auth.user, auth.profile?.display_name || auth.user?.email);
   const boardState = useBoard(id, auth.user, room);
   const { table, members, messages, rolls, states, characters, online, connected, error } = room;
@@ -46,7 +70,7 @@ export default function RoomPage({ auth, id }) {
       {error && <p role="alert" className="muted">{error}</p>}
     </aside>
     <section className="room-board" aria-label="Tabuleiro">
-      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} />
+      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating} />
     </section>
     <aside className="room-panel">
       <div className="tabs-row" role="tablist">
@@ -56,9 +80,9 @@ export default function RoomPage({ auth, id }) {
       </div>
       {closed && <p className="callout">Esta mesa foi encerrada. O histórico continua visível, mas ninguém pode escrever.</p>}
       {tab === 'dice' ? <>
-        <DicePanel tableId={id} me={auth.user.id} members={members} characters={characters} onRolled={room.addRoll} disabled={closed} />
+        <DicePanel tableId={id} me={auth.user.id} members={members} characters={characters} onRolled={room.addRoll} disabled={closed} settings={diceSettings} onSettings={setDiceSettings} />
         <h3>Histórico</h3>
-        <RollHistory rolls={rolls} members={members} me={auth.user.id} />
+        <RollHistory rolls={rolls} hidden={hidden} members={members} me={auth.user.id} />
       </>
         : tab === 'chat'
         ? <ChatPanel tableId={id} me={auth.user.id} members={members} messages={messages} addMessage={room.addMessage} disabled={closed} />

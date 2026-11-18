@@ -5,7 +5,8 @@ import { ROOM_DICE, parseFormula, traitSpec, describeRoll } from '../../diceRoll
 
 const when = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-export function RollHistory({ rolls, members, me }) {
+export function RollHistory({ rolls: all, hidden, members, me }) {
+  const rolls = hidden?.size ? all.filter(r => !hidden.has(r.id)) : all;
   const names = Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador']));
   if (!rolls.length) return <p className="muted">Nenhuma rolagem ainda.</p>;
   return <ol className="roll-history" aria-label="Histórico de rolagens">
@@ -24,7 +25,7 @@ export function RollHistory({ rolls, members, me }) {
   </ol>;
 }
 
-export default function DicePanel({ tableId, me, members, characters, onRolled, disabled }) {
+export default function DicePanel({ tableId, me, members, characters, onRolled, disabled, settings, onSettings }) {
   const [formula, setFormula] = useState('1d20');
   const [mode, setMode] = useState('normal');
   const [visibility, setVisibility] = useState('public');
@@ -88,6 +89,10 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
         <button className="primary" disabled={disabled || busy} onClick={rollTrait}>Rolar {traitKey.split(':').slice(1).join(':')}</button>
       </>}
     </fieldset>
+    <div className="dice-options">
+      <label className="check"><input type="checkbox" checked={Boolean(settings?.anim)} onChange={e => onSettings?.({ anim: e.target.checked })} /> Animação 3D no tabuleiro</label>
+      <label className="check"><input type="checkbox" checked={Boolean(settings?.sound)} disabled={!settings?.anim} onChange={e => onSettings?.({ sound: e.target.checked })} /> Som dos dados</label>
+    </div>
     {error && <p role="alert" className="muted">{error}</p>}
   </div>;
 }

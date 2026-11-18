@@ -9,6 +9,7 @@ export function useRoom(tableId, user, displayName) {
   const [members, setMembers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [rolls, setRolls] = useState([]);
+  const [ready, setReady] = useState(false);
   const [states, setStates] = useState({});
   const [characters, setCharacters] = useState({});
   const [online, setOnline] = useState([]);
@@ -45,6 +46,7 @@ export function useRoom(tableId, user, displayName) {
         setMessages(msgs);
         setStates(st);
         setRolls(rl);
+        setReady(true);
         channel = supabase.channel(`table:${tableId}`, { config: { private: true, presence: { key: user.id } } });
         channelRef.current = channel;
         channel
@@ -59,8 +61,6 @@ export function useRoom(tableId, user, displayName) {
             p => p.new?.character_id && setStates(prev => ({ ...prev, [p.new.character_id]: p.new.state })))
           .on('postgres_changes', { event: '*', schema: 'public', table: 'table_members', filter: `table_id=eq.${tableId}` },
             () => reloadMembers().catch(() => {}))
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tables', filter: `id=eq.${tableId}` },
-            () => getTable(tableId).then(next => alive && setTable(next)).catch(() => {}))
           .subscribe(status => {
             if (!alive) return;
             setConnected(status === 'SUBSCRIBED');
@@ -73,6 +73,13 @@ export function useRoom(tableId, user, displayName) {
     return () => { alive = false; channelRef.current = null; if (channel) supabase.removeChannel(channel); };
   }, [tableId, user?.id, reloadMembers]);
 
+  // `tables` nao esta na publicacao do Realtime (assinar derrubaria todos os eventos do canal); consulta o estado de tempos em tempos.
+  useEffect(() => {
+    if (!supabase || !user || !ready) return undefined;
+    const timer = setInterval(() => { getTable(tableId).then(next => next && setTable(next)).catch(() => {}); }, 20000);
+    return () => clearInterval(timer);
+  }, [tableId, user?.id, ready]);
+
   const sendBroadcast = useCallback((event, payload) => { channelRef.current?.send({ type: 'broadcast', event, payload }); }, []);
   const onBroadcast = useCallback((event, fn) => {
     (listeners.current[event] ||= []).push(fn);
@@ -81,5 +88,5 @@ export function useRoom(tableId, user, displayName) {
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
   const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
   const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
-  return { sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
+  return { ready, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }
