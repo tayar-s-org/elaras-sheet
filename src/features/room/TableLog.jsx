@@ -16,12 +16,13 @@ export default function TableLog({ messages, rolls, stateLog, hidden, members, c
       ...messages.map(m => ({ key: `m${m.id}`, at: m.created_at, type: 'msg', m })),
       ...rolls.filter(r => !hidden?.has(r.id)).map(r => ({ key: `r${r.id}`, at: r.created_at, type: 'roll', r })),
     ];
-    return list.sort((a, b) => new Date(a.at) - new Date(b.at)).slice(-LIMIT);
+    // Mais recente primeiro: a ultima acao fica no topo e as anteriores embaixo.
+    return list.sort((a, b) => new Date(b.at) - new Date(a.at) || String(b.key).localeCompare(String(a.key))).slice(0, LIMIT);
   }, [messages, rolls, hidden]);
-  const vitalEntries = useMemo(() => (stateLog || []).slice(-LIMIT), [stateLog]);
-  const lastKey = tab === 'dice' ? diceEntries[diceEntries.length - 1]?.key : vitalEntries[vitalEntries.length - 1]?.id;
-  // Rola so o proprio quadro (scrollIntoView arrastaria a pagina inteira).
-  useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight; }, [lastKey, tab]);
+  const vitalEntries = useMemo(() => [...(stateLog || [])].sort((a, b) => b.id - a.id).slice(0, LIMIT), [stateLog]);
+  const newestKey = tab === 'dice' ? diceEntries[0]?.key : vitalEntries[0]?.id;
+  // A novidade aparece no topo; volta o quadro (so ele, nao a pagina) para o inicio.
+  useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = 0; }, [newestKey, tab]);
 
   return <section className="table-log" aria-label="Registro da mesa">
     <div className="tabs-row log-tabs" role="tablist">
