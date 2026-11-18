@@ -103,7 +103,7 @@ export default function CustomItemForm({ cloudId }) {
         : !mine.length ? <p className="muted">Você ainda não enviou nenhum item.</p>
           : <div className="mk-list">{mine.map(row => <article key={row.id} className="mk-item">
             <div className="mk-main">
-              <h4>{row.name}<span className={`ci-status ${row.status}`}>{ITEM_STATUS[row.status]}</span></h4>
+              <h4>{row.name}<span className={`ci-status ${row.status}`}>{ITEM_STATUS[row.status]}</span>{row.status === "approved" && row.price > 0 && <span className="muted"> · custou $ {row.price.toLocaleString("pt-BR")}</span>}</h4>
               <p className="mk-meta">{row.tables?.name || "Mesa"} · {row.weight ? fmtKg(Number(row.weight)) : "sem peso"}</p>
               {row.effects?.length > 0 && <div className="mk-chips">{row.effects.map((e, i) => <span key={i} className="mk-chip">{describeEffect(e)}</span>)}</div>}
               {row.description && <p className="mk-notes">{row.description}</p>}

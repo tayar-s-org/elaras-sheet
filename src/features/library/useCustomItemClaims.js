@@ -37,8 +37,19 @@ export function useCustomItemClaims(session, setSession, user, notify) {
               const names = entries.map(e => e.custom.name).join(', ');
               notifyRef.current?.(`✨ O mestre aprovou ${entries.length > 1 ? 'os itens' : 'o item'} ${names}. ${entries.length > 1 ? 'Estão' : 'Está'} na mochila de ${sheet.character.name || 'sua ficha'}.`);
             }
-            // Itens que o mestre revogou saem da mochila.
             const mine = await listMyCustomItems();
+            // Entrega à prova de falhas: item aprovado que não está na mochila (a aba que o recolheu fechou ou travou
+            // antes de salvar) volta, a menos que o jogador o tenha descartado.
+            const live = sessionRef.current.sheets.find(s => s.id === sheet.id)?.character;
+            const have = new Set((live?.inventory || []).map(e => e.id));
+            entries.forEach(e => have.add(e.id));
+            const lost = (mine || []).filter(r => r.status === 'approved' && r.character_id === id && !r.discarded_at && !have.has(customId(r.id)))
+              .map(r => customEntry(r, LISTS)).filter(Boolean);
+            if (lost.length) {
+              setSession(prev => editSheet(prev, sheet.id, ch => addCustomEntries(ch, lost)));
+              notifyRef.current?.(`✨ ${lost.length > 1 ? 'Itens aprovados voltaram' : 'Item aprovado voltou'} para a mochila de ${sheet.character.name || 'sua ficha'}: ${lost.map(e => e.custom.name).join(', ')}.`);
+            }
+            // Itens que o mestre revogou saem da mochila.
             const revoked = new Set((mine || []).filter(r => r.status === 'rejected').map(r => customId(r.id)));
             const gone = (sheet.character.inventory || []).filter(e => revoked.has(e.id));
             if (gone.length) {

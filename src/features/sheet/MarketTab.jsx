@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { CATEGORIES, MARKET_ITEMS, SLOTS, resolveItem } from "../../market/items.js";
 import { describeEffect } from "../../market/custom.js";
+import { markCustomDiscarded } from "../../lib/customItems.js";
 import CustomItemForm from "./CustomItemForm.jsx";
 import { buyItem, sellItem, toggleEquip, sellPrice, discardItem } from "../../market/inventory.js";
 import { formatMoney, normalizeMoney } from "../../money.js";
@@ -111,7 +112,7 @@ export default function MarketTab({ c, d, setC, setToast, cloudId }) {
           <div className="mk-buy">
             {item.slot && <button type="button" className={equipped ? "outline" : "primary"} onClick={() => equip(id)}>{equipped ? "Desequipar" : "Equipar"}</button>}
             {item.isCustom
-              ? <button type="button" className="text-button danger" onClick={() => window.confirm(`Descartar "${item.name}"? O item sai da mochila e não volta sem nova aprovação.`) && setC(prev => discardItem(prev, id) || prev)}>Descartar</button>
+              ? <button type="button" className="text-button danger" onClick={() => window.confirm(`Descartar "${item.name}"? O item sai da mochila e não volta sem nova aprovação.`) && (setC(prev => discardItem(prev, id) || prev), markCustomDiscarded(id))}>Descartar</button>
               : <button type="button" className="text-button" onClick={() => sell(item)} title="Vender uma unidade por metade do preço">Vender (+$ {formatMoney(sellPrice(item, 1))})</button>}
           </div>
         </article>)}

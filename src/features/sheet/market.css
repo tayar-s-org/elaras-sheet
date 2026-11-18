@@ -48,3 +48,7 @@
 .approvals h3 { margin: 6px 0 0; font-size: 1.05rem; }
 .approval-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
 .approval-actions input { flex: 1 1 180px; min-width: 0; }
+
+.ap-price { display: flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 600; }
+.ap-price input { width: 8ch; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }
+.ap-balance { font-size: .78rem; flex-basis: 100%; }
