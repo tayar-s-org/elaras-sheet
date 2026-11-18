@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ATTRIBUTES, SKILLS } from '../../rules.js';
 import { rollDice } from '../../lib/room.js';
 import { ROOM_DICE, parseFormula, traitSpec, describeRoll } from '../../diceRoll.js';
+import { calculate, validateCharacter } from '../../rules.js';
 import './roompanels.css';
 
 const when = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -38,6 +39,14 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
   const [error, setError] = useState('');
   const mine = members.find(m => m.user_id === me);
   const character = mine?.character_id ? characters[mine.character_id] : null;
+  // Bonus dos itens equipados (customizados) para o atributo ou pericia escolhido; entra no modificador da rolagem.
+  const itemBonus = (() => {
+    if (!character) return 0;
+    try {
+      const [type, ...rest] = traitKey.split(':');
+      return calculate(validateCharacter(character.data)).inventory.rollBonus[type]?.[rest.join(':')] || 0;
+    } catch { return 0; }
+  })();
 
   async function run(spec, label = '', characterId = null) {
     setBusy(true);
@@ -50,7 +59,7 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
   const rollTrait = () => {
     const [type, ...rest] = traitKey.split(':');
     const name = rest.join(':');
-    run(traitSpec({ type, name, wild, modifier: Number(modifier) || 0, target: Number(target) || 4 }), name, character.id);
+    run(traitSpec({ type, name, wild, modifier: (Number(modifier) || 0) + itemBonus, target: Number(target) || 4 }), name, character.id);
   };
 
   const off = disabled || busy;
@@ -81,7 +90,8 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
           </select></label>
         <div className="dice2-row2">
           <label className="dice2-label"><span>Modificador</span>
-            <input type="number" min="-20" max="20" value={modifier} onChange={e => setModifier(e.target.value)} /></label>
+            <input type="number" min="-20" max="20" value={modifier} onChange={e => setModifier(e.target.value)} />
+            {itemBonus !== 0 && <small className="dice2-item-bonus">Itens equipados: {itemBonus > 0 ? `+${itemBonus}` : `−${Math.abs(itemBonus)}`} (somado à rolagem)</small>}</label>
           <label className="dice2-label"><span>Dificuldade</span>
             <input type="number" min="2" max="30" value={target} onChange={e => setTarget(e.target.value)} /></label>
         </div>

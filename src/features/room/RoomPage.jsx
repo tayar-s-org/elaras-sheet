@@ -9,8 +9,10 @@ import BoardView from './BoardView.jsx';
 import TableControls from '../tables/TableControls.jsx';
 import TableLog from './TableLog.jsx';
 import TrainingButton from './TrainingButton.jsx';
+import ItemApprovals from './ItemApprovals.jsx';
 import TrainingApprovals from './TrainingApprovals.jsx';
 import { useTrainingApprovals } from './useTrainingApprovals.js';
+import { useCustomItemRequests } from './useCustomItemRequests.js';
 import { setLastRoom, clearLastRoom } from '../../lib/lastRoom.js';
 import { useBoard } from './useBoard.js';
 import { useLiveCharacters } from './useLiveCharacters.js';
@@ -46,6 +48,7 @@ export default function RoomPage({ auth, id }) {
   const boardState = useBoard(id, auth.user, room);
   const { table, members, messages, rolls, states, characters: savedCharacters, online, connected, error } = room;
   const characters = useLiveCharacters(id, members, savedCharacters, Boolean(room.ready));
+  const itemRequests = useCustomItemRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const trainingRequests = useTrainingApprovals(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   // Guarda esta sala como a sessao atual (o menu do topo oferece "Voltar a mesa"); esquece se a pessoa perdeu o acesso.
   const userId = auth.user?.id;
@@ -97,12 +100,13 @@ export default function RoomPage({ auth, id }) {
         <button role="tab" aria-selected={tab === 'chat'} className={tab === 'chat' ? 'primary' : 'outline'} onClick={() => setTab('chat')}>Chat</button>
         <button role="tab" aria-selected={tab === 'dice'} className={tab === 'dice' ? 'primary' : 'outline'} onClick={() => setTab('dice')}>Dados</button>
         <button role="tab" aria-selected={tab === 'party'} className={tab === 'party' ? 'primary' : 'outline'} onClick={() => setTab('party')}>{isGm ? 'Grupo' : 'Fichas'}</button>
-        {isGm && <button role="tab" aria-selected={tab === 'items'} className={tab === 'items' ? 'primary' : 'outline'} onClick={() => setTab('items')}>Aprovações{trainingRequests.pending.length > 0 ? ` (${trainingRequests.pending.length})` : ''}</button>}
+        {isGm && <button role="tab" aria-selected={tab === 'items'} className={tab === 'items' ? 'primary' : 'outline'} onClick={() => setTab('items')}>Aprovações{itemRequests.pending + trainingRequests.pending.length > 0 ? ` (${itemRequests.pending + trainingRequests.pending.length})` : ''}</button>}
         <button role="tab" aria-selected={tab === 'table'} className={tab === 'table' ? 'primary' : 'outline'} onClick={() => setTab('table')}>Mesa</button>
       </div>
       {closed && <p className="callout">Esta mesa foi encerrada. O histórico continua visível, mas ninguém pode escrever.</p>}
       {tab === 'items' && isGm ? <>
           <TrainingApprovals part="pending" tableId={id} me={auth.user.id} members={members} characters={characters} closed={closed} pending={trainingRequests.pending} approved={trainingRequests.approved} available={trainingRequests.available} refresh={trainingRequests.refresh} />
+          <ItemApprovals items={itemRequests.items} available={itemRequests.available} refresh={itemRequests.refresh} members={members} characters={characters} />
           <TrainingApprovals part="decided" tableId={id} me={auth.user.id} members={members} characters={characters} closed={closed} pending={trainingRequests.pending} approved={trainingRequests.approved} available={trainingRequests.available} refresh={trainingRequests.refresh} />
         </>
         : tab === 'table' ? <>

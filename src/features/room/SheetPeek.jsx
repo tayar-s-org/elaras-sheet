@@ -4,7 +4,7 @@ import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals
 import { incapacitation, steppedDie, effectiveMovement } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
-import { itemById } from '../../market/items.js';
+import { resolveItem } from '../../market/items.js';
 
 // "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; perícia abaixo de d4 vira "d4−2".
 function DieText({ die, steps, kind }) {
@@ -15,6 +15,8 @@ function DieText({ die, steps, kind }) {
 }
 import './peek.css';
 
+// Bônus de rolagem de itens equipados ao lado do dado.
+const Bonus = ({ value }) => (value ? <small className="peek-bonus"> ({value > 0 ? `+${value}` : `−${Math.abs(value)}`})</small> : null);
 const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace('.', ',')} kg`;
 const Pill = ({ label, value, tone }) => <span className={`peek-pill${tone ? ` ${tone}` : ''}`}>{label}{value ? <b>{value}</b> : null}</span>;
 // Vantagens repetidas aparecem uma vez só, com o multiplicador (Nome ×2).
@@ -36,7 +38,7 @@ export default function SheetPeek({ data, state, onClose }) {
   const max = safeMaxima(data);
   const inc = incapacitation(state, max);
   const skills = Object.entries(c.skills).filter(([, die]) => die > 0);
-  const gear = c.inventory.map(e => ({ ...e, name: itemById.get(e.id)?.name })).filter(e => e.name);
+  const gear = c.inventory.map(e => ({ ...e, name: resolveItem(e)?.name })).filter(e => e.name);
   return <aside className="sheet-peek" aria-label={`Ficha de ${c.name || 'personagem'}`}>
     <button type="button" className="peek-close" aria-label="Fechar resumo da ficha" onClick={onClose}>×</button>
     <h4>{c.name || 'Sem nome'}</h4>
@@ -62,10 +64,10 @@ export default function SheetPeek({ data, state, onClose }) {
       {[['Movimento', effectiveMovement(d.movement, inc.movePenalty)], ['Aparar', d.parry], ['Resistência', d.toughness]].map(([k, v]) => <span key={k}><small>{k}</small><b>{v}</b></span>)}
     </div>
     <h5>Atributos</h5>
-    <div className="peek-grid">{ATTRIBUTES.map(n => <span key={n}>{n} <DieText die={c.attributes[n]} steps={inc.dieSteps} kind="attribute" /></span>)}</div>
+    <div className="peek-grid">{ATTRIBUTES.map(n => <span key={n}>{n} <DieText die={c.attributes[n]} steps={inc.dieSteps} kind="attribute" /><Bonus value={d.inventory.rollBonus.attribute[n]} /></span>)}</div>
     {skills.length > 0 && <>
       <h5>Perícias</h5>
-      <div className="peek-grid">{skills.map(([n, die]) => <span key={n}>{n} <DieText die={die} steps={inc.dieSteps} kind="skill" /></span>)}</div>
+      <div className="peek-grid">{skills.map(([n, die]) => <span key={n}>{n} <DieText die={die} steps={inc.dieSteps} kind="skill" /><Bonus value={d.inventory.rollBonus.skill[n]} /></span>)}</div>
     </>}
     {c.advantages.length > 0 && <>
       <h5>Vantagens</h5>

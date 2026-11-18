@@ -1,4 +1,5 @@
 // Criaturas do mestre no tabuleiro: token com vida. Ficam na coluna `meta` do token: { creature: true, hp, maxHp }.
+// Criatura "sem vida" ({ creature: true, noHp: true }) tem a mesma moldura, mas sem barra nem controle de vida.
 // Moldura e cor são únicas para todas as criaturas (o mestre só escolhe nome, foto e vida).
 
 export const CREATURE_FRAME = 'blood';
@@ -17,15 +18,22 @@ export const parseHp = value => {
   return Number.isInteger(n) && n >= 1 && n <= MAX_HP ? n : null;
 };
 
-export const newCreatureMeta = hp => ({ creature: true, hp, maxHp: hp });
+export const newCreatureMeta = hp => (hp === null || hp === undefined ? { creature: true, noHp: true } : { creature: true, hp, maxHp: hp });
 
 // { hp, maxHp, ratio } de um token de criatura, ou null se não for criatura.
 export function creatureOf(token) {
   const meta = token?.meta;
   if (!meta || meta.creature !== true) return null;
+  if (meta.noHp === true) return { hp: 1, maxHp: 1, ratio: 1, noHp: true };
   const maxHp = clampInt(meta.maxHp, 1, MAX_HP, 1);
   const hp = clampInt(meta.hp, 0, maxHp, maxHp);
   return { hp, maxHp, ratio: hp / maxHp };
+}
+
+// Tira a vida da criatura (vira "sem vida"); metaWithMaxHp a devolve.
+export function metaWithoutHp(token) {
+  const { hp: _hp, maxHp: _max, ...rest } = token?.meta || {};
+  return { ...rest, creature: true, noHp: true };
 }
 
 // Novo meta com a vida atual alterada (limitada de 0 até a vida máxima).
@@ -38,7 +46,8 @@ export function metaWithHp(token, hp) {
 export function metaWithMaxHp(token, maxHp) {
   const c = creatureOf(token);
   const max = clampInt(maxHp, 1, MAX_HP, c?.maxHp || 1);
-  return { ...(token?.meta || {}), creature: true, maxHp: max, hp: Math.min(c ? c.hp : max, max) };
+  const { noHp: _noHp, ...rest } = token?.meta || {};
+  return { ...rest, creature: true, maxHp: max, hp: Math.min(c && !c.noHp ? c.hp : max, max) };
 }
 
 // Nome único numa lista: "Goblin" -> "Goblin (2)" se já existir (sem diferenciar maiúsculas).

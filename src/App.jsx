@@ -12,6 +12,7 @@ import { useHashRoute, navigate, loginThen } from "./lib/router.js";
 import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
 import { useMoneyClaims } from "./features/library/useMoneyClaims.js";
+import { useCustomItemClaims } from "./features/library/useCustomItemClaims.js";
 import { listMine, getCharacter, deleteCharacter } from "./lib/cloud.js";
 import { claimXp } from "./lib/xp.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
@@ -73,6 +74,7 @@ export default function App() {
   const setTab = i => { if (i === 6) setEditing(6); else { setEditing(null); goTo(i); } };
   const [toast, setToast] = useState("");
   useMoneyClaims(session, setSession, auth.user, setToast);
+  useCustomItemClaims(session, setSession, auth.user, setToast);
   const [storageError, setStorageError] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [requestedPage, setRequestedPage] = useState(null);
@@ -220,7 +222,7 @@ export default function App() {
     setTab(0);
     navigate("/");
   }
-  const ctx = { auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
+  const ctx = { cloudId: session.sheets.find(s => s.id === activeId)?.cloud?.id, auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
   const sheetsLocked = cloudConfigured && route === "/fichas" && !auth.user;
   const topbar = <TopBar theme={theme} setTheme={setTheme} file={file} loadPdf={loadPdf} save={save} setTab={setTab} route={route} auth={auth} onSignOut={signOut} />;
   const page = route === "/fichas" ? (sheetsLocked ? <main className="page">

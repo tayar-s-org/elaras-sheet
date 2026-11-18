@@ -265,20 +265,44 @@ export const MARKET_ITEMS = items;
 export const itemById = new Map(items.map(item => [item.id, item]));
 export const equippable = item => Boolean(item.slot);
 
+// Item de uma entrada da mochila: do catálogo do livro ou customizado (aprovado pelo mestre e guardado na ficha).
+export function resolveItem(entry) {
+  if (!entry) return null;
+  if (entry.custom) {
+    const c = entry.custom;
+    return { id: entry.id, name: c.name, weight: c.weight, cost: 0, notes: c.description, damage: c.effects.find(e => e.kind === 'damage')?.target || '', customEffects: c.effects, isCustom: true, slot: 'custom', category: 'custom', group: 'Itens customizados' };
+  }
+  return itemById.get(entry.id) || null;
+}
+
 // Soma os efeitos dos itens equipados (a mochila inteira conta para o peso).
 // Armadura soma por espaço (torso, cabeça, braços, pernas); Aparar soma arma e escudo.
+// Itens customizados somam em armadura/Aparar/Movimento/Mana e dão bônus de rolagem a atributos e perícias.
 export function inventoryEffects(inventory = [], strengthDie = 4) {
-  let armor = 0, parry = 0, weight = 0;
+  let armor = 0, parry = 0, movement = 0, mana = 0, weight = 0;
+  const rollBonus = { attribute: {}, skill: {} };
   for (const entry of inventory) {
-    const item = itemById.get(entry.id);
+    const item = resolveItem(entry);
     if (!item) continue;
     weight += (item.weight || 0) * entry.qty;
-    if (entry.equipped && item.effects) {
+    if (!entry.equipped) continue;
+    if (item.effects) {
       armor += item.effects.armor || 0;
       parry += item.effects.parry || 0;
+    }
+    for (const e of item.customEffects || []) {
+      if (e.kind === 'damage') continue; // dano da arma é só informativo
+      if (e.kind === 'derived') {
+        if (e.target === 'armor') armor += e.bonus;
+        else if (e.target === 'parry') parry += e.bonus;
+        else if (e.target === 'movement') movement += e.bonus;
+        else if (e.target === 'mana') mana += e.bonus;
+      } else {
+        rollBonus[e.kind][e.target] = (rollBonus[e.kind][e.target] || 0) + e.bonus;
+      }
     }
   }
   const capacity = 2.5 * strengthDie;
   const overload = weight > capacity ? Math.ceil((weight - capacity) / capacity) : 0;
-  return { armor, parry, weight, capacity, overload };
+  return { armor, parry, movement, mana, rollBonus, weight, capacity, overload };
 }

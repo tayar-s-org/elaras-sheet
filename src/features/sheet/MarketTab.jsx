@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { CATEGORIES, MARKET_ITEMS, SLOTS, itemById } from "../../market/items.js";
-import { buyItem, sellItem, toggleEquip, sellPrice } from "../../market/inventory.js";
+import { CATEGORIES, MARKET_ITEMS, SLOTS, resolveItem } from "../../market/items.js";
+import { describeEffect } from "../../market/custom.js";
+import CustomItemForm from "./CustomItemForm.jsx";
+import { buyItem, sellItem, toggleEquip, sellPrice, discardItem } from "../../market/inventory.js";
 import { formatMoney, normalizeMoney } from "../../money.js";
 import "../../ui/money.css";
 import "./market.css";
@@ -19,14 +21,15 @@ function Stats({ item }) {
     item.armor != null && item.slot && item.armor > 0 && ["Armadura", signed(item.armor)],
     item.effects?.parry && ["Aparar", signed(item.effects.parry)],
   ].filter(Boolean);
+  const effects = (item.customEffects || []).filter(e => e.kind !== 'damage'); // o dano já aparece no chip "Dano"
   return <>
-    {chips.length > 0 && <div className="mk-chips">{chips.map(([k, v]) => <span key={k} className="mk-chip">{k} <b>{v}</b></span>)}</div>}
+    {(chips.length > 0 || effects.length > 0) && <div className="mk-chips">{chips.map(([k, v]) => <span key={k} className="mk-chip">{k} <b>{v}</b></span>)}{effects.map((e, i) => <span key={i} className="mk-chip">{describeEffect(e)}</span>)}</div>}
     {item.notes && <p className="mk-notes">{item.notes}</p>}
   </>;
 }
 
 // Mercado: compra de equipamento do livro com o dinheiro da ficha; itens equipados somam à Resistência, ao Aparar e à carga.
-export default function MarketTab({ c, d, setC, setToast }) {
+export default function MarketTab({ c, d, setC, setToast, cloudId }) {
   const [view, setView] = useState("shop");
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
@@ -37,7 +40,7 @@ export default function MarketTab({ c, d, setC, setToast }) {
 
   const shopItems = MARKET_ITEMS.filter(item => (searching ? norm(`${item.name} ${item.group}`).includes(norm(query)) : item.category === category));
   const groups = [...new Set(shopItems.map(i => i.group))];
-  const bag = c.inventory.map(e => ({ ...e, item: itemById.get(e.id) })).filter(e => e.item)
+  const bag = c.inventory.map(e => ({ ...e, item: resolveItem(e) })).filter(e => e.item)
     .sort((a, b) => Number(b.equipped) - Number(a.equipped) || a.item.category.localeCompare(b.item.category) || a.item.name.localeCompare(b.item.name, "pt-BR"));
 
   const buy = item => {
@@ -64,10 +67,11 @@ export default function MarketTab({ c, d, setC, setToast }) {
 
     <div className="tabs-row" role="tablist">
       <button type="button" role="tab" aria-selected={view === "shop"} className={view === "shop" ? "primary" : "outline"} onClick={() => setView("shop")}>Loja</button>
+      <button type="button" role="tab" aria-selected={view === "custom"} className={view === "custom" ? "primary" : "outline"} onClick={() => setView("custom")}>Item custom</button>
       <button type="button" role="tab" aria-selected={view === "bag"} className={view === "bag" ? "primary" : "outline"} onClick={() => setView("bag")}>Mochila ({c.inventory.reduce((n, e) => n + e.qty, 0)})</button>
     </div>
 
-    {view === "shop" ? <>
+    {view === "custom" ? <CustomItemForm cloudId={cloudId} /> : view === "shop" ? <>
       <div className="mk-filters">
         <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar item em todo o mercado…" aria-label="Buscar item" />
       </div>
@@ -101,12 +105,14 @@ export default function MarketTab({ c, d, setC, setToast }) {
         {bag.map(({ id, qty, equipped, item }) => <article className={`mk-item${equipped ? " on" : ""}`} key={id}>
           <div className="mk-main">
             <h4>{item.name}{qty > 1 && <span className="mk-owned">×{qty}</span>}{equipped && <span className="mk-equipped">Equipado</span>}</h4>
-            <p className="mk-meta">{item.weight ? fmtKg(item.weight * qty) : "sem peso"}{item.slot ? ` · ${SLOTS[item.slot]}` : ""}</p>
+            <p className="mk-meta">{item.weight ? fmtKg(item.weight * qty) : "sem peso"}{item.isCustom ? " · Item customizado" : item.slot ? ` · ${SLOTS[item.slot]}` : ""}</p>
             <Stats item={item} />
           </div>
           <div className="mk-buy">
             {item.slot && <button type="button" className={equipped ? "outline" : "primary"} onClick={() => equip(id)}>{equipped ? "Desequipar" : "Equipar"}</button>}
-            <button type="button" className="text-button" onClick={() => sell(item)} title="Vender uma unidade por metade do preço">Vender (+$ {formatMoney(sellPrice(item, 1))})</button>
+            {item.isCustom
+              ? <button type="button" className="text-button danger" onClick={() => window.confirm(`Descartar "${item.name}"? O item sai da mochila e não volta sem nova aprovação.`) && setC(prev => discardItem(prev, id) || prev)}>Descartar</button>
+              : <button type="button" className="text-button" onClick={() => sell(item)} title="Vender uma unidade por metade do preço">Vender (+$ {formatMoney(sellPrice(item, 1))})</button>}
           </div>
         </article>)}
       </div>}

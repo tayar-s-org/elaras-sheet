@@ -66,3 +66,17 @@ test('uniqueName acrescenta (2), (3)... sem diferenciar maiúsculas', () => {
   assert.equal(uniqueName('Orc', ['Goblin']), 'Orc');
   assert.ok(uniqueName('a'.repeat(60), ['a'.repeat(60)]).length <= 60);
 });
+
+test('criatura sem vida: mesma moldura, sem números de vida, e dá para devolver a vida', async () => {
+  const { newCreatureMeta, creatureOf, metaWithoutHp, metaWithMaxHp, metaWithHp } = await import('./creature.js');
+  const meta = newCreatureMeta(null);
+  assert.deepEqual(meta, { creature: true, noHp: true });
+  const token = { meta };
+  assert.equal(creatureOf(token).noHp, true, 'continua sendo criatura');
+  assert.equal(creatureOf({ meta: newCreatureMeta(30) }).noHp, undefined);
+  const withHp = { meta: newCreatureMeta(30) };
+  assert.deepEqual(metaWithoutHp(withHp), { creature: true, noHp: true });
+  const back = metaWithMaxHp(token, 12);
+  assert.deepEqual(back, { creature: true, maxHp: 12, hp: 12 });
+  assert.equal(metaWithHp({ meta: back }, 5).hp, 5);
+});

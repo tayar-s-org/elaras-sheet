@@ -1,6 +1,7 @@
 import { racialEffects } from "./templates.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
 import { inventoryEffects, itemById } from "./market/items.js";
+import { sanitizeCustom, isCustomId } from "./market/custom.js";
 export const ATTRIBUTES = [
   "Agilidade",
   "Astúcia",
@@ -216,7 +217,7 @@ export function calculate(c) {
     movement: Math.max(
       1,
       Math.floor(ATTRIBUTES.reduce((sum, name) => sum + a[name], 0) / 12) +
-        c.movementBonus + racial.movement - inv.overload,
+        c.movementBonus + racial.movement + inv.movement - inv.overload,
     ),
     parry: 2 + (c.skills.Lutar || 0) / 2 + c.parryBonus + inv.parry,
     toughness: 2 + a.Vigor / 2 + c.armor + inv.armor + racial.toughness,
@@ -227,7 +228,7 @@ export function calculate(c) {
     mana:
       10 + a.Espírito * 2 +
       powerPointEdges * MANA_PER_POWER_POINTS +
-      c.manaBonus,
+      c.manaBonus + inv.mana,
   };
 }
 
@@ -265,6 +266,10 @@ export function validateCharacter(raw) {
   // Mochila do mercado: só ids que existem no catálogo, quantidade 1 a 99, e um item equipado por espaço.
   const takenSlots = new Set();
   c.inventory = (Array.isArray(raw.inventory) ? raw.inventory : []).slice(0, 300).flatMap(entry => {
+    if (isCustomId(entry?.id)) {
+      const custom = sanitizeCustom(entry.custom, { attributes: ATTRIBUTES, skills: SKILLS.map(([name]) => name) });
+      return custom ? [{ id: entry.id, custom, qty: integer(entry.qty, 1, 99, 1), equipped: entry.equipped === true }] : [];
+    }
     const item = itemById.get(entry?.id);
     if (!item) return [];
     let equipped = entry.equipped === true && Boolean(item.slot) && !takenSlots.has(item.slot);

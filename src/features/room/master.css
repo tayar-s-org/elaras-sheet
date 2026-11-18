@@ -55,3 +55,6 @@
 .board-toolbar .music-button:hover, .board-toolbar .music-button.outline:hover { background: #237a46; border-color: #237a46; color: #fff; }
 .board-toolbar .sound-button, .board-toolbar .sound-button.outline { background: #e0b020; border-color: #e0b020; color: #231a00; }
 .board-toolbar .sound-button:hover, .board-toolbar .sound-button.outline:hover { background: #bf9314; border-color: #bf9314; color: #231a00; }
+.token-nohp { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: .88rem; }
+.sfx-bar.sfx-min { padding: 2px 8px; }
+.sfx-toggle { order: 3; }

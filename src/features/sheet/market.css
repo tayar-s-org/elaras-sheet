@@ -29,3 +29,22 @@
   .mk-item { flex-direction: column; align-items: stretch; }
   .mk-buy { justify-items: stretch; grid-auto-flow: column; align-items: center; }
 }
+
+/* Item custom */
+.ci { display: grid; gap: 14px; }
+.ci-form { display: grid; gap: 12px; }
+.ci-row2 { display: grid; grid-template-columns: 1fr 140px; gap: 12px; }
+.ci-effect { display: grid; grid-template-columns: 150px 1fr 80px 32px; gap: 8px; align-items: center; }
+.ci-hint { margin: 0; font-size: .8rem; }
+.ci-actions { justify-content: flex-start; }
+.ci-status { font-size: .72rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--border); }
+.ci-status.pending { color: var(--warning); border-color: var(--warning); }
+.ci-status.approved { color: var(--success); border-color: var(--success); }
+.ci-status.rejected { color: var(--danger); border-color: var(--danger); }
+@media (max-width: 560px) { .ci-row2 { grid-template-columns: 1fr; } .ci-effect { grid-template-columns: 1fr 1fr; } }
+
+/* Aprovacao de itens (mestre) */
+.approvals { display: grid; gap: 10px; }
+.approvals h3 { margin: 6px 0 0; font-size: 1.05rem; }
+.approval-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.approval-actions input { flex: 1 1 180px; min-width: 0; }

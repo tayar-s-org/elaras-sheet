@@ -135,7 +135,7 @@ export default function MasterModule({ board, tokens, marks, members, characters
             <label className="field"><span>Tamanho</span>
               <select value={selected.size} onChange={e => patchToken(selected, { size: Number(e.target.value) })}>
                 <option value="0.5">Pequeno</option><option value="1">Médio</option><option value="2">Grande</option><option value="3">Enorme</option></select></label>
-            {creature && <>
+            {creature && !creature.noHp && <>
               <label className="field"><span>Vida atual</span>
                 <input type="number" min="0" max={creature.maxHp} defaultValue={creature.hp} key={`hp-${selected.id}-${creature.hp}-${creature.maxHp}`}
                   onBlur={e => { const v = Math.trunc(Number(e.target.value)); if (Number.isFinite(v) && v !== creature.hp) patchToken(selected, { meta: metaWithHp(selected, v) }); }} /></label>
@@ -147,7 +147,7 @@ export default function MasterModule({ board, tokens, marks, members, characters
           <div className="row master-actions">
             <button type="button" className="outline" disabled={busy} onClick={() => onEditImage(selected)}>
               {creature ? 'Trocar imagem da criatura' : selected.image_path ? 'Trocar imagem' : 'Criar imagem do token'}</button>
-            {creature && <button type="button" className="outline" disabled={busy || !presets} onClick={() => run(async () => {
+            {creature && !creature.noHp && <button type="button" className="outline" disabled={busy || !presets} onClick={() => run(async () => {
               const p = await savePreset(board.table_id, { name: uniqueName(selected.name, (presets || []).map(x => x.name)), image_path: selected.image_path, max_hp: creature.maxHp, size: selected.size });
               setPresets(prev => [...(prev || []), p]);
             })}>Salvar como predefinição</button>}

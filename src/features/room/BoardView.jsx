@@ -8,7 +8,7 @@ import SoundBar from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
-import { creatureOf, metaWithHp, metaWithMaxHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
+import { creatureOf, metaWithHp, metaWithMaxHp, metaWithoutHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import SheetPeek from './SheetPeek.jsx';
 import { safeMaxima, currentValue } from './vitals.js';
 
@@ -244,7 +244,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     // Sem apagar a imagem anterior: ela pode estar em uso por uma predefinição ou outro token.
     const path = await uploadTokenImage(me, blob, '');
     if (target) {
-      const patch = { name: extra.name, image_path: path, meta: metaWithMaxHp(target, extra.hp) };
+      const patch = { name: extra.name, image_path: path, meta: extra.hp == null ? metaWithoutHp(target) : metaWithMaxHp(target, extra.hp) };
       await updateToken(target.id, patch);
       local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, ...patch } : t)));
     } else {
@@ -255,7 +255,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   };
   const adjustHp = async (token, delta) => {
     const c = creatureOf(token);
-    if (!c) return;
+    if (!c || c.noHp) return;
     const meta = metaWithHp(token, c.hp + delta);
     local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, meta } : t)));
     try { await updateToken(token.id, { meta }); } catch (err) { setError(err.message); local.reloadItems(); }
@@ -350,11 +350,11 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
             <circle r={r} fill={t.color} stroke={mine ? '#fff' : '#000'} strokeWidth={mine ? 5 : 3} />
             <text textAnchor="middle" dominantBaseline="central" fontSize={r * 0.8} fill="#fff" pointerEvents="none">{initials(label)}</text>
           </>}
-          {cr && <g pointerEvents="none">
+          {cr && !cr.noHp && <g pointerEvents="none">
             <rect className="hp-track" x={-r} y={r + gsize * 0.05} width={r * 2} height={gsize * 0.11} rx={gsize * 0.05} />
             <rect className={`hp-fill ${hpTone(cr.ratio)}`} x={-r} y={r + gsize * 0.05} width={Math.max(0, r * 2 * cr.ratio)} height={gsize * 0.11} rx={gsize * 0.05} />
           </g>}
-          <text y={r + gsize * (cr ? 0.46 : 0.28)} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{label}</text>
+          <text y={r + gsize * (cr && !cr.noHp ? 0.46 : 0.28)} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{label}</text>
         </g>;
       })}</g>
     </svg>
@@ -370,7 +370,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
       onEditImage={t => { setMasterOpen(false); setMaker({ token: t, creature: Boolean(creatureOf(t)) }); }} />}
     {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
-      creature={maker.creature ? { name: maker.token?.name || '', hp: creatureOf(maker.token)?.maxHp, editing: Boolean(maker.token) } : undefined}
+      creature={maker.creature ? { name: maker.token?.name || '', hp: creatureOf(maker.token)?.noHp ? undefined : creatureOf(maker.token)?.maxHp, noHp: Boolean(creatureOf(maker.token)?.noHp), editing: Boolean(maker.token) } : undefined}
       onSave={saveTokenImage} onClose={() => setMaker(null)} />}
   </div>;
 }

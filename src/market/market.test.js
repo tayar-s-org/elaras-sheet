@@ -91,3 +91,69 @@ test('texto do equipamento junta os itens da mochila e as anotações antigas', 
   c = toggleEquip(c, find('Adaga').id);
   assert.equal(equipmentText(c), 'Adaga ×2 (equipado)\nMapa antigo');
 });
+
+const LISTS = { attributes: ['Agilidade', 'Força'], skills: ['Furtividade', 'Lutar'] };
+const CUSTOM_ROW = { id: '123e4567-e89b-12d3-a456-426614174000', name: ' Anel do lobo ', weight: 0.2, description: 'Brilha à noite',
+  effects: [{ kind: 'attribute', target: 'Força', bonus: 2 }, { kind: 'skill', target: 'Furtividade', bonus: 1 }, { kind: 'derived', target: 'parry', bonus: 1 },
+    { kind: 'derived', target: 'mana', bonus: 5 }, { kind: 'skill', target: 'Inventada', bonus: 3 }, { kind: 'attribute', target: 'Força', bonus: 99 }] };
+
+test('item custom: sanitiza nome, peso e efeitos (descarta alvos e bônus inválidos)', async () => {
+  const { sanitizeCustom, customEntry, describeEffect } = await import('./custom.js');
+  const item = sanitizeCustom(CUSTOM_ROW, LISTS);
+  assert.equal(item.name, 'Anel do lobo');
+  assert.equal(item.effects.length, 4, 'perícia inventada e bônus +99 caem');
+  assert.equal(sanitizeCustom({ name: '   ' }, LISTS), null);
+  assert.equal(sanitizeCustom({ name: 'x', weight: 9999 }, LISTS).weight, 500);
+  assert.equal(customEntry(CUSTOM_ROW, LISTS).id, 'custom-123e4567-e89b-12d3-a456-426614174000');
+  assert.equal(describeEffect({ kind: 'skill', target: 'Furtividade', bonus: 1 }), '+1 nas rolagens de Furtividade');
+  assert.equal(describeEffect({ kind: 'derived', target: 'parry', bonus: -2 }), '−2 em Aparar');
+});
+
+test('item custom equipado soma bônus de rolagem e valores derivados; vários ao mesmo tempo', async () => {
+  const { customEntry } = await import('./custom.js');
+  const { addCustomEntries, discardItem } = await import('./inventory.js');
+  const lists = { attributes: ['Agilidade', 'Astúcia', 'Espírito', 'Força', 'Vigor'], skills: ['Furtividade'] };
+  let c = { ...newCharacter(), race: 'Outra raça' };
+  const base = calculate(c);
+  const entry = customEntry(CUSTOM_ROW, lists);
+  c = addCustomEntries(c, [entry, entry]);
+  assert.equal(c.inventory.length, 1, 'o mesmo item não entra duas vezes');
+  assert.equal(calculate(c).parry, base.parry, 'na mochila, sem equipar, não soma');
+  c = toggleEquip(c, entry.id);
+  const d = calculate(c);
+  assert.equal(d.parry, base.parry + 1);
+  assert.equal(d.mana, base.mana + 5);
+  assert.deepEqual(d.inventory.rollBonus, { attribute: { Força: 2 }, skill: { Furtividade: 1 } });
+  assert.equal(sellItem(c, entry.id, 1), null, 'item custom não se vende');
+  assert.deepEqual(discardItem(c, entry.id).inventory, []);
+});
+
+test('a ficha mantém item custom válido e descarta o forjado', () => {
+  const good = { id: 'custom-123e4567-e89b-12d3-a456-426614174000', qty: 1, equipped: true, custom: { name: 'Amuleto', weight: 1, description: '', effects: [{ kind: 'derived', target: 'armor', bonus: 2 }] } };
+  const badId = { ...good, id: 'custom-abc' };
+  const noName = { ...good, id: 'custom-123e4567-e89b-12d3-a456-426614174001', custom: { name: '', weight: 1, effects: [] } };
+  const v = validateCharacter(JSON.parse(JSON.stringify({ ...newCharacter(), inventory: [good, badId, noName] })));
+  assert.equal(v.inventory.length, 1);
+  assert.equal(calculate(v).toughness, calculate({ ...v, inventory: [] }).toughness + 2);
+});
+
+test('item custom pode ter dano de arma, sem contar nos efeitos e sem mexer nos números da ficha', async () => {
+  const { sanitizeCustom, cleanDamage, damageOf, describeEffect } = await import('./custom.js');
+  const { resolveItem, inventoryEffects } = await import('./items.js');
+  assert.equal(cleanDamage('  For+d6 '), 'For+d6');
+  assert.equal(cleanDamage('2d6+1'), '2d6+1');
+  assert.equal(cleanDamage('<script>'), '');
+  assert.equal(cleanDamage('x'.repeat(40)), '');
+  const raw = { name: 'Espada flamejante', weight: 3, effects: [
+    { kind: 'damage', target: 'For+d8+2', bonus: 0 }, { kind: 'damage', target: 'segundo', bonus: 0 },
+    ...Array.from({ length: 5 }, () => ({ kind: 'derived', target: 'parry', bonus: 1 })) ] };
+  const item = sanitizeCustom(raw, { attributes: [], skills: [] });
+  assert.equal(damageOf(item), 'For+d8+2');
+  assert.equal(item.effects.filter(e => e.kind === 'damage').length, 1, 'só um dano por item');
+  assert.equal(item.effects.length, 6, 'o dano não conta nos 5 efeitos');
+  assert.equal(describeEffect(item.effects[0]), 'Dano For+d8+2');
+  const entry = { id: 'custom-123e4567-e89b-12d3-a456-426614174000', custom: item, qty: 1, equipped: true };
+  assert.equal(resolveItem(entry).damage, 'For+d8+2');
+  const fx = inventoryEffects([entry], 8);
+  assert.equal(fx.parry, 5, 'o dano é informativo; só os 5 bônus de Aparar somam');
+});

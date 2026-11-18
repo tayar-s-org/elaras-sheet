@@ -12,7 +12,7 @@ import HistoryTab from "./HistoryTab.jsx";
 import BookTab from "./BookTab.jsx";
 import GuideTab from "./GuideTab.jsx";
 import MarketTab from "./MarketTab.jsx";
-import { itemById } from "../../market/items.js";
+import { resolveItem } from "../../market/items.js";
 import "./modules.css";
 
 export const MODULES = [
@@ -41,7 +41,9 @@ const groupedAdvantages = list => {
   return [...map.values()];
 };
 // Itens da mochila (equipados primeiro).
-const bagItems = c => c.inventory.map(e => ({ ...e, name: itemById.get(e.id)?.name })).filter(e => e.name).sort((a, b) => Number(b.equipped) - Number(a.equipped));
+const bagItems = c => c.inventory.map(e => ({ ...e, name: resolveItem(e)?.name })).filter(e => e.name).sort((a, b) => Number(b.equipped) - Number(a.equipped));
+// Bônus de rolagem vindo de itens equipados, ex.: " (+2)".
+const bonusText = b => (b ? ` (${b > 0 ? `+${b}` : `−${Math.abs(b)}`})` : "");
 const Empty = ({ children }) => <p className="mod-empty">{children}</p>;
 const Chip = ({ label, value, tone }) => <span className={`mod-chip${tone ? ` ${tone}` : ""}`}>{label}{value != null && <b>{value}</b>}</span>;
 const Stat = ({ label, value }) => <div className="mod-stat"><b>{value}</b><span>{label}</span></div>;
@@ -65,7 +67,7 @@ function Summary({ index, c, d }) {
     }
     case 1:
       return <>
-        <div className="mod-chips">{ATTRIBUTE_ORDER.map(a => <Chip key={a} label={a} value={`d${c.attributes[a]}`} />)}</div>
+        <div className="mod-chips">{ATTRIBUTE_ORDER.map(a => <Chip key={a} label={a} value={`d${c.attributes[a]}${bonusText(d.inventory.rollBonus.attribute[a])}`} />)}</div>
         <div className="mod-stats">
           <Stat label="Movimento" value={d.movement} /><Stat label="Aparar" value={d.parry} /><Stat label="Resistência" value={d.toughness} />
           <Stat label="Vida" value={d.life} /><Stat label="Stamina" value={d.stamina} /><Stat label="Mana" value={d.mana} />
@@ -74,7 +76,7 @@ function Summary({ index, c, d }) {
     case 2: {
       const skills = Object.entries(c.skills).filter(([, die]) => die > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
       return skills.length
-        ? <div className="mod-chips">{skills.map(([name, die]) => <Chip key={name} label={name} value={`d${die}`} />)}</div>
+        ? <div className="mod-chips">{skills.map(([name, die]) => <Chip key={name} label={name} value={`d${die}${bonusText(d.inventory.rollBonus.skill[name])}`} />)}</div>
         : <Empty>Nenhuma perícia ainda.</Empty>;
     }
     case 3:
