@@ -145,7 +145,7 @@ export default function App() {
   async function signOut() {
     await auth.signOut();
     // As fichas ficam na conta; limpa os rascunhos deste navegador para o proximo usuario.
-    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); localStorage.removeItem(OWNER_KEY); } catch { /* sem storage */ }
+    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); localStorage.removeItem(OWNER_KEY); localStorage.removeItem("elara-last-room"); } catch { /* sem storage */ }
     setSession(restoreSheets({ getItem: () => null }));
     setMaster(false);
     setTab(0);

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { navigate } from '../../lib/router.js';
 import { STATUS_LABEL } from '../../lib/tables.js';
 import { useRoom } from './useRoom.js';
@@ -8,6 +8,7 @@ import DicePanel, { RollHistory } from './DicePanel.jsx';
 import BoardView from './BoardView.jsx';
 import TableControls from '../tables/TableControls.jsx';
 import TableLog from './TableLog.jsx';
+import { setLastRoom, clearLastRoom } from '../../lib/lastRoom.js';
 import { useBoard } from './useBoard.js';
 
 const SETTINGS_KEY = 'elara-dice3d';
@@ -40,6 +41,14 @@ export default function RoomPage({ auth, id }) {
   const room = useRoom(id, auth.user, auth.profile?.display_name || auth.user?.email);
   const boardState = useBoard(id, auth.user, room);
   const { table, members, messages, rolls, states, characters, online, connected, error } = room;
+  // Guarda esta sala como a sessao atual (o menu do topo oferece "Voltar a mesa"); esquece se a pessoa perdeu o acesso.
+  const userId = auth.user?.id;
+  const approved = members.find(m => m.user_id === userId)?.status === 'approved';
+  useEffect(() => {
+    if (!userId) return;
+    if (room.ready && table && approved) setLastRoom(userId, id, table.name);
+    else if (table === null || (members.length && !approved)) clearLastRoom(id);
+  }, [userId, id, room.ready, table, approved, members.length]);
 
   if (auth.loading) return <main className="page"><p className="muted">Verificando sessão…</p></main>;
   if (!auth.user) return <main className="page"><p className="muted">Entre para acessar a sala.</p><button className="primary" onClick={() => navigate('/entrar')}>Entrar</button></main>;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { navigate } from '../../lib/router.js';
 import { listMine } from '../../lib/cloud.js';
+import { clearLastRoom } from '../../lib/lastRoom.js';
 import {
   updateTable, deleteTable, decideMember, leaveTable, setMemberCharacter,
   getInviteCode, rotateInvite, inviteLink, STATUS_LABEL,
@@ -72,7 +73,7 @@ function GmPanel({ table, me, members, reload, run }) {
         <button className="text-button danger" onClick={() => window.confirm(`Remover ${m.profiles?.display_name} da mesa?`) && decide(m.user_id, 'kicked')}>Expulsar</button>
       </div>)}
     </section>
-    <button className="text-button danger" onClick={() => window.confirm('Apagar esta mesa e todos os vínculos? Isso não pode ser desfeito.') && run(async () => { await deleteTable(table.id); navigate('/mesas'); })}>Apagar mesa</button>
+    <button className="text-button danger" onClick={() => window.confirm('Apagar esta mesa e todos os vínculos? Isso não pode ser desfeito.') && run(async () => { await deleteTable(table.id); clearLastRoom(table.id); navigate('/mesas'); })}>Apagar mesa</button>
   </>;
 }
 
@@ -86,7 +87,7 @@ function PlayerPanel({ table, me, members, reload, run }) {
         {roster.map(m => <div className="row" key={m.user_id}><span>{m.profiles?.display_name}</span><span className="muted">{m.role === 'gm' ? 'Mestre' : 'Jogador'}</span></div>)}
       </section>
     </>}
-    <button className="text-button danger" onClick={() => window.confirm('Sair desta mesa?') && run(async () => { await leaveTable(table.id); navigate('/mesas'); })}>Sair da mesa</button>
+    <button className="text-button danger" onClick={() => window.confirm('Sair desta mesa?') && run(async () => { await leaveTable(table.id); clearLastRoom(table.id); navigate('/mesas'); })}>Sair da mesa</button>
   </>;
 }
 
