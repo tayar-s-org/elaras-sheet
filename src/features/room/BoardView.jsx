@@ -251,12 +251,14 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         <button className="outline" aria-label="Aumentar zoom" onClick={() => zoomBy(0.8)}>+</button>
         <button className="outline" onClick={() => setView({ x: 0, y: 0, w: W })}>Enquadrar</button>
       </div>
-      {myCharacter && !closed && <div role="group" aria-label="Meu token" className="tabs-row">
-        {!myToken && <button className="primary" disabled={busy} onClick={placeMine}>Colocar meu token</button>}
-        <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken ? 'Trocar imagem do token' : 'Criar token'}</button>
-      </div>}
-      {isGm && !closed && <div role="group" aria-label="Mestre" className="tabs-row">
-        <button type="button" className="outline" onClick={() => setMasterOpen(true)}>Módulo do mestre</button>
+      {!closed && (myCharacter || isGm) && <div className="toolbar-end">
+        {myCharacter && <div role="group" aria-label="Meu token" className="tabs-row">
+          {!myToken && <button className="primary" disabled={busy} onClick={placeMine}>Colocar meu token</button>}
+          <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken ? 'Trocar imagem do token' : 'Criar token'}</button>
+        </div>}
+        {isGm && <div role="group" aria-label="Mestre" className="tabs-row">
+          <button type="button" className="outline master-button" onClick={() => setMasterOpen(true)}>Módulo do mestre</button>
+        </div>}
       </div>}
     </div>
     <div className="board-wrap">

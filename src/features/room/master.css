@@ -25,3 +25,9 @@
 .hp-fill.bad, .hp-fill.down { fill: #d6453b; }
 .board-token.defeated { opacity: 0.55; }
 .token-fixed { margin: 6px 0; }
+
+/* Barra do tabuleiro: os botoes de token e do mestre ficam juntos e alinhados */
+.board-toolbar { align-items: center; }
+.toolbar-end { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.board-toolbar .master-button, .board-toolbar .master-button.outline { background: #b3261e; border-color: #b3261e; color: #fff; }
+.board-toolbar .master-button:hover, .board-toolbar .master-button.outline:hover { background: #8f1d17; border-color: #8f1d17; color: #fff; }
