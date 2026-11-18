@@ -14,11 +14,11 @@ export const ACTIVITY_LABEL = {
   [ACT.SKILL]: 'Treinar Perícia', [ACT.SPELL]: 'Treinar Feitiço', [ACT.STUDY]: 'Estudo Mágico', [ACT.WORK]: 'Trabalhar',
   [ACT.REST]: 'Descanso Completo', [ACT.QUICK]: 'Descanso Rápido', [ACT.MEDITATE]: 'Meditar',
 };
-// Trabalhar entra na Fase 4 (depende de o mestre aprovar e configurar o trabalho); até lá não aparece no editor.
-export const ENABLED_ACTIVITIES = [ACT.SKILL, ACT.SPELL, ACT.STUDY, ACT.REST, ACT.QUICK, ACT.MEDITATE];
+export const ENABLED_ACTIVITIES = [ACT.SKILL, ACT.SPELL, ACT.STUDY, ACT.WORK, ACT.REST, ACT.QUICK, ACT.MEDITATE];
 export const ACTIVITIES = [{ id: '', label: '—' }, ...ENABLED_ACTIVITIES.map(id => ({ id, label: ACTIVITY_LABEL[id] }))];
 
 export const SKILL_TRAIN_MAX_HOURS = 12;
+export const WORK_MAX_HOURS = 12;
 export const REST_MAX_HOURS = 12;
 export const REST_MIN_STREAK = 4;
 export const REST_PER_HOUR = 1.5;
@@ -65,6 +65,7 @@ export function fieldsFor(activity) {
     case ACT.SKILL: return ['skill', 'mode'];
     case ACT.SPELL: return ['spell', 'mode'];
     case ACT.STUDY: return ['spell'];
+    case ACT.WORK: return ['job'];
     default: return [];
   }
 }
@@ -81,12 +82,15 @@ export function rowIssue(row, stats) {
     case ACT.STUDY:
       if (!row.spell) return 'escolha o feitiço';
       return stats.trainedSpells.includes(row.spell) ? '' : 'só se estuda um feitiço que já passou pelo treinamento';
+    case ACT.WORK:
+      if (!row.job) return 'escolha o trabalho';
+      return stats.jobs?.[row.job] ? '' : 'este trabalho não está aprovado';
     default: return '';
   }
 }
 
 export const newDay = dayNo => ({
-  dayNo, trainHours: 0, spellHours: 0, restHours: 0, restStreak: 0, quickHours: 0,
+  dayNo, trainHours: 0, spellHours: 0, workHours: 0, restHours: 0, restStreak: 0, quickHours: 0,
   medClosed: 0, medActive: false, medHours: 0, medRoll: 0, medRate: 0, prev: '',
 });
 
@@ -179,9 +183,30 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
       dM = d.medRate;
       break;
     }
-    case ACT.WORK:
-      fail('Trabalhar ainda não está disponível.');
+    case ACT.WORK: {
+      // Trabalho configurado pelo mestre: custos de estamina e mana por faixa de horas (1–4, 5–8, 9–12), pagamento e XP por hora.
+      const job = stats.jobs?.[row.job];
+      if (!row.job) fail('Trabalho não escolhido.');
+      else if (!job) fail('Este trabalho não está aprovado pelo mestre.');
+      else if (d.workHours >= WORK_MAX_HOURS) fail(`Limite de ${WORK_MAX_HOURS} horas de trabalho por dia.`);
+      else {
+        const n = d.workHours + 1;
+        const tier = n <= 4 ? 0 : n <= 8 ? 1 : 2;
+        const sCost = job.staminaTiers[tier], mCost = job.manaTiers[tier];
+        if (sCost > 0 && state.stamina <= LOW_RESOURCE) fail('Bloqueado: estamina em 1 ou menos, sem forças para trabalhar.');
+        else if (mCost > 0 && state.mana <= LOW_RESOURCE) fail('Bloqueado: mana em 1 ou menos, sem mana para trabalhar.');
+        else {
+          d.workHours = n;
+          dS = -Math.min(sCost, state.stamina);
+          dM = -Math.min(mCost, state.mana);
+          if (job.xp > 0 && job.xpSkill) ev.xp.push({ kind: 'skill', name: job.xpSkill, modality: 'normal', amount: job.xp });
+          ev.pay = job.pay;
+          ev.job = row.job;
+          ev.workHour = n;
+        }
+      }
       break;
+    }
     default:
       ev.ok = act !== '' ? false : true;
       if (act === '') ev.idle = true;

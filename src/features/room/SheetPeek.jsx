@@ -92,6 +92,7 @@ export default function SheetPeek({ data, state, onClose, limited = false, mine 
     {c.powers.length > 0 && <>
       <h5>Poderes</h5>
       <div className="peek-pills">{c.powers.map((p, i) => <Pill key={i} label={p.name || 'Sem nome'} value={p.cost} tone="power" />)}</div>
+      {c.powers.some(p => p.upgrades?.length) && <ul className="peek-upgrades">{c.powers.flatMap((p, i) => (p.upgrades || []).map(u => <li key={`${i}-${u.n}`}><b>{p.name || 'Feitiço'} · melhoria {u.n}:</b> {u.description}</li>))}</ul>}
     </>}
     </>}
   </aside>;

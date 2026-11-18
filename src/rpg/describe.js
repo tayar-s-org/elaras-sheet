@@ -25,6 +25,7 @@ export function describeEvent(e, stats) {
       if (!paid) return `Descanso ininterrupto, ${streak}ª hora: ainda sem recuperação (vem retroativa na 4ª hora)`;
       return streak === 4 ? `Descanso ininterrupto, ${streak}ª hora: +${fmt(paid)} de estamina (as 4 horas, retroativo)` : `Descanso ininterrupto, ${streak}ª hora: +${fmt(paid)} de estamina`;
     }
+    case ACT.WORK: return `${e.workHour}ª hora de trabalho: −${fmt(-e.staminaDelta)} de estamina, −${fmt(-e.manaDelta)} de mana · +$${fmt(e.pay || 0)}${e.xp?.length ? ` · +${fmt(e.xp[0].amount)} XP em ${e.xp[0].name}` : ''}`;
     case ACT.QUICK: return 'Descanso rápido: +2 de estamina';
     case ACT.MEDITATE: {
       const m = e.meditation || {};

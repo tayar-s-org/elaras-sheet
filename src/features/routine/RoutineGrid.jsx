@@ -13,6 +13,7 @@ function Rules({ stats }) {
       <section><h4>Treinar Perícia</h4><p>Estamina por hora acumulada no dia: horas 1–4 custam 1, 5–8 custam 2, 9–12 custam 4 (4h = 4, 8h = 12, 12h = 28). Limite de {SKILL_TRAIN_MAX_HOURS} horas por dia. Cada hora dá +1 XP na perícia e +0,5 no atributo ligado. O <b>Treinamento Focado</b> dobra a estamina e dá o mesmo XP, num acumulador próprio (teto de 5.000, independente do Normal).</p></section>
       <section><h4>Treinar Feitiço</h4><p>1 de mana por hora (2 no Focado), até {spellTrainingHoursPerDay(stats.conjurar)}h por dia (metade do dado-base de Conjurar). Cada hora dá +1 XP no feitiço, +0,5 em Conjurar e +0,25 em Espírito.</p></section>
       <section><h4>Estudo Mágico</h4><p>Só para feitiços que já passaram pelo treinamento. Sem custo de recursos. Cada 25 horas dão 1 dado de Astúcia (acumulam até 24).</p></section>
+      <section><h4>Trabalhar</h4><p>O mestre aprova e configura cada trabalho: custo de estamina e mana por faixa de horas (1–4, 5–8, 9–12), pagamento e XP por hora. Só dá para escolher trabalhos já aprovados para este personagem. Limite de 12 horas por dia.</p></section>
       <section><h4>Descanso Completo</h4><p>Precisa ser ininterrupto. Nas 3 primeiras horas não recupera; ao completar a 4ª recupera 6 (retroativo) e depois 1,5 por hora, até {REST_MAX_HOURS}h por dia. Se interromper, a sequência recomeça do zero.</p></section>
       <section><h4>Descanso Rápido</h4><p>Exige estar alimentado. Recupera 2 de estamina por hora, até {QUICK_MAX_HOURS} horas por dia.</p></section>
       <section><h4>Meditar</h4><p>Recupera 1 / (4 − x/4) de mana por hora, onde x é a rolagem de Meditar da sessão (máx. 12). Este personagem tem {meditationSessionsPerDay(stats.spirit)} sessão(ões) por dia; uma sessão conta como usada quando termina e não pode ser retomada. Aqui a prévia usa o valor médio do dado.</p></section>
@@ -71,6 +72,10 @@ export default function RoutineGrid({ data, sim, stats, canEdit, onEdit, onRow }
                     <option value="">Escolha o feitiço…</option>
                     {(row.a === ACT.STUDY ? stats.spells.filter(s => stats.trainedSpells.includes(s.id)) : stats.spells).map(s => <option key={s.id} value={s.id}>{s.name || 'Sem nome'}</option>)}
                   </select>}
+                  {fields.includes('job') && <select aria-label={`Trabalho às ${HOURS[i]}`} value={row.job} onChange={e2 => onRow(i, { job: e2.target.value })}>
+                    <option value="">{Object.keys(stats.jobs || {}).length ? 'Escolha o trabalho…' : 'Nenhum trabalho aprovado (peça em Solicitações)'}</option>
+                    {Object.values(stats.jobs || {}).map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
+                  </select>}
                   {fields.includes('mode') && <select aria-label={`Complexidade do treinamento às ${HOURS[i]}`} value={row.mode} onChange={e2 => onRow(i, { mode: e2.target.value })}>
                     <option value="normal">Treinamento Normal</option><option value="focused">Treinamento Focado (custo dobrado)</option>
                   </select>}
@@ -79,6 +84,7 @@ export default function RoutineGrid({ data, sim, stats, canEdit, onEdit, onRow }
                   <b>{ACTIVITIES.find(a => a.id === row.a)?.label}</b>
                   {row.a === ACT.SKILL && row.skill && <span> · {row.skill}</span>}
                   {(row.a === ACT.SPELL || row.a === ACT.STUDY) && row.spell && <span> · {label('spell', row.spell)}</span>}
+                  {row.a === ACT.WORK && row.job && <span> · {stats.jobs?.[row.job]?.name || 'trabalho'}</span>}
                   {(row.a === ACT.SKILL || row.a === ACT.SPELL) && row.mode === 'focused' && <span> · Focado</span>}
                   {row.n && <span> {row.n}</span>}
                 </>}

@@ -117,7 +117,7 @@ export function createPdfBlob(character) {
   section("Poderes e canções");
   for (const x of c.powers)
     line(
-      `${x.name || "Sem nome"} | Custo: ${x.cost || "a definir"}${x.description ? "\n" + x.description : ""}`,
+      `${x.name || "Sem nome"} | Custo: ${x.cost || "a definir"}${x.description ? "\n" + x.description : ""}${(x.upgrades || []).map(u => `\nMelhoria ${u.n}: ${u.description}`).join("")}`,
     );
   if (!c.powers.length) line("Nenhum registrado.");
   for (const [title, text] of [

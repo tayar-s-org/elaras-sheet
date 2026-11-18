@@ -349,5 +349,5 @@ test('statsFromCharacter lê Espírito, Conjurar, Meditar (com bônus), máximos
 });
 
 test('newDay começa zerado', () => {
-  assert.deepEqual(newDay(3), { dayNo: 3, trainHours: 0, spellHours: 0, restHours: 0, restStreak: 0, quickHours: 0, medClosed: 0, medActive: false, medHours: 0, medRoll: 0, medRate: 0, prev: '' });
+  assert.deepEqual(newDay(3), { dayNo: 3, trainHours: 0, spellHours: 0, workHours: 0, restHours: 0, restStreak: 0, quickHours: 0, medClosed: 0, medActive: false, medHours: 0, medRoll: 0, medRate: 0, prev: '' });
 });

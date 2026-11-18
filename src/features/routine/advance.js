@@ -2,6 +2,7 @@ import { loadCharacters, loadStates } from '../../lib/room.js';
 import { loadRoutines } from '../../lib/training.js';
 import { loadRoutineDays } from '../../lib/clock.js';
 import { loadProgress, loadTraining, advanceTime } from '../../lib/engine.js';
+import { loadRequests, approvedJobs } from '../../lib/requests.js';
 import { statsFromCharacter, processTicks } from '../../rpg/processor.js';
 import { checkAdvance } from '../../rpg/readiness.js';
 import { normalizeRoutine } from '../../training/routine.js';
@@ -14,10 +15,10 @@ import { cryptoRng } from '../../rpg/dice.js';
 export async function runAdvance({ tableId, members, tick, hours, kind }) {
   const roster = members.filter(m => m.status === 'approved' && m.character_id);
   const ids = roster.map(m => m.character_id);
-  const [chars, states, routines, days, progress, training] = await Promise.all([
-    loadCharacters(ids), loadStates(tableId), loadRoutines(tableId), loadRoutineDays(tableId), loadProgress(tableId), loadTraining(tableId),
+  const [chars, states, routines, days, progress, training, requests] = await Promise.all([
+    loadCharacters(ids), loadStates(tableId), loadRoutines(tableId), loadRoutineDays(tableId), loadProgress(tableId), loadTraining(tableId), loadRequests(tableId),
   ]);
-  if (!routines || !days || !progress || !training) throw new Error('As migrations 0023 e 0024 precisam estar rodadas no Supabase.');
+  if (!routines || !days || !progress || !training || !requests) throw new Error('As migrations 0023, 0024 e 0025 precisam estar rodadas no Supabase.');
   const byId = Object.fromEntries(routines.map(r => [r.id, r]));
 
   const report = checkAdvance({
@@ -31,7 +32,7 @@ export async function runAdvance({ tableId, members, tick, hours, kind }) {
     const row = chars[id];
     if (!row) throw new Error(`Ficha de ${m.profiles?.display_name || 'um jogador'} não encontrada.`);
     const trained = (progress[id] || []).filter(p => p.kind === 'spell' && p.earned_total > 0).map(p => p.name);
-    const stats = statsFromCharacter(row.data, [...new Set(trained)]);
+    const stats = statsFromCharacter(row.data, [...new Set(trained)], approvedJobs(requests, id));
     const max = safeMaxima(row.data);
     const st = states[id] || {};
     const num = (v, fallback) => (Number.isFinite(Number(v)) && v !== null && v !== '' && v !== undefined ? Number(v) : fallback);

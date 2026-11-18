@@ -7,7 +7,9 @@ import { loadRoutineDays, assignDays } from '../../lib/clock.js';
 import { emptyRoutine, normalizeRoutine, simulateRoutine, routineProblems } from '../../training/routine.js';
 import { statsFromCharacter } from '../../rpg/processor.js';
 import { blockedReason } from '../../rpg/activities.js';
-import { loadProgress } from '../../lib/engine.js';
+import { loadProgress, loadTraining } from '../../lib/engine.js';
+import { loadRequests, approvedJobs, loadSpellProgress } from '../../lib/requests.js';
+import RequestsPanel from '../routine/Requests.jsx';
 import RoutineGrid from '../routine/RoutineGrid.jsx';
 import { formatClock, dayParts, dayOfTick, shiftMonth } from '../../rpg/clock.js';
 import CampaignCalendar from '../routine/CampaignCalendar.jsx';
@@ -21,8 +23,8 @@ const POLL_MS = 8000;
 const viewOfDay = dayNo => { const p = dayParts(dayNo); return { year: p.year, month: p.month }; };
 
 const FALLBACK_STATS = { maxStamina: 0, maxMana: 0, spirit: { die: 4, bonus: 0 }, conjurar: { die: 0, bonus: 0 }, meditar: { die: 0, bonus: 0 }, skills: [], spells: [], trainedSpells: [] };
-function statsOf(data, trained) {
-  try { return statsFromCharacter(data, trained); } catch { return FALLBACK_STATS; }
+function statsOf(data, trained, jobs) {
+  try { return statsFromCharacter(data, trained, jobs); } catch { return FALLBACK_STATS; }
 }
 
 const label = r => r?.name?.trim() || 'Sem nome';
@@ -43,6 +45,9 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const [monthView, setMonthView] = useState(null);
   const [daysByChar, setDaysByChar] = useState({});
   const [progress, setProgress] = useState({});
+  const [requests, setRequests] = useState([]);
+  const [training, setTraining] = useState({});
+  const [spellProgress, setSpellProgress] = useState({});
   const [flagged, setFlagged] = useState([]);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [returning, setReturning] = useState(false);
@@ -62,9 +67,12 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
 
   // Carrega e atualiza de tempos em tempos; o que eu estou editando não é sobrescrito.
   const pull = useCallback(async () => {
-    const [list, assigned, prog] = await Promise.all([loadRoutines(tableId), loadRoutineDays(tableId), loadProgress(tableId)]);
+    const [list, assigned, prog, reqs, trn, sp] = await Promise.all([loadRoutines(tableId), loadRoutineDays(tableId), loadProgress(tableId), loadRequests(tableId), loadTraining(tableId), loadSpellProgress(tableId)]);
     if (list === null || assigned === null) { setAvailable(false); setLoaded(true); return; }
     if (prog) setProgress(prog);
+    if (reqs) setRequests(reqs);
+    if (trn) setTraining(trn);
+    if (sp) setSpellProgress(sp);
     setAvailable(true);
     setRows(prev => list.map(r => (r.id === dirtyId.current ? (prev.find(p => p.id === r.id) || { ...r, data: normalizeRoutine(r.data) }) : { ...r, data: normalizeRoutine(r.data) })));
     if (!writes.current) setDaysByChar(assigned);
@@ -93,7 +101,10 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const member = roster.find(m => m.character_id === selected);
   const character = member ? characters[member.character_id] : null;
   const trained = useMemo(() => [...new Set((progress[selected] || []).filter(p => p.kind === 'spell' && p.earned_total > 0).map(p => p.name))], [progress, selected]);
-  const stats = useMemo(() => statsOf(character?.data, trained), [character, trained]);
+  const jobs = useMemo(() => approvedJobs(requests, selected), [requests, selected]);
+  const stats = useMemo(() => statsOf(character?.data, trained, jobs), [character, trained, jobs]);
+  const refreshAll = useCallback(() => pull().catch(() => {}), [pull]);
+  const pendingRequests = useMemo(() => requests.filter(r => r.character_id === selected && r.status === 'pending').length, [requests, selected]);
   const owner = member?.user_id === me;
   const canEdit = owner && !closed && available;
   const theirs = useMemo(() => rows.filter(r => r.character_id === selected), [rows, selected]);
@@ -229,6 +240,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
             <div className="tabs-row tr-views" role="tablist" aria-label="Seção">
               <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'primary' : 'outline'} onClick={() => setView('calendar')}>Calendário</button>
               <button type="button" role="tab" aria-selected={view === 'routines'} className={view === 'routines' ? 'primary' : 'outline'} onClick={() => setView('routines')}>Rotinas ({theirs.length})</button>
+              <button type="button" role="tab" aria-selected={view === 'requests'} className={view === 'requests' ? 'primary' : 'outline'} onClick={() => setView('requests')}>Solicitações{pendingRequests ? ` (${pendingRequests})` : ''}</button>
               {isGm && <button type="button" role="tab" aria-selected={view === 'time'} className={view === 'time' ? 'primary' : 'outline'} onClick={() => setView('time')}>Tempo da campanha</button>}
             </div>
 
@@ -238,6 +250,9 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
                   onShift={shift} onToday={goToday} onAssign={assign} highlight={flagged}
                   onOpen={id => { setRoutineId(id); setView('routines'); }} />
                 : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
+              : view === 'requests'
+                ? <RequestsPanel tableId={tableId} characterId={selected} owner={owner} isGm={isGm} closed={closed} requests={requests} stats={stats}
+                  training={training[selected]} spellProgress={spellProgress[selected]} refresh={refreshAll} />
               : view === 'time' && isGm
                 ? (clockReady
                   ? <ClockPanel tableId={tableId} members={members} tick={tick} characters={roleCharacters} routines={routinesById} routineDays={daysByChar}

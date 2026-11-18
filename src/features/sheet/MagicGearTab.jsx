@@ -52,6 +52,10 @@ export default function MagicGearTab({ c, d, update, rule, setC, setConfirm, set
                       }
                     />
                   </Field>
+                  {x.upgrades?.length > 0 && <div className="callout" role="note">
+                    <b>Melhorias conquistadas ({x.upgrades.length})</b>
+                    <ul>{x.upgrades.map(u => <li key={u.n}><b>{u.n}ª:</b> {u.description}</li>)}</ul>
+                  </div>}
                   <button
                     className="text-button danger"
                     onClick={() =>

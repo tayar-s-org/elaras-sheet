@@ -27,7 +27,7 @@ export function migrateRoutineV1toV2(raw) {
   };
 }
 
-export const emptyRow = () => ({ a: '', skill: '', spell: '', mode: 'normal', n: '' });
+export const emptyRow = () => ({ a: '', skill: '', spell: '', job: '', mode: 'normal', n: '' });
 export const emptyRoutine = () => ({
   v: ROUTINE_VERSION, period: '', place: '', fed: true, startStamina: null, startMana: null,
   rows: HOURS.map(emptyRow),
@@ -55,6 +55,7 @@ export function normalizeRoutine(input) {
         a,
         skill: a === ACT.SKILL ? text(r?.skill, 60) : '',
         spell: a === ACT.SPELL || a === ACT.STUDY ? text(r?.spell, 64) : '',
+        job: a === ACT.WORK && /^[0-9a-f-]{36}$/i.test(r?.job || '') ? r.job : '',
         mode: (a === ACT.SKILL || a === ACT.SPELL) && r?.mode === 'focused' ? 'focused' : 'normal',
         n: text(r?.n, 200),
       };

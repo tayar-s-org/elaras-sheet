@@ -15,9 +15,9 @@ export async function loadProgress(tableId) {
 
 // Horas de estudo e estado do dia por personagem: { [character_id]: { study_hours, day_no, day_state } }.
 export async function loadTraining(tableId) {
-  const { data, error } = await supabase.from('character_training').select('character_id,study_hours,day_no,day_state').eq('table_id', tableId);
+  const { data, error } = await supabase.from('character_training').select('character_id,study_hours,astucia_dice_spent,day_no,day_state').eq('table_id', tableId);
   if (error) return null;
-  return Object.fromEntries(data.map(r => [r.character_id, { study_hours: Number(r.study_hours), day_no: r.day_no, day_state: r.day_state || {} }]));
+  return Object.fromEntries(data.map(r => [r.character_id, { study_hours: Number(r.study_hours), astucia_dice_spent: Number(r.astucia_dice_spent) || 0, day_no: r.day_no, day_state: r.day_state || {} }]));
 }
 
 // Ledger do personagem (mais recentes primeiro).

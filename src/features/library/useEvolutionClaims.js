@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { claimEvolutions } from '../../lib/engine.js';
+import { claimSpellUpgrades } from '../../lib/requests.js';
 import { editSheet } from '../../sheets.js';
 import { applyEvolution } from '../../rpg/progression.js';
 import { describeDie, readDie } from '../../rpg/dice.js';
@@ -28,6 +29,20 @@ export function useEvolutionClaims(session, setSession, user, notify) {
           const id = sheet.cloud?.id;
           if (!id || !alive) continue;
           try {
+            // Melhorias de feitiço conquistadas no Estudo Mágico (descrição vai para a ficha e para o token).
+            try {
+              const ups = await claimSpellUpgrades(id);
+              if (ups.length && alive) {
+                setSession(prev => editSheet(prev, sheet.id, ch => ({
+                  ...ch,
+                  powers: ch.powers.map(p => {
+                    const mine = ups.filter(u => u.spell_id === p.id);
+                    return mine.length ? { ...p, upgrades: [...(p.upgrades || []), ...mine.map(u => ({ n: u.n, description: u.description, at: u.at }))] } : p;
+                  }),
+                })));
+                notifyRef.current?.(`✨ ${sheet.character.name || 'Sua ficha'} aprimorou ${ups.length > 1 ? `${ups.length} feitiços` : 'um feitiço'}: veja em Magia.`);
+              }
+            } catch (error) { if (/function|does not exist|schema cache/i.test(error.message)) { /* migration 0025 pendente */ } }
             const list = await claimEvolutions(id);
             if (!list.length || !alive) continue;
             let result = null;

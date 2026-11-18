@@ -7,7 +7,8 @@ import { dayOfTick, slotOfTick } from './clock.js';
 // É puro (não acessa rede); quem grava é o servidor (advance_time), que garante unicidade e atomicidade.
 
 // Estatísticas que as regras de atividade precisam, tiradas da ficha. trainedSpells = ids de feitiços que já passaram pelo treino.
-export function statsFromCharacter(data, trainedSpells = []) {
+// jobs = trabalhos aprovados pelo mestre para esta ficha: [{ id, name, staminaTiers, manaTiers, pay, xp, xpSkill }].
+export function statsFromCharacter(data, trainedSpells = [], jobs = []) {
   const c = validateCharacter(data);
   const d = calculate(c);
   return {
@@ -19,6 +20,7 @@ export function statsFromCharacter(data, trainedSpells = []) {
     skills: Object.keys(c.skills).filter(k => c.skills[k] > 0),
     spells: c.powers.map(p => ({ id: p.id, name: p.name })),
     trainedSpells,
+    jobs: Object.fromEntries(jobs.map(j => [j.id, j])),
   };
 }
 
@@ -42,7 +44,7 @@ export function processTicks({ entries, fromTick, hours, rng }) {
       const row = at?.row || {};
       events.push({
         ...out.event, tick, dayNo, slot, characterId: entry.characterId, routineId: at?.routineId || null,
-        row: { a: row.a || '', skill: row.skill || '', spell: row.spell || '', mode: row.mode === 'focused' ? 'focused' : 'normal' },
+        row: { a: row.a || '', skill: row.skill || '', spell: row.spell || '', job: row.job || '', mode: row.mode === 'focused' ? 'focused' : 'normal' },
       });
     }
     return { characterId: entry.characterId, events, state, day };

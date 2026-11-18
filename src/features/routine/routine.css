@@ -60,3 +60,39 @@
   .cc-badge { font-size: .58rem; }
   .clock-now strong { font-size: 1.3rem; }
 }
+
+/* Solicitacoes (trabalho e melhoria de feitico) */
+.rq-panel { display: grid; gap: 14px; }
+.rq-new { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.rq-new h4, .rq-panel h4, .rq-group h4 { margin: 0; font-family: var(--font-display); color: var(--accent); }
+.rq-list { display: grid; gap: 10px; }
+.rq-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-left: 4px solid var(--st, var(--border)); border-radius: 10px; background: var(--surface); }
+.rq-card header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.rq-card h4 { margin: 0; }
+.rq-card.st-approved, .rq-status.st-approved { --st: var(--success); }
+.rq-card.st-pending, .rq-status.st-pending { --st: var(--warning); }
+.rq-card.st-rejected, .rq-status.st-rejected { --st: var(--danger); }
+.rq-card.st-changes, .rq-status.st-changes { --st: #a89bd8; }
+.rq-card.st-done, .rq-status.st-done { --st: var(--gold); }
+.rq-status { padding: 1px 10px; border-radius: 999px; border: 1px solid var(--st); color: var(--st); font-size: .74rem; font-weight: 700; }
+.rq-body, .rq-desc { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rq-summary { margin: 0; padding-left: 18px; font-size: .85rem; }
+.rq-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rq-decide { display: grid; gap: 8px; margin-top: 6px; }
+.rq-gm summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+.rq-tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.rq-tiers fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; display: grid; gap: 4px; }
+.rq-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.rq-preview { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.rq-preview caption { text-align: left; color: var(--muted); padding-bottom: 4px; }
+.rq-preview th, .rq-preview td { padding: 3px 8px; border-top: 1px solid var(--border); text-align: left; }
+.rq-hint { margin: 0; font-size: .8rem; }
+.rq-attempt { display: grid; gap: 4px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: 8px; }
+.rq-attempt p { margin: 0; }
+.rq-result { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--st); margin-top: 6px; }
+.rq-result.ok { --st: var(--success); }
+.rq-result.bad { --st: var(--danger); }
+.rq-result p { margin: 2px 0 0; }
+.rq-rolls { font-size: .78rem; word-spacing: 4px; }
+.rq-group { display: grid; gap: 8px; margin-bottom: 14px; }
+.peek-upgrades, .mod-upgrades { margin: 6px 0 0; padding-left: 16px; font-size: .8rem; display: grid; gap: 2px; }

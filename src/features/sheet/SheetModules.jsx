@@ -94,6 +94,7 @@ function Summary({ index, c, d }) {
       return <>
         <h4 className="mod-sub">Poderes ({c.powers.length})</h4>
         {c.powers.length ? <div className="mod-chips">{c.powers.map((p, i) => <Chip key={i} label={p.name || "Sem nome"} value={p.cost || null} tone="power" />)}</div> : <Empty>Nenhum poder.</Empty>}
+        {c.powers.some(p => p.upgrades?.length) && <ul className="mod-upgrades">{c.powers.flatMap((p, i) => (p.upgrades || []).map(u => <li key={`${i}-${u.n}`}><b>{p.name || "Feitiço"} · melhoria {u.n}:</b> {u.description}</li>))}</ul>}
       </>;
     case 7: {
       const bag = bagItems(c);
