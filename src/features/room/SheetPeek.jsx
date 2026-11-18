@@ -33,7 +33,8 @@ const grouped = list => {
 
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
 // limited: visão dos jogadores (inclusive do próprio token) (só nome, descrição e barras de Vida, Stamina e Mana; sem dinheiro nem o resto da ficha).
-export default function SheetPeek({ data, state, onClose, limited = false }) {
+// mine: o token é do próprio jogador (só ele vê a própria mana; os outros jogadores não).
+export default function SheetPeek({ data, state, onClose, limited = false, mine = false }) {
   let c, d;
   try { c = validateCharacter(data); d = calculate(c); } catch { return null; }
   const max = safeMaxima(data);
@@ -46,7 +47,7 @@ export default function SheetPeek({ data, state, onClose, limited = false }) {
     <p className="muted">{[c.race, c.concept, `Nível ${d.level}`, `${c.xp} XP`].filter(Boolean).join(' · ')}</p>
     {!limited && <MoneyTag value={c.money} />}
     <div className="peek-vitals">
-      {RESOURCES.map(([k, label]) => {
+      {RESOURCES.filter(([k]) => !limited || mine || k !== 'mana').map(([k, label]) => {
         const mana = k === 'mana';
         const value = currentValue(state, max, k);
         const lvl = level(value, max[k], mana);

@@ -7,7 +7,7 @@ const LIMIT = 80;
 const RESOURCE_LABEL = { life: 'Vida', stamina: 'Stamina', mana: 'Mana' };
 
 // Registro da mesa sob o tabuleiro, em abas: dados/chat e alteracoes de vida, stamina e mana.
-export default function TableLog({ messages, rolls, stateLog, hidden, members, characters, me }) {
+export default function TableLog({ messages, rolls, stateLog, hidden, members, characters, me, isGm }) {
   const [tab, setTab] = useState('dice');
   const boxRef = useRef(null);
   const names = useMemo(() => Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador'])), [members]);
@@ -19,7 +19,9 @@ export default function TableLog({ messages, rolls, stateLog, hidden, members, c
     // Mais recente primeiro: a ultima acao fica no topo e as anteriores embaixo.
     return list.sort((a, b) => new Date(b.at) - new Date(a.at) || String(b.key).localeCompare(String(a.key))).slice(0, LIMIT);
   }, [messages, rolls, hidden]);
-  const vitalEntries = useMemo(() => [...(stateLog || [])].sort((a, b) => b.id - a.id).slice(0, LIMIT), [stateLog]);
+  // Jogadores não veem as mudanças de mana dos outros (só as da própria ficha); o mestre vê tudo.
+  const myCharacter = members.find(m => m.user_id === me)?.character_id;
+  const vitalEntries = useMemo(() => [...(stateLog || [])].filter(v => isGm || v.resource !== 'mana' || v.character_id === myCharacter).sort((a, b) => b.id - a.id).slice(0, LIMIT), [stateLog, isGm, myCharacter]);
   const newestKey = tab === 'dice' ? diceEntries[0]?.key : vitalEntries[0]?.id;
   // A novidade aparece no topo; volta o quadro (so ele, nao a pagina) para o inicio.
   useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = 0; }, [newestKey, tab]);
