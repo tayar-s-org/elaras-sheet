@@ -59,7 +59,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const gsize = clamp(Number(grid.size) || 70, 20, 400);
   const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
   // O token inteiro (nao so o centro) fica dentro do tabuleiro.
-  const tokenHalf = t => (gsize * t.size * tokenScale) / 2;
+  // Tokens de criatura aparecem com o dobro do tamanho dos demais.
+  const unit = t => gsize * t.size * tokenScale * (creatureOf(t) ? 2 : 1);
+  const tokenHalf = t => unit(t) / 2;
   const keepIn = (v, half, max) => (max <= half * 2 ? max / 2 : clamp(v, half, max - half));
 
   // Limites da visao: o maximo de zoom out faz o mapa cobrir toda a area do tabuleiro (sem margens) e nao se pode arrastar para fora dele.
@@ -320,7 +322,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       <g>{visibleTokens.map(t => {
         const raw = tokenPos(t);
         const p = { x: keepIn(raw.x, tokenHalf(t), W), y: keepIn(raw.y, tokenHalf(t), H) };
-        const r = (gsize * t.size * tokenScale) / 2 - 3;
+        const r = unit(t) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
         const src = imageOf(t);
         const cr = creatureOf(t);
