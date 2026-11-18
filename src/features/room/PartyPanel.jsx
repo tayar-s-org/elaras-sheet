@@ -57,7 +57,7 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
       {canEdit && <button type="button" className="outline view-sheet-btn" onClick={() => setViewing(true)}>Ver ficha</button>}
     </div>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
-    <MoneyTag value={row.data?.money} />
+    {canEdit && <MoneyTag value={row.data?.money} />}
     {viewing && <SheetViewModal data={row.data} owner={member.profiles?.display_name} onClose={() => setViewing(false)} />}
     {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
       <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}
