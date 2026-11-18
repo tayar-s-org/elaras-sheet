@@ -86,3 +86,23 @@ test('abrir ficha da nuvem substitui a única aba em branco',()=>{
   s=openCloudSheet(openSheet({sheets:[],activeId:''},{...newCharacter(),name:'Rascunho'},'b'),row);
   assert.equal(s.sheets.length,2);
 });
+
+test('sincronizar: troca fichas desatualizadas, abre as que faltam e mantém a aba ativa', async () => {
+  const { syncCloudSheets, sheetsLosingChanges } = await import('./sheets.js');
+  const A = '11111111-1111-1111-1111-111111111111', B = '22222222-2222-2222-2222-222222222222';
+  const row = (id, revision, name) => ({ id, revision, character: { ...newCharacter(), name } });
+  let s = openCloudSheet(openSheet({ sheets: [], activeId: '' }, newCharacter(), 'a'), row(A, 3, 'Antiga'));
+  s = { ...s, sheets: s.sheets.map(x => ({ ...x, character: { ...x.character, name: 'Editada' } })) };   // alteração local sem salvar
+  const rows = [row(A, 5, 'Nova'), row(B, 1, 'Outra')];
+  assert.equal(sheetsLosingChanges(s, rows).length, 1);
+  const r = syncCloudSheets(s, rows);
+  assert.equal(r.session.sheets.length, 2);
+  assert.equal(r.session.sheets[0].character.name, 'Nova');
+  assert.equal(r.session.sheets[0].cloud.revision, 5);
+  assert.equal(r.session.activeId, 'a');
+  assert.deepEqual([r.updated.length, r.added.length], [1, 1]);
+  // mesma revisão com alterações locais: não mexe
+  const same = syncCloudSheets(s, [row(A, 3, 'Antiga')]);
+  assert.equal(same.session.sheets[0].character.name, 'Editada');
+  assert.equal(sheetsLosingChanges(s, [row(A, 3, 'Antiga')]).length, 0);
+});

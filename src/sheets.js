@@ -25,6 +25,31 @@ export function openCloudSheet(session,row) {
   const next=openSheet(session,row.character);
   return {...next,sheets:next.sheets.map(s=>s.id===next.activeId?{...s,cloud}:s)};
 }
+// Fichas abertas com alteracoes ainda nao salvas que a nuvem ja ultrapassou (a sincronizacao as descartaria).
+export function sheetsLosingChanges(session,rows) {
+  return session.sheets.filter(s=>s.cloud && JSON.stringify(s.character)!==s.cloud.base && rows.some(r=>r.id===s.cloud.id && r.revision>s.cloud.revision));
+}
+// Traz a versao da nuvem: fichas com revisao mais nova sao trocadas, as que faltam abrem como aba (a aba ativa nao muda).
+// Ficha com alteracoes locais na mesma revisao fica como esta (o salvamento automatico envia).
+export function syncCloudSheets(session,rows) {
+  const updated=[];
+  let sheets=session.sheets.map(s=>{
+    const row=s.cloud && rows.find(r=>r.id===s.cloud.id);
+    if(!row || row.revision<=s.cloud.revision) return s;
+    updated.push(s.id);
+    return {...s,character:row.character,cloud:{id:row.id,revision:row.revision,base:JSON.stringify(row.character)}};
+  });
+  let next={...session,sheets};
+  const added=[];
+  for(const row of rows){
+    if(next.sheets.some(s=>s.cloud?.id===row.id)) continue;
+    const before=next.activeId;
+    next={...openCloudSheet(next,row),activeId:before};
+    added.push(row.id);
+  }
+  if(!next.sheets.some(s=>s.id===next.activeId)) next={...next,activeId:next.sheets[0].id};
+  return {session:next,updated,added};
+}
 export function setCloud(session,id,row) {
   return {...session,sheets:session.sheets.map(s=>s.id===id?{...s,cloud:{id:row.id,revision:row.revision,base:JSON.stringify(row.character)}}:s)};
 }

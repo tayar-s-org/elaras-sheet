@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
 import { exportPdf, importPdf } from "./pdf.js";
-import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet } from "./sheets.js";
+import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, syncCloudSheets, sheetsLosingChanges } from "./sheets.js";
+import { fetchCloudRows } from "./features/library/syncCloud.js";
 import SheetTabs from "./SheetTabs.jsx";
 import MasterView from "./MasterView.jsx";
 import CloudSheets from "./features/library/CloudSheets.jsx";
@@ -39,6 +40,21 @@ export default function App() {
   const auth = useAuth();
   const route = useHashRoute();
   const autosave = useAutosave(session, setSession, Boolean(auth.user));
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState('');
+  const syncNow = async () => {
+    setSyncing(true);
+    setSyncNote('');
+    try {
+      const rows = await fetchCloudRows();
+      const lost = sheetsLosingChanges(session, rows);
+      if (lost.length && !window.confirm(`${lost.length === 1 ? 'Uma ficha tem' : `${lost.length} fichas têm`} alterações que não foram salvas e a nuvem já tem uma versão mais nova. Descartar as alterações locais e usar a da nuvem?`)) return;
+      const result = syncCloudSheets(session, rows);
+      setSession(result.session);
+      autosave.unblock();
+      setSyncNote(result.updated.length || result.added.length ? `Sincronizado: ${result.updated.length} atualizada(s), ${result.added.length} aberta(s).` : 'Tudo já está em dia com a nuvem.');
+    } catch (e) { setSyncNote(`Não foi possível sincronizar: ${e.message}`); } finally { setSyncing(false); }
+  };
   const c = session.sheets.find(s => s.id === activeId).character;
   const setC = value => setSession(prev => editSheet(prev, activeId, value));
   const [master, setMaster] = useState(false);
@@ -223,7 +239,8 @@ export default function App() {
   return (
     <>
       {topbar}
-      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} />
+      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} onSync={auth.user ? syncNow : undefined} syncing={syncing} />
+      {syncNote && <p className="muted" role="status" style={{margin:'4px 16px'}}>{syncNote}</p>}
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}
         onNew={() => addCharacter(newCharacter())} master={master} onMaster={() => setMaster(value => !value)}
         onClose={id => {

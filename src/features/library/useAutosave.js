@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createCharacter, updateCharacter, ConflictError } from '../../lib/cloud.js';
 import { setCloud } from '../../sheets.js';
 import { newCharacter } from '../../rules.js';
@@ -52,5 +52,7 @@ export function useAutosave(session, setSession, enabled) {
 
   // Ao trocar de conta ou sair, esquece conflitos e falhas da conta anterior.
   useEffect(() => { if (!enabled) { blocked.current.clear(); failed.current.clear(); setStatus({ state: 'idle', message: '' }); } }, [enabled]);
-  return status;
+  // Depois de sincronizar com a nuvem: libera as fichas travadas por conflito e tenta salvar de novo.
+  const unblock = useCallback(() => { blocked.current.clear(); failed.current.clear(); setStatus({ state: 'idle', message: '' }); setRetry(n => n + 1); }, []);
+  return { ...status, unblock };
 }
