@@ -85,6 +85,17 @@ export function useRoom(tableId, user, displayName) {
     return () => clearInterval(timer);
   }, [tableId, user?.id, ready]);
 
+  // As fichas nao estao no Realtime: confere de tempos em tempos para o XP e outras mudancas aparecerem sem recarregar a sala.
+  useEffect(() => {
+    if (!supabase || !user || !ready) return undefined;
+    const ids = members.filter(m => m.status === 'approved' && m.character_id).map(m => m.character_id);
+    if (!ids.length) return undefined;
+    const timer = setInterval(() => {
+      loadCharacters(ids).then(next => setCharacters(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))).catch(() => {});
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [user?.id, ready, members]);
+
   // Recarrega mesa e membros (usado pelos controles da mesa dentro da sala).
   const reload = useCallback(async () => {
     const t = await getTable(tableId);

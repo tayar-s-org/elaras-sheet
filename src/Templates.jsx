@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { races, archetypes, applyRace, racialEffects, loadArchetype } from './templates.js';
 import { newCharacter, SKILLS } from './rules.js';
+import CustomArchetype from './CustomArchetype.jsx';
 
 export default function Templates({ character:c, onChange, onLoad }) {
   const [view, setView] = useState('races');
@@ -9,7 +10,7 @@ export default function Templates({ character:c, onChange, onLoad }) {
   const effects = racialEffects(c);
   return <section className="templates">
     <h3>Começar com o livro</h3>
-    <div className="template-tabs"><button className={view==='races'?'primary':'outline'} onClick={()=>setView('races')}>Raças ({races.length})</button><button className={view==='archetypes'?'primary':'outline'} onClick={()=>setView('archetypes')}>Arquétipos prontos ({archetypes.length})</button></div>
+    <div className="template-tabs"><button className={view==='races'?'primary':'outline'} onClick={()=>setView('races')}>Raças ({races.length})</button><button className={view==='archetypes'?'primary':'outline'} onClick={()=>setView('archetypes')}>Arquétipos prontos ({archetypes.length})</button><button className={view==='custom'?'primary':'outline'} onClick={()=>setView('custom')}>Criar o meu</button></div>
     {view === 'races' ? <>
       <label className="field"><span>Aplicar raça do livro</span><select value={c.raceId || ''} onChange={e => onChange(applyRace(c,e.target.value))}><option value="">Personalizada / ficha anterior</option>{races.map(r=><option key={r.id}>{r.id}</option>)}</select></label>
       {race && <div className="race-details">
@@ -21,7 +22,8 @@ export default function Templates({ character:c, onChange, onLoad }) {
         <details><summary>Descrição e todos os traços raciais</summary>{race.text.map((text,i)=><p key={i}>{text}</p>)}</details>
         <p className="muted">Visão, imunidades, voo, penalidades e demais efeitos condicionais são lembretes para as rolagens. Os valores dos dados não incluem modificadores de testes. Trocar de raça mantém os avanços pagos dos atributos.</p>
       </div>}
-    </> : <>
+    </> : view === 'custom' ? <CustomArchetype character={c} onChange={onChange} onLoad={onLoad} />
+    : <>
       <p className="muted">Escolha um modelo para carregar atributos, perícias, vantagens e uma sugestão de bagagem. Depois preencha nome e história. Todos os modelos do livro são humanos; você pode trocar a raça depois. Magias e equipamento dependem do cenário e da aprovação do mestre.</p>
       <label className="field"><span>Buscar arquétipo</span><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Mago, ladrão, atirador…" /></label>
       <div className="archetype-grid">{archetypes.filter(a=>a.id.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(query.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))).map(a=><article className="archetype-card" key={a.id}>

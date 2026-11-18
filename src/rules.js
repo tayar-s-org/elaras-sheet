@@ -1,5 +1,6 @@
 import { racialEffects } from "./templates.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
+import { inventoryEffects, itemById } from "./market/items.js";
 export const ATTRIBUTES = [
   "Agilidade",
   "Astúcia",
@@ -69,7 +70,7 @@ export const MASTER_RULES = [
   ],
   [
     "Mana e exaustão",
-    "Mana máxima = 10 + 2 × Espírito. Bônus específicos podem ser registrados em Mana adicional. Na metade, o tempo de conjuração dobra e magias instantâneas passam a levar um turno. Abaixo de 25%, o efeito dos feitiços cai pela metade. Ao atingir 10%, o personagem testa Espírito a cada turno para evitar desmaiar.",
+    "Mana máxima = 10 + 2 × Espírito, mais 10 para cada vantagem Pontos de Poder. Outros bônus específicos podem ser registrados em Mana adicional. Na metade, o tempo de conjuração dobra e magias instantâneas passam a levar um turno. Abaixo de 25%, o efeito dos feitiços cai pela metade. Ao atingir 10%, o personagem testa Espírito a cada turno para evitar desmaiar.",
   ],
   [
     "Treinamento físico",
@@ -90,6 +91,7 @@ export function newCharacter() {
     schemaVersion: 1,
     name: "",
     player: "",
+    age: "",
     xp: 0,
     money: START_MONEY,
     dice: {weaponName:'', weaponDie:0, weaponCount:1, damageBonus:0},
@@ -108,6 +110,7 @@ export function newCharacter() {
     history: "",
     notes: "",
     tokenImage: "",
+    inventory: [],
     armor: 0,
     movementBonus: 0,
     parryBonus: 0,
@@ -151,6 +154,20 @@ export function elaraCharacter() {
   };
 }
 
+export const MANA_PER_POWER_POINTS = 10;
+const edgeKey = name => String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+// Custo de cada vantagem na ordem da ficha (a 1a custa 1, a 2a custa 2...). Copias repetidas de uma vantagem
+// sao permitidas e custam o mesmo que qualquer outra na sua posicao, sem acrescimo.
+export function advantageCosts(c, freeEdges = 0) {
+  const seen = new Set();
+  return c.advantages.map((item, i) => {
+    const key = edgeKey(item.name);
+    const repeat = Boolean(key) && seen.has(key);
+    if (key) seen.add(key);
+    return { cost: i < freeEdges ? 0 : 1 + c.rules.ownedAdvantages + i - freeEdges, repeat };
+  });
+}
+
 export function calculate(c) {
   const a = c.attributes;
   const racial = racialEffects(c);
@@ -171,10 +188,11 @@ export function calculate(c) {
     0,
   );
   const advantageCost =
-    c.advantages.reduce(
-      (sum, _, i) => sum + (i < racial.freeEdges ? 0 : 1 + c.rules.ownedAdvantages + i - racial.freeEdges),
-      0,
-    ) - c.rules.advantageDiscount;
+    advantageCosts(c, racial.freeEdges).reduce((sum, item) => sum + item.cost, 0) - c.rules.advantageDiscount;
+  // Itens equipados do mercado somam a Resistência e ao Aparar; peso acima da carga (2,5 × Força, em kg) tira Movimentação.
+  const inv = inventoryEffects(c.inventory, a.Força);
+  // Cada vantagem "Pontos de Poder" (pode ser repetida) soma +10 de mana maximo.
+  const powerPointEdges = c.advantages.filter(item => edgeKey(item.name).startsWith("pontos de poder")).length;
   const extra =
     c.hindrances.reduce((sum, h) => sum + (h.severity === "Maior" ? 5 : 3), 0) +
     c.rules.extraPoints;
@@ -198,14 +216,17 @@ export function calculate(c) {
     movement: Math.max(
       1,
       Math.floor(ATTRIBUTES.reduce((sum, name) => sum + a[name], 0) / 12) +
-        c.movementBonus + racial.movement,
+        c.movementBonus + racial.movement - inv.overload,
     ),
-    parry: 2 + (c.skills.Lutar || 0) / 2 + c.parryBonus,
-    toughness: 2 + a.Vigor / 2 + c.armor + racial.toughness,
+    parry: 2 + (c.skills.Lutar || 0) / 2 + c.parryBonus + inv.parry,
+    toughness: 2 + a.Vigor / 2 + c.armor + inv.armor + racial.toughness,
+    inventory: inv,
     life: a.Vigor,
     stamina: a.Vigor,
+    powerPointEdges,
     mana:
       10 + a.Espírito * 2 +
+      powerPointEdges * MANA_PER_POWER_POINTS +
       c.manaBonus,
   };
 }
@@ -241,7 +262,17 @@ export function validateCharacter(raw) {
     "notes",
   ])
     c[name] = string(raw[name]);
+  // Mochila do mercado: só ids que existem no catálogo, quantidade 1 a 99, e um item equipado por espaço.
+  const takenSlots = new Set();
+  c.inventory = (Array.isArray(raw.inventory) ? raw.inventory : []).slice(0, 300).flatMap(entry => {
+    const item = itemById.get(entry?.id);
+    if (!item) return [];
+    let equipped = entry.equipped === true && Boolean(item.slot) && !takenSlots.has(item.slot);
+    if (equipped) takenSlots.add(item.slot);
+    return [{ id: item.id, qty: integer(entry.qty, 1, 99, 1), equipped }];
+  });
   c.tokenImage = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(raw.tokenImage) ? raw.tokenImage : "";
+  c.age = string(raw.age, 30);
   c.raceId = ["Androide","Anão","Atlante","Aviano","Elfo","Humano","Meio-elfo","Meio-orc","Pequenino","Rakashano","Sáurio"].includes(raw.raceId) ? raw.raceId : "";
   c.raceChoice = raw.raceChoice === "Vantagem" ? "Vantagem" : "Agilidade";
   c.raceSkill = SKILLS.some(([name]) => name === raw.raceSkill) ? raw.raceSkill : "Conhecimento";

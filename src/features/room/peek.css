@@ -13,3 +13,11 @@
 .peek-vital-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
 .peek-vital-head strong { margin-left: auto; }
 .peek-vital-head small { font-weight: 400; color: var(--muted); }
+
+.peek-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.peek-pill { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-soft); font-size: .85rem; }
+.peek-pill b { color: var(--accent); }
+.peek-pill.power { border-color: var(--accent); background: var(--selection); }
+.peek-pill.major b { color: var(--danger); }
+.peek-pill.minor b { color: var(--warning); }
+.peek-load { font-size: .78rem; margin: 6px 0 0; }

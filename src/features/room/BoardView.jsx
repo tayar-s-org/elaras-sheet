@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { updateToken, addToken, addMark, removeMark, snapToGrid } from '../../lib/board.js';
+import { updateToken, addToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
 import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
@@ -53,6 +53,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const grid = board?.grid || { size: 70, visible: true };
   const gsize = clamp(Number(grid.size) || 70, 20, 400);
   const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
+  // O token inteiro (nao so o centro) fica dentro do tabuleiro.
+  const tokenHalf = t => (gsize * t.size * tokenScale) / 2;
+  const keepIn = (v, half, max) => (max <= half * 2 ? max / 2 : clamp(v, half, max - half));
 
   // Limites da visao: o maximo de zoom out faz o mapa cobrir toda a area do tabuleiro (sem margens) e nao se pode arrastar para fora dele.
   const constrain = v => {
@@ -66,6 +69,28 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
 
   // Enquadra o mapa quando o tabuleiro (ou o mapa) muda de tamanho.
   useEffect(() => { setView({ x: 0, y: 0, w: W }); }, [W, H, board?.id]);
+
+  // Cura tabuleiros antigos: sem mapa, o tamanho padrao; com mapa, ~2000 no lado maior (tokens vao junto, na mesma posicao relativa).
+  // Corrige o caso de um mapa pequeno ou enorme ter deixado o tabuleiro minusculo/gigante e os tokens fora da tela.
+  const healed = useRef(null);
+  useEffect(() => {
+    if (!isGm || !board || healed.current === board.id) return;
+    healed.current = board.id;
+    const target = board.map_path
+      ? (Math.max(board.width, board.height) === BOARD_BASE ? null : fitMapSize(board.width, board.height))
+      : (board.width === DEFAULT_SIZE.width && board.height === DEFAULT_SIZE.height ? null : DEFAULT_SIZE);
+    if (!target) return;
+    (async () => {
+      try {
+        const items = await loadBoardItems(board.id);
+        await updateBoard(board.id, { width: target.width, height: target.height });
+        const moved = await relayoutBoard(board, items.tokens, target);
+        local.setBoard({ ...board, width: target.width, height: target.height });
+        local.setTokens(prev => applyMoves(prev, moved));
+        local.setMarks([]);
+      } catch (e) { setError(e.message); }
+    })();
+  }, [isGm, board?.id, board?.map_path, board?.width, board?.height]);
   // Acompanha o tamanho do SVG (janela redimensionada, painel aberto) e reajusta a visao.
   useEffect(() => {
     const el = svgRef.current;
@@ -129,7 +154,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       if (tool === 'move' && t && canMove(t)) {
         const pt = toMap(e.clientX, e.clientY);
         local.beginDrag(t.id);
-        gesture.current = { type: 'token', id: t.id, dx: t.x - pt.x, dy: t.y - pt.y, moved: false };
+        gesture.current = { type: 'token', id: t.id, dx: t.x - pt.x, dy: t.y - pt.y, half: tokenHalf(t), moved: false };
         return;
       }
     }
@@ -156,7 +181,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       return;
     }
     const pt = toMap(e.clientX, e.clientY);
-    const x = clamp(pt.x + g.dx, 0, W), y = clamp(pt.y + g.dy, 0, H);
+    const x = keepIn(pt.x + g.dx, g.half, W), y = keepIn(pt.y + g.dy, g.half, H);
     g.moved = true;
     g.x = x; g.y = y;
     local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, x, y } : t)));
@@ -172,7 +197,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     if (!g || g.type !== 'token') return;
     local.endDrag(g.id);
     if (!g.moved) return;
-    const final = grid.visible ? { x: clamp(snapToGrid(g.x, gsize), 0, W), y: clamp(snapToGrid(g.y, gsize), 0, H) } : { x: g.x, y: g.y };
+    const final = grid.visible ? { x: keepIn(snapToGrid(g.x, gsize), g.half, W), y: keepIn(snapToGrid(g.y, gsize), g.half, H) } : { x: g.x, y: g.y };
     local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, ...final } : t)));
     room.sendBroadcast('drag', { id: g.id, ...final, done: true });
     try { await updateToken(g.id, final); } catch (err) { setError(err.message); local.reloadItems(); }
@@ -273,11 +298,14 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         <title>{m.kind === 'note' ? m.text : `Marcador de ${names[m.created_by] || 'jogador'}`}</title>
       </g>)}</g>
       <g>{visibleTokens.map(t => {
-        const p = tokenPos(t);
+        const raw = tokenPos(t);
+        const p = { x: keepIn(raw.x, tokenHalf(t), W), y: keepIn(raw.y, tokenHalf(t), H) };
         const r = (gsize * t.size * tokenScale) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
         const src = imageOf(t);
         const cr = creatureOf(t);
+        // Token de personagem mostra o nome atual da ficha (o nome gravado no token é só o de quando foi colocado).
+        const label = (t.character_id && characters[t.character_id]?.name) || t.name;
         return <g key={t.id} data-token={t.id} transform={`translate(${p.x} ${p.y})`}
           className={`board-token${canMove(t) ? ' movable' : ''}${selected === t.id ? ' selected' : ''}${t.hidden ? ' hidden-token' : ''}${cr && cr.hp === 0 ? ' defeated' : ''}`}>
           {src ? <>
@@ -285,13 +313,13 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
             <image href={src} x={-r - 3} y={-r - 3} width={(r + 3) * 2} height={(r + 3) * 2} pointerEvents="none" preserveAspectRatio="xMidYMid meet" />
           </> : <>
             <circle r={r} fill={t.color} stroke={mine ? '#fff' : '#000'} strokeWidth={mine ? 5 : 3} />
-            <text textAnchor="middle" dominantBaseline="central" fontSize={r * 0.8} fill="#fff" pointerEvents="none">{initials(t.name)}</text>
+            <text textAnchor="middle" dominantBaseline="central" fontSize={r * 0.8} fill="#fff" pointerEvents="none">{initials(label)}</text>
           </>}
           {cr && <g pointerEvents="none">
             <rect className="hp-track" x={-r} y={r + gsize * 0.05} width={r * 2} height={gsize * 0.11} rx={gsize * 0.05} />
             <rect className={`hp-fill ${hpTone(cr.ratio)}`} x={-r} y={r + gsize * 0.05} width={Math.max(0, r * 2 * cr.ratio)} height={gsize * 0.11} rx={gsize * 0.05} />
           </g>}
-          <text y={r + gsize * (cr ? 0.46 : 0.28)} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{t.name}</text>
+          <text y={r + gsize * (cr ? 0.46 : 0.28)} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{label}</text>
         </g>;
       })}</g>
     </svg>

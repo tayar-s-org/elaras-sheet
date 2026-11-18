@@ -45,11 +45,9 @@ export function checkAdvantage(entry, character, advantageNames, current = calcu
     if (result === null) manual.push(requirement);
   }
 
-  const position = character.advantages.length;
-  const free = current.racial.freeEdges;
-  const rawCost = position < free ? 0 : 1 + character.rules.ownedAdvantages + position - free;
-  const grossSpent = Math.max(0, position - free) * (1 + character.rules.ownedAdvantages + Math.max(0, position - free - 1) / 2);
-  const cost = Math.max(0, grossSpent + rawCost - character.rules.advantageDiscount) - current.advantageCost;
+  // Custo de adicionar esta vantagem agora (a proxima posicao da lista), comparando o total antes e depois.
+  const withEntry = { ...character, advantages: [...character.advantages, { name: entry.name, description: '', power: false }] };
+  const cost = calculate(withEntry).advantageCost - current.advantageCost;
   if (cost > 0 && current.remaining < cost) missing.push(`${cost} ${cost === 1 ? 'ponto disponível' : 'pontos disponíveis'} (saldo: ${current.remaining})`);
   return {stage, cost, missing, manual};
 }

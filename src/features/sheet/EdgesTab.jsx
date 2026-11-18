@@ -1,9 +1,11 @@
 import React from "react";
 import { Field, NumberField } from "../../ui/Field.jsx";
 import Catalog from "../../Catalog.jsx";
+import { advantageCosts } from "../../rules.js";
 
 /* eslint-disable-next-line no-unused-vars */
 export default function EdgesTab({ c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage }) {
+  const costs = advantageCosts(c, d.racial.freeEdges);
   return (
             <>
               <p className="intro">
@@ -45,7 +47,7 @@ export default function EdgesTab({ c, d, update, rule, setC, setConfirm, setToas
                     />
                   </Field>
                   <div className="row">
-                    <span className="muted">Bônus específicos de mana: use Mana adicional em Atributos.</span>
+                    <span className="muted">Custo: {costs[i]?.cost ?? 0} {costs[i]?.cost === 1 ? "ponto" : "pontos"}{costs[i]?.repeat ? " (repetida)" : ""}. Pontos de Poder somam +10 de mana sozinhos; outros bônus: Mana adicional em Atributos.</span>
                     <button
                       className="text-button danger"
                       onClick={() =>

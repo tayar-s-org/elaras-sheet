@@ -205,3 +205,18 @@ input, select, textarea { font-family: inherit; }
 .board-tools input, .board-tools select { min-width: 0; max-width: 100%; }
 
 .nav-links button.resume { color: var(--gold); border: 1px solid var(--gold); border-radius: 999px; padding: 4px 14px; margin-left: 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.summary-token { display: block; width: 104px; height: 104px; object-fit: contain; margin: 18px auto 10px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+.summary-level { margin: 2px 0 6px; text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--gold); }
+.summary-level span { color: var(--muted); font-weight: 400; font-size: .9rem; }
+
+/* Ficha em pagina unica: secoes empilhadas com separador e rolagem suave */
+.editor { scroll-behavior: smooth; }
+.sheet-section { scroll-margin-top: 84px; padding-top: 6px; }
+.sheet-section + .sheet-section { margin-top: 44px; padding-top: 30px; border-top: 1px solid var(--border); }
+.sheet-book { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; background: var(--surface-soft); }
+.sheet-book > summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--accent); }
+.sheet-book[open] > summary { margin-bottom: 14px; }
+
+.point-total { font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.point-total b { color: var(--gold); }

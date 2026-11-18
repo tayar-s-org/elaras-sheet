@@ -1,14 +1,16 @@
 import React from "react";
+import { tokenUrl } from "../../lib/tokens.js";
 import MoneyTag from "../../ui/MoneyTag.jsx";
 
 export default function SheetSummary({ c, d, save }) {
   return (
         <aside className="summary">
           <p className="eyebrow">FICHA EM TEMPO REAL</p>
-          <div className="crest" aria-hidden="true">
-            ✧
-          </div>
+          {tokenUrl(c.tokenImage)
+            ? <img className="summary-token" src={tokenUrl(c.tokenImage)} alt={`Token de ${c.name || "personagem"}`} />
+            : <div className="crest" aria-hidden="true">✧</div>}
           <h2>{c.name || "Seu personagem"}</h2>
+          <p className="summary-level">Nível {d.level}<span> · {c.xp} XP</span></p>
           <MoneyTag value={c.money} />
           <p className="muted">
             {c.race} · {c.village}
@@ -46,6 +48,8 @@ export default function SheetSummary({ c, d, save }) {
                   ? "Você ultrapassou o orçamento definido."
                   : "pontos disponíveis"}
             </p>
+            <div className="point-line point-total"><span>Total de pontos</span><b>{d.remaining + d.spent}</b></div>
+            <div className="point-line point-total"><span>Pontos gastos</span><b>{d.spent}</b></div>
             {[
               ["Atributos", d.attributeCost, true],
               ["Perícias", d.skillCost, true],

@@ -1,2 +1,10 @@
 .amount-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 2px; font-size: .85rem; color: var(--muted); }
 .amount-field input { width: 72px; text-align: center; padding: 4px 6px; }
+.xp-grant { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.xp-grant label { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
+.xp-grant input { width: 80px; text-align: center; padding: 4px 6px; }
+.xp-grant small { flex-basis: 100%; }
+.party-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.party-head h4 { min-width: 0; overflow-wrap: anywhere; }
+.view-sheet-btn { flex: none; padding: 4px 12px; font-size: .85rem; }
+.view-owner { font-family: var(--font-body); font-size: .9rem; font-weight: 400; color: var(--muted); }

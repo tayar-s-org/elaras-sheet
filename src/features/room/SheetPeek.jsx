@@ -4,14 +4,30 @@ import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue } from './vitals
 import { incapacitation, steppedDie, effectiveMovement } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
+import { itemById } from '../../market/items.js';
 
 // "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; perícia abaixo de d4 vira "d4−2".
 function DieText({ die, steps, kind }) {
   const eff = steppedDie(die, steps, kind);
   const label = `d${eff.die}${eff.bonus ? eff.bonus : ''}`.replace('-', '−');
-  return <b>{label}{(eff.die !== die || eff.bonus) && <small> (d{die})</small>}</b>;
+  // Boolean(...): sem ele, bonus 0 faria o React escrever um "0" depois do dado (d4 virava d40).
+  return <b>{label}{Boolean(eff.die !== die || eff.bonus) && <small> (d{die})</small>}</b>;
 }
 import './peek.css';
+
+const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace('.', ',')} kg`;
+const Pill = ({ label, value, tone }) => <span className={`peek-pill${tone ? ` ${tone}` : ''}`}>{label}{value ? <b>{value}</b> : null}</span>;
+// Vantagens repetidas aparecem uma vez só, com o multiplicador (Nome ×2).
+const grouped = list => {
+  const map = new Map();
+  for (const a of list) {
+    const name = a.name || 'Sem nome';
+    const key = name.trim().toLowerCase();
+    const prev = map.get(key);
+    map.set(key, prev ? { ...prev, n: prev.n + 1 } : { name, n: 1, power: a.power });
+  }
+  return [...map.values()];
+};
 
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
 export default function SheetPeek({ data, state, onClose }) {
@@ -20,10 +36,11 @@ export default function SheetPeek({ data, state, onClose }) {
   const max = safeMaxima(data);
   const inc = incapacitation(state, max);
   const skills = Object.entries(c.skills).filter(([, die]) => die > 0);
+  const gear = c.inventory.map(e => ({ ...e, name: itemById.get(e.id)?.name })).filter(e => e.name);
   return <aside className="sheet-peek" aria-label={`Ficha de ${c.name || 'personagem'}`}>
     <button type="button" className="peek-close" aria-label="Fechar resumo da ficha" onClick={onClose}>×</button>
     <h4>{c.name || 'Sem nome'}</h4>
-    <p className="muted">{[c.race, c.concept, `Nível ${d.level}`].filter(Boolean).join(' · ')}</p>
+    <p className="muted">{[c.race, c.concept, `Nível ${d.level}`, `${c.xp} XP`].filter(Boolean).join(' · ')}</p>
     <MoneyTag value={c.money} />
     <div className="peek-vitals">
       {RESOURCES.map(([k, label]) => {
@@ -52,15 +69,24 @@ export default function SheetPeek({ data, state, onClose }) {
     </>}
     {c.advantages.length > 0 && <>
       <h5>Vantagens</h5>
-      <p>{c.advantages.map(a => a.name).filter(Boolean).join(', ')}</p>
+      <div className="peek-pills">{grouped(c.advantages).map(a => <Pill key={a.name} label={a.name} value={a.n > 1 ? `×${a.n}` : ''} tone={a.power ? 'power' : ''} />)}</div>
     </>}
     {c.hindrances.length > 0 && <>
       <h5>Complicações</h5>
-      <p>{c.hindrances.map(h => `${h.name}${h.name ? ` (${h.severity})` : ''}`).filter(Boolean).join(', ')}</p>
+      <div className="peek-pills">{c.hindrances.map((h, i) => <Pill key={i} label={h.name || 'Sem nome'} value={h.severity} tone={h.severity === 'Maior' ? 'major' : 'minor'} />)}</div>
+    </>}
+    {gear.length > 0 && <>
+      <h5>Equipamento</h5>
+      <div className="peek-pills">{gear.filter(g => g.equipped).map(g => <Pill key={g.id} label={g.name} value={g.qty > 1 ? `×${g.qty}` : ''} tone="power" />)}</div>
+      {gear.some(g => !g.equipped) && <>
+        <h5>Mochila</h5>
+        <div className="peek-pills">{gear.filter(g => !g.equipped).map(g => <Pill key={g.id} label={g.name} value={g.qty > 1 ? `×${g.qty}` : ''} />)}</div>
+      </>}
+      <p className="muted peek-load">Carga {fmtKg(d.inventory.weight)} / {fmtKg(d.inventory.capacity)}{d.inventory.overload ? ` · sobrecarga −${d.inventory.overload} de Movimento` : ''}</p>
     </>}
     {c.powers.length > 0 && <>
       <h5>Poderes</h5>
-      <p>{c.powers.map(p => p.name).filter(Boolean).join(', ')}</p>
+      <div className="peek-pills">{c.powers.map((p, i) => <Pill key={i} label={p.name || 'Sem nome'} value={p.cost} tone="power" />)}</div>
     </>}
   </aside>;
 }

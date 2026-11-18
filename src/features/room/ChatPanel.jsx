@@ -1,43 +1,54 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { sendMessage } from '../../lib/room.js';
+import './roompanels.css';
 
 const time = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const initial = name => (name || '?').trim()[0]?.toUpperCase() || '?';
+const GROUP_MS = 5 * 60 * 1000; // mensagens seguidas da mesma pessoa dentro de 5 min ficam agrupadas
 
+// Chat geral da mesa: todos veem tudo.
 export default function ChatPanel({ tableId, me, members, messages, addMessage, disabled }) {
   const [body, setBody] = useState('');
-  const [to, setTo] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const endRef = useRef(null);
+  const logRef = useRef(null);
   const names = Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador']));
-  const others = members.filter(m => m.status === 'approved' && m.user_id !== me);
-  useEffect(() => { endRef.current?.scrollIntoView?.({ block: 'end' }); }, [messages.length]);
+  // Rola so o proprio quadro (scrollIntoView arrastaria a pagina inteira).
+  useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length]);
+
   async function submit(e) {
     e.preventDefault();
     const text = body.trim();
-    if (!text) return;
+    if (!text || busy) return;
+    setBusy(true);
     setError('');
-    try { addMessage(await sendMessage(tableId, text, to || null)); setBody(''); }
+    try { addMessage(await sendMessage(tableId, text)); setBody(''); }
     catch (err) { setError(err.message); }
+    finally { setBusy(false); }
   }
-  return <div className="chat">
-    <div className="chat-log" role="log" aria-live="polite">
-      {!messages.length && <p className="muted">Nenhuma mensagem ainda. Diga olá!</p>}
-      {messages.map(m => <p key={m.id} className={`chat-line${m.kind === 'whisper' ? ' whisper' : ''}${m.user_id === me ? ' mine' : ''}`}>
-        <span className="chat-meta">{time(m.created_at)} · <strong>{names[m.user_id] || 'Jogador'}</strong>
-          {m.kind === 'whisper' && <em> (sussurro para {m.to_user === me ? 'você' : names[m.to_user] || 'alguém'})</em>}</span>
-        <span className="chat-body">{m.body}</span>
-      </p>)}
-      <div ref={endRef} />
+  const onKeyDown = e => { if (e.key === 'Enter' && !e.shiftKey) submit(e); };
+
+  return <div className="chat2">
+    <div className="chat2-log" ref={logRef} role="log" aria-live="polite" aria-label="Chat da mesa">
+      {!messages.length && <div className="chat2-empty"><span aria-hidden="true">💬</span><p>Nenhuma mensagem ainda.<br />Diga olá para a mesa!</p></div>}
+      {messages.map((m, i) => {
+        const mine = m.user_id === me;
+        const prev = messages[i - 1];
+        const grouped = prev && prev.user_id === m.user_id && new Date(m.created_at) - new Date(prev.created_at) < GROUP_MS;
+        return <div key={m.id} className={`chat2-msg${mine ? ' mine' : ''}${grouped ? ' grouped' : ''}`}>
+          {!mine && (grouped ? <span className="chat2-avatar ghost" /> : <span className="chat2-avatar" aria-hidden="true">{initial(names[m.user_id])}</span>)}
+          <div className="chat2-bubble">
+            {!grouped && <div className="chat2-meta">{!mine && <strong>{names[m.user_id] || 'Jogador'}</strong>}<span>{time(m.created_at)}</span></div>}
+            <p>{m.kind === 'whisper' && <em className="chat2-whisper">sussurro · </em>}{m.body}</p>
+          </div>
+        </div>;
+      })}
     </div>
-    <form className="chat-form" onSubmit={submit}>
-      <select aria-label="Destinatário" value={to} onChange={e => setTo(e.target.value)} disabled={disabled}>
-        <option value="">Para todos</option>
-        {others.map(m => <option key={m.user_id} value={m.user_id}>Sussurrar para {m.profiles?.display_name}</option>)}
-      </select>
-      <input aria-label="Mensagem" maxLength={2000} value={body} disabled={disabled}
-        placeholder={disabled ? 'Mesa encerrada' : 'Escreva uma mensagem'} onChange={e => setBody(e.target.value)} />
-      <button className="primary" disabled={disabled || !body.trim()}>Enviar</button>
+    <form className="chat2-form" onSubmit={submit}>
+      <textarea aria-label="Mensagem" rows={1} maxLength={2000} value={body} disabled={disabled}
+        placeholder={disabled ? 'Mesa encerrada' : 'Escreva uma mensagem… (Enter envia)'} onChange={e => setBody(e.target.value)} onKeyDown={onKeyDown} />
+      <button className="primary" disabled={disabled || busy || !body.trim()}>Enviar</button>
     </form>
-    {error && <p role="alert" className="muted">{error}</p>}
+    {error && <p role="alert" className="chat2-error">{error}</p>}
   </div>;
 }

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Field, NumberField } from "../../ui/Field.jsx";
-import Templates from "../../Templates.jsx";
 import { stageForXP } from "../../catalogRules.js";
 import { MAX_MONEY } from "../../money.js";
 import TokenMaker from "../token/TokenMaker.jsx";
@@ -32,7 +31,15 @@ export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm
                     onChange={(e) => update("player", e.target.value)}
                   />
                 </Field>
-                <Field label="Raça atual" hint="Escolha no catálogo abaixo para aplicar os traços do livro.">
+                <Field label="Idade">
+                  <input
+                    value={c.age}
+                    maxLength={30}
+                    placeholder="Ex.: 27 anos"
+                    onChange={(e) => update("age", e.target.value)}
+                  />
+                </Field>
+                <Field label="Raça atual" hint="Escolha no Guia de criação (menu lateral) para aplicar os traços da raça.">
                   <input value={c.race} maxLength={100} onChange={e => update("race", e.target.value)} disabled={Boolean(c.raceId)} />
                 </Field>
                 <Field label="Vila de origem">
@@ -78,7 +85,6 @@ export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm
               </div>
               {maker && <TokenMaker name={c.name} onClose={() => setMaker(false)}
                 onSave={async blob => { const path = await uploadTokenImage(userId, blob, c.tokenImage); update("tokenImage", path); setToast("Token salvo na ficha."); }} />}
-              <Templates character={c} onChange={setC} onLoad={(title, action) => setConfirm({title, text:"A ficha atual será substituída. Salve seu PDF antes de continuar se quiser guardá-la.", action})} />
               <div className="callout">
                 <b>As florestas de Sylvargan</b>
                 <p>
@@ -88,7 +94,7 @@ export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm
                 </p>
               </div>
               <div className="form-grid">
-                <NumberField label="Experiência (XP)" value={c.xp} max={1000000} onChange={v => update("xp", v)} hint="A cada 5 XP, sobe um nível e recebe 2 pontos." />
+                <NumberField label="Experiência (XP)" value={c.xp} max={1000000} onChange={v => update("xp", v)} hint="A cada 5 XP, sobe um nível e recebe 2 pontos. O XP dado pelo mestre é somado aqui sozinho." />
                 <Field label="Nível calculado"><output>{d.level} · +{d.progressionPoints} pontos de progressão</output></Field>
                 <div className="wide"><NumberField label="Dinheiro ($)" value={c.money} max={MAX_MONEY} onChange={v => update("money", v)}
                   hint="Toda ficha começa com 500. O mestre pode adicionar dinheiro; registre aqui o que você gastar." /></div>

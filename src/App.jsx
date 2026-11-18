@@ -12,35 +12,19 @@ import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
 import { useMoneyClaims } from "./features/library/useMoneyClaims.js";
 import { listMine, getCharacter, deleteCharacter } from "./lib/cloud.js";
+import { claimXp } from "./lib/xp.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
 import TablePage from "./features/tables/TablePage.jsx";
 import InvitePage from "./features/tables/InvitePage.jsx";
 import RoomPage from "./features/room/RoomPage.jsx";
 import HomePage from "./features/home/HomePage.jsx";
-import Dice from "./Dice.jsx";
 import TopBar from "./features/sheet/TopBar.jsx";
 import SheetSummary from "./features/sheet/SheetSummary.jsx";
-import IdentityTab from "./features/sheet/IdentityTab.jsx";
-import AttributesTab from "./features/sheet/AttributesTab.jsx";
-import SkillsTab from "./features/sheet/SkillsTab.jsx";
-import EdgesTab from "./features/sheet/EdgesTab.jsx";
-import MagicGearTab from "./features/sheet/MagicGearTab.jsx";
-import HistoryTab from "./features/sheet/HistoryTab.jsx";
-import BookTab from "./features/sheet/BookTab.jsx";
+import SheetModules from "./features/sheet/SheetModules.jsx";
 import Toast from "./ui/Toast.jsx";
 import ConfirmModal from "./ui/ConfirmModal.jsx";
 
 const OWNER_KEY = "manrakora-sheets-owner";
-const TABS = [
-  "Identidade",
-  "Atributos",
-  "Perícias",
-  "Vantagens",
-  "Magia e bagagem",
-  "História",
-  "Livro e regras",
-  "Dados para Discord",
-];
 export default function App() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'light');
   useEffect(() => {
@@ -59,7 +43,18 @@ export default function App() {
   const setC = value => setSession(prev => editSheet(prev, activeId, value));
   const [master, setMaster] = useState(false);
   const addCharacter = character => {setSession(prev => openSheet(prev, character));setMaster(false);setTab(0);};
-  const [tab, setTab] = useState(0);
+  // Ficha em pagina unica: "setTab(n)" rola ate a secao n (a 6 e o livro, que abre quando pedido).
+  const [editing, setEditing] = useState(null); // modulo aberto no editor completo
+  useEffect(() => { setEditing(null); }, [activeId]);
+  const goTo = i => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`sec-${i}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: 0 });
+    });
+  };
+  // Chamado pelas secoes: 6 abre o livro; as demais rolam ate o modulo.
+  const setTab = i => { if (i === 6) setEditing(6); else { setEditing(null); goTo(i); } };
   const [toast, setToast] = useState("");
   useMoneyClaims(session, setSession, auth.user, setToast);
   const [storageError, setStorageError] = useState(false);
@@ -118,6 +113,42 @@ export default function App() {
     })();
     return () => { alive = false; };
   }, [auth.user?.id]);
+  // XP concedido pelo mestre: recolhe o que esta pendente para cada ficha da conta e soma na ficha (o autosave envia).
+  const claiming = useRef(false);
+  const claimAgain = useRef(false);
+  useEffect(() => {
+    if (!auth.user) return undefined;
+    const claimAll = async () => {
+      if (claiming.current) { claimAgain.current = true; return; } // chegou outra concessao no meio: repete ao terminar
+      claiming.current = true;
+      try {
+        for (const sheet of sessionRef.current.sheets.filter(s => s.cloud)) {
+          try {
+            const gained = await claimXp(sheet.cloud.id);
+            if (gained > 0) {
+              setSession(prev => editSheet(prev, sheet.id, ch => ({ ...ch, xp: Math.min(1000000, ch.xp + gained) })));
+              const before = Math.floor(sheet.character.xp / 5);
+              const after = Math.floor(Math.min(1000000, sheet.character.xp + gained) / 5);
+              const up = after > before ? ` Subiu para o nível ${after}: +${(after - before) * 2} pontos de progressão!` : "";
+              setToast(`${sheet.character.name || "Sua ficha"} recebeu ${gained} XP do mestre.${up}`);
+            }
+          } catch { /* sem permissao ou migration pendente: tenta de novo depois */ }
+        }
+      } finally {
+        claiming.current = false;
+        if (claimAgain.current) { claimAgain.current = false; claimAll(); }
+      }
+    };
+    const first = setTimeout(claimAll, 2500);
+    const timer = setInterval(claimAll, 15000); // reserva caso o tempo real falhe
+    // Canal proprio: se a tabela ainda nao estiver no Realtime, so ele falha e a verificacao periodica segue valendo.
+    const channel = supabase?.channel(`xp:${auth.user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "xp_awards" }, () => claimAll())
+      .subscribe();
+    const onVisible = () => { if (document.visibilityState === "visible") claimAll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearTimeout(first); clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); if (channel) supabase.removeChannel(channel); };
+  }, [auth.user?.id]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 6500);
@@ -167,7 +198,7 @@ export default function App() {
   async function signOut() {
     await auth.signOut();
     // As fichas ficam na conta; limpa os rascunhos deste navegador para o proximo usuario.
-    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); localStorage.removeItem(OWNER_KEY); localStorage.removeItem("elara-last-room"); } catch { /* sem storage */ }
+    try { localStorage.removeItem(SHEETS_STORAGE); localStorage.removeItem(LEGACY_STORAGE); localStorage.removeItem(OWNER_KEY); localStorage.removeItem("elara-last-room"); localStorage.removeItem("manrakora-custom-archetypes"); } catch { /* sem storage */ }
     setSession(restoreSheets({ getItem: () => null }));
     setMaster(false);
     setTab(0);
@@ -209,18 +240,23 @@ export default function App() {
           <p className="eyebrow">SEU PERSONAGEM</p>
           <h1>{c.name || "Uma nova história"}</h1>
           <p className="muted">{c.concept || "Dê forma à próxima aventura."}</p>
-          <nav aria-label="Etapas da ficha">
-            {TABS.map((name, i) => (
-              <button
-                key={name}
-                aria-current={tab === i ? "step" : undefined}
-                className={tab === i ? "selected" : ""}
-                onClick={() => setTab(i)}
-              >
-                {name}
-                <span aria-hidden="true">{tab === i ? "↗" : "›"}</span>
-              </button>
-            ))}
+          <nav aria-label="Ficha">
+            <button aria-current={editing == null ? "page" : undefined} className={editing == null ? "selected" : ""} onClick={() => { setEditing(null); goTo(0); }}>
+              Identidade
+              <span aria-hidden="true">{editing == null ? "↗" : "›"}</span>
+            </button>
+            <button aria-current={editing === "guide" ? "page" : undefined} className={editing === "guide" ? "selected" : ""} onClick={() => setEditing("guide")}>
+              Guia de criação
+              <span aria-hidden="true">{editing === "guide" ? "↗" : "›"}</span>
+            </button>
+            <button aria-current={editing === "market" ? "page" : undefined} className={editing === "market" ? "selected" : ""} onClick={() => setEditing("market")}>
+              Mercado
+              <span aria-hidden="true">{editing === "market" ? "↗" : "›"}</span>
+            </button>
+            <button aria-current={editing === 6 ? "page" : undefined} className={editing === 6 ? "selected" : ""} onClick={() => setEditing(6)}>
+              Livro e regras
+              <span aria-hidden="true">{editing === 6 ? "↗" : "›"}</span>
+            </button>
           </nav>
           <div className="sidebar-bottom">
             <button
@@ -248,37 +284,7 @@ export default function App() {
           </div>
         </aside>
         <section className="editor" key={activeId}>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">SAVAGE WORLDS · REGRAS DA MESA</p>
-              <h2>{TABS[tab]}</h2>
-            </div>
-            <span className="chapter">
-              {String(tab + 1).padStart(2, "0")} / {String(TABS.length).padStart(2, "0")}
-            </span>
-          </div>
-          {tab === 0 && <IdentityTab {...ctx} />}
-          {tab === 1 && <AttributesTab {...ctx} />}
-          {tab === 2 && <SkillsTab {...ctx} />}
-          {tab === 3 && <EdgesTab {...ctx} />}
-          {tab === 4 && <MagicGearTab {...ctx} />}
-          {tab === 5 && <HistoryTab {...ctx} />}
-          {tab === 6 && <BookTab {...ctx} />}
-          {tab === 7 && <Dice character={c} onChange={value => update('dice', value)} />}
-          {tab < TABS.length - 1 && (
-            <div className="editor-footer">
-              <button
-                className="quiet"
-                disabled={tab === 0}
-                onClick={() => setTab(tab - 1)}
-              >
-                ← Voltar
-              </button>
-              <button className="primary" onClick={() => setTab(tab + 1)}>
-                Continuar →
-              </button>
-            </div>
-          )}
+          <SheetModules ctx={ctx} editing={editing} setEditing={setEditing} />
         </section>
         <SheetSummary c={c} d={d} save={save} />
       </main>}

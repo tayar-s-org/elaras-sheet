@@ -1,0 +1,29 @@
+.skills2-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+.skills2-stat { display: grid; justify-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.skills2-stat b { font-family: var(--font-display); font-size: 1.6rem; color: var(--accent); line-height: 1.1; }
+.skills2-stat span { font-size: .75rem; color: var(--muted); text-align: center; }
+.skills2-stat.bad b { color: var(--danger); }
+.skills2-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 8px; }
+.skills2-filters input[type="search"] { flex: 1; min-width: 180px; }
+.skills2-group { margin-top: 18px; }
+.skills2-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1.05rem; }
+.skills2-attr { font-family: var(--font-body); font-size: .8rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); }
+.skills2-list { display: grid; gap: 6px; }
+.skills2-row { display: grid; grid-template-columns: minmax(110px, 1fr) auto 46px; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.skills2-row.on { border-color: var(--accent); background: var(--selection); }
+.skills2-name { display: grid; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.skills2-name small { font-weight: 400; color: var(--gold); font-size: .72rem; }
+.die-picker { display: inline-flex; border: 1px solid var(--control-border); border-radius: 8px; overflow: hidden; }
+.die-picker button { min-width: 38px; padding: 5px 7px; border: 0; border-right: 1px solid var(--control-border); background: var(--surface); color: var(--muted); font: inherit; font-size: .85rem; cursor: pointer; }
+.die-picker button:last-child { border-right: 0; }
+.die-picker button:hover:not(:disabled):not(.sel) { background: var(--selection); color: var(--accent); }
+.die-picker button.sel { background: var(--accent); color: var(--surface); font-weight: 700; }
+.die-picker button:disabled { opacity: .3; cursor: default; }
+.skills2-cost { text-align: right; font-size: .8rem; color: var(--gold); font-weight: 700; }
+.skills2-note { margin-top: 18px; font-size: .85rem; }
+@media (max-width: 560px) {
+  .skills2-row { grid-template-columns: 1fr auto; }
+  .skills2-cost { display: none; }
+}
+.skills2-tabs { margin: 6px 0 4px; }
+.skills2-count { font-size: .75rem; opacity: .75; margin-left: 2px; }

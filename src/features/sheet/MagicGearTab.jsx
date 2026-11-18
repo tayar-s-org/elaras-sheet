@@ -68,18 +68,6 @@ export default function MagicGearTab({ c, d, update, rule, setC, setConfirm, set
               <button className="outline" onClick={() => addItem("powers")}>
                 + Adicionar poder personalizado
               </button>
-              <h3>Equipamento</h3>
-              <Field
-                label="Armas, armadura e bagagem"
-                hint="Anote dano, alcance, munição, dinheiro e outros detalhes."
-              >
-                <textarea
-                  maxLength={10000}
-                  rows="9"
-                  value={c.equipment}
-                  onChange={(e) => update("equipment", e.target.value)}
-                />
-              </Field>
             </>
   );
 }

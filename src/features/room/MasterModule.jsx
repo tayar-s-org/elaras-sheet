@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, clearMarks } from '../../lib/board.js';
+import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
 import { creatureOf, metaWithHp, metaWithMaxHp, parseHp, MAX_HP } from '../../creature.js';
 import './master.css';
 
@@ -50,9 +50,10 @@ export default function MasterModule({ board, tokens, marks, members, characters
         <div className="row master-actions">
           <button type="button" className="outline" disabled={busy} onClick={() => fileRef.current.click()}>{board.map_path ? 'Trocar mapa' : 'Enviar mapa'}</button>
           {board.map_path && <button type="button" className="text-button danger" disabled={busy}
-            onClick={() => window.confirm('Remover o mapa?') && run(async () => { await removeMap(board); local.setBoard({ ...board, map_path: null }); local.reloadMap(); })}>Remover mapa</button>}
+            onClick={() => window.confirm('Remover o mapa?') && run(async () => { const r = await removeMap(board, tokens); local.setBoard({ ...board, map_path: null, width: r.width, height: r.height }); local.setTokens(prev => applyMoves(prev, r.moved)); local.setMarks([]); local.reloadMap(); })}>Remover mapa</button>}
+          <button className="outline" disabled={busy || !tokens.length} title="Se algum token ficou fora da tela, traz todos para o centro" onClick={() => run(async () => { const moves = await gatherTokens(board, tokens); local.setTokens(prev => applyMoves(prev, moves)); })}>Trazer tokens ao centro</button>
           <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/webp"
-            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) run(async () => { const r = await uploadMap(board, f); local.setBoard({ ...board, map_path: r.path, width: r.width, height: r.height }); local.reloadMap(); }); }} />
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) run(async () => { const r = await uploadMap(board, f, tokens); local.setBoard({ ...board, map_path: r.path, width: r.width, height: r.height }); local.setTokens(prev => applyMoves(prev, r.moved)); local.setMarks([]); local.reloadMap(); }); }} />
         </div>
         <p className="muted">PNG, JPEG ou WebP até 5 MB. Só quem está na mesa vê o mapa.</p>
         <div className="form-grid compact">

@@ -1,0 +1,12 @@
+.custom-arch { display: grid; gap: 14px; }
+.custom-set { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; margin: 0; }
+.custom-set legend { font-size: .8rem; color: var(--muted); padding: 0 6px; }
+.custom-attrs { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.custom-line { display: flex; align-items: center; gap: 8px; }
+.custom-line > span { flex: 1; }
+.custom-line > input, .custom-line > select { flex: 1; min-width: 0; }
+.custom-line > select.die { flex: 0 0 90px; }
+.custom-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-edge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1px solid var(--accent); background: var(--selection); font-size: .85rem; }
+.chip-edge button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 6px; }
+.custom-arch .negative { color: var(--danger); }

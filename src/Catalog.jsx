@@ -30,13 +30,13 @@ export default function Catalog({ character, onAdd, onOpenPage }) {
     <div className="catalog-results">{entries.map(({entry, check}) => {
       const added = character[kind].some(x => normalize(x.name) === normalize(entry.name));
       const add = impact => onAdd(kind, {name:entry.name, description:[entry.requirements && `Requisitos: ${entry.requirements}`,entry.description,`Fonte: livro, página ${entry.page} do PDF.`].filter(Boolean).join('\n\n'), ...(kind === 'advantages' ? {power:false} : {severity:impact})});
-      const status = added ? 'Na ficha' : check?.missing.length ? 'Requisitos pendentes' : check?.manual.length ? 'Revisão do mestre' : check ? 'Disponível' : '';
+      const status = added ? 'Na ficha · pode repetir' : check?.missing.length ? 'Requisitos pendentes' : check?.manual.length ? 'Revisão do mestre' : check ? 'Disponível' : '';
       return <details className="catalog-entry" key={entry.id}><summary><b>{entry.name}</b><span>{[check?.stage, check ? entry.category : entry.severities.join(' / '), status].filter(Boolean).join(' · ')}</span></summary>
         {entry.requirements && <p><strong>Requisitos:</strong> {entry.requirements}</p>}
-        {check && !added && <p><strong>Custo nesta ficha:</strong> {check.cost} {check.cost === 1 ? 'ponto' : 'pontos'}.{check.missing.length > 0 && <><br /><strong>Falta:</strong> {check.missing.join('; ')}.</>}{check.manual.length > 0 && <><br /><strong>Confirme com o mestre:</strong> {check.manual.join('; ')}.</>}</p>}
+        {check && <p><strong>{added ? 'Custo de repetir:' : 'Custo nesta ficha:'}</strong> {check.cost} {check.cost === 1 ? 'ponto' : 'pontos'}.{check.missing.length > 0 && <><br /><strong>Falta:</strong> {check.missing.join('; ')}.</>}{check.manual.length > 0 && <><br /><strong>Confirme com o mestre:</strong> {check.manual.join('; ')}.</>}</p>}
         <div className="catalog-description">{entry.description.split('\n\n').map((p,i) => <p key={i}>{p}</p>)}</div>
         <div className="catalog-actions"><button className="text-button" onClick={() => onOpenPage(entry.page)}>Ver página {entry.page} do PDF ↗</button>
-          {check ? <button className="primary" disabled={added || check.missing.length > 0} onClick={() => add()}>{added ? 'Já adicionada' : check.missing.length ? 'Requisitos pendentes' : check.manual.length ? 'Adicionar para revisão' : 'Adicionar à ficha'}</button> : entry.severities.map(s => <button key={s} className="primary" disabled={added} onClick={() => add(s)}>Adicionar {s.toLowerCase()} (+{s === 'Maior' ? 5 : 3})</button>)}
+          {check ? <button className="primary" disabled={check.missing.length > 0} onClick={() => add()}>{check.missing.length ? 'Requisitos pendentes' : added ? `Adicionar outra (${check.cost} ${check.cost === 1 ? 'ponto' : 'pontos'})` : check.manual.length ? 'Adicionar para revisão' : 'Adicionar à ficha'}</button> : entry.severities.map(s => <button key={s} className="primary" disabled={added} onClick={() => add(s)}>Adicionar {s.toLowerCase()} (+{s === 'Maior' ? 5 : 3})</button>)}
         </div>
       </details>;
     })}{!entries.length && <p>Nenhuma opção encontrada. <button className="text-button" onClick={() => {setQuery('');setCategory('');setSeverity('');setStage('');setAvailableOnly(false);}}>Limpar filtros</button></p>}</div>

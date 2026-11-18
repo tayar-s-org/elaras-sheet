@@ -1,3 +1,4 @@
+import { equipmentText } from "./market/inventory.js";
 import { racialSummary } from "./templates.js";
 import { jsPDF } from "jspdf";
 import { ATTRIBUTES, calculate, validateCharacter } from "./rules.js";
@@ -120,7 +121,7 @@ export function createPdfBlob(character) {
     );
   if (!c.powers.length) line("Nenhum registrado.");
   for (const [title, text] of [
-    ["Equipamento", c.equipment],
+    ["Equipamento", equipmentText(c)],
     ["História", c.history],
     ["Anotações", c.notes],
   ]) {

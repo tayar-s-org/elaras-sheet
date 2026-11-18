@@ -4,7 +4,8 @@ import catalog from './catalog.json' with { type: 'json' };
 
 export { races, archetypes };
 export function racialEffects(c) {
-  const id = c.raceId || '';
+  // "Humano" digitado em Raça atual (sem aplicar do guia) tambem vale: o unico efeito humano e a 1a vantagem gratis.
+  const id = c.raceId || (String(c.race || '').trim().toLowerCase() === 'humano' ? 'Humano' : '');
   const base = {};
   if (['Elfo','Rakashano'].includes(id) || (id === 'Meio-elfo' && c.raceChoice !== 'Vantagem')) base.Agilidade = 6;
   if (id === 'Anão') base.Vigor = 6;
@@ -66,3 +67,19 @@ export function loadArchetype(blank, template, previous) {
   c.notes = `Arquétipo do livro: ${template.id}, página ${template.page} do PDF. Humano Novato.\n${template.extraSkills ? `${template.extraSkills} pontos abertos de perícia foram distribuídos como sugestão de exploração.\n` : ''}Recalculado com as fórmulas e os custos da mesa. O orçamento inicial continua sujeito ao mestre. A primeira vantagem usa a gratuidade racial. Equipamento é sugestão, sem bônus automáticos. Complicações são opcionais.\n${/Mago|Sacerdote|Cientista Estranho/.test(template.id) ? 'Escolher poderes e detalhes do antecedente arcano com o mestre antes de jogar.\n' : ''}Personalize nome, história e origem.`;
   return c;
 }
+
+// Arquétipo criado pelo jogador: aplica atributos, perícias, vantagens e equipamento sobre a ficha atual (mantém nome, raça e história).
+export function loadCustomArchetype(c, tpl) {
+  const next = {...c, concept:tpl.name, attributes:{...c.attributes, ...tpl.attributes}, skills:{...tpl.skills}, rules:{...c.rules}};
+  const effects = racialEffects(next);
+  for (const [name, die] of Object.entries(effects.base)) next.attributes[name] = Math.max(die, next.attributes[name]);
+  if (effects.skill) next.skills[effects.skill] = Math.max(6, next.skills[effects.skill] || 0);
+  next.advantages = tpl.advantages.map(name => {
+    const edge = catalog.find(e => e.kind === 'advantages' && e.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+    return {name, description:edge ? `Requisitos: ${edge.requirements}\n\n${edge.description}` : 'Vantagem do arquétipo personalizado. Confirme com o mestre.', power:false};
+  });
+  if (tpl.equipment) next.equipment = tpl.equipment;
+  return next;
+}
+
+export const advantageNames = catalog.filter(e => e.kind === 'advantages').map(e => e.name);

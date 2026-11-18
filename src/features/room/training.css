@@ -1,0 +1,28 @@
+.training-modal { max-width: 1180px; }
+.training-modal .mod-editor-head { gap: 14px; }
+.training-modal .mod-editor-head h2 { margin-right: auto; }
+.tr-status { font-size: .85rem; color: var(--muted); }
+.tr-owner { margin: 10px 0 6px; font-size: .9rem; }
+.tr-head { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; margin: 8px 0 12px; }
+.tr-fed { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.tr-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.tr-warnings { margin: 0 0 10px; padding: 8px 12px 8px 28px; border: 1px solid var(--warning); border-radius: 8px; background: var(--warning-bg); color: var(--warning); font-size: .88rem; }
+.tr-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.tr-table { width: 100%; border-collapse: collapse; min-width: 760px; font-size: .9rem; }
+.tr-table thead th { background: var(--surface-soft); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 8px 6px; text-align: center; }
+.tr-table td, .tr-table tbody th { padding: 4px 6px; border-top: 1px solid var(--border); text-align: center; }
+.tr-table tbody th { font-weight: 700; background: var(--surface-soft); width: 62px; }
+.tr-table td.tr-act { text-align: left; min-width: 280px; }
+.tr-table td.tr-act > * { width: 100%; box-sizing: border-box; }
+.tr-table td.tr-act select { margin-bottom: 3px; }
+.tr-table td.tr-effect { text-align: left; color: var(--muted); font-size: .82rem; min-width: 200px; }
+.tr-table .tr-estm { color: var(--gold); font-weight: 700; }
+.tr-table tr.on { background: var(--selection); }
+.tr-table .neg { color: var(--danger); font-weight: 700; }
+.tr-table .pos { color: var(--success); font-weight: 700; }
+.tr-rules { margin-top: 16px; }
+.tr-rules summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; color: var(--accent); }
+.tr-rules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
+.tr-rules h4 { margin: 0 0 4px; font-size: .95rem; }
+.tr-rules p { margin: 0; font-size: .85rem; color: var(--muted); }
+.side-training { width: 100%; }

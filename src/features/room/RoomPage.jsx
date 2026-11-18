@@ -8,6 +8,7 @@ import DicePanel, { RollHistory } from './DicePanel.jsx';
 import BoardView from './BoardView.jsx';
 import TableControls from '../tables/TableControls.jsx';
 import TableLog from './TableLog.jsx';
+import TrainingModal from './TrainingModal.jsx';
 import { setLastRoom, clearLastRoom } from '../../lib/lastRoom.js';
 import { useBoard } from './useBoard.js';
 import { useLiveCharacters } from './useLiveCharacters.js';
@@ -21,6 +22,7 @@ const loadSettings = () => {
 export default function RoomPage({ auth, id }) {
   const [tab, setTab] = useState('chat');
   const [ctrlError, setCtrlError] = useState('');
+  const [training, setTraining] = useState(false);
   const [diceSettings, setDiceSettingsState] = useState(loadSettings);
   const setDiceSettings = useCallback(patch => setDiceSettingsState(prev => {
     const next = { ...prev, ...patch };
@@ -70,6 +72,8 @@ export default function RoomPage({ auth, id }) {
     <aside className="room-side">
       <p className="eyebrow">{STATUS_LABEL[table.status].toUpperCase()}</p>
       <h2>{table.name}</h2>
+      <button type="button" className="outline side-training" onClick={() => setTraining(true)}>Rotina de Treino</button>
+      {training && <TrainingModal tableId={id} me={auth.user.id} members={members} characters={characters} closed={closed} onClose={() => setTraining(false)} />}
       <p className="muted">Mestre: {table.profiles?.display_name} · Savage Worlds</p>
       <p className="muted"><span className={`dot ${connected ? 'on' : 'off'}`} aria-hidden="true" /> {connected ? 'Conectado' : 'Conectando…'}</p>
       <h3>Jogadores</h3>

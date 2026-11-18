@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { saveState, sendMessage } from '../../lib/room.js';
+import SheetViewModal from './SheetViewModal.jsx';
+import { grantXp } from '../../lib/xp.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue, baseMovement } from './vitals.js';
 import { incapacitation } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
@@ -24,6 +26,7 @@ function Counter({ id, label, value, max, amount, canEdit, onChange }) {
 
 function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState, closed }) {
   const [error, setError] = useState('');
+  const [viewing, setViewing] = useState(false);
   const [amountText, setAmountText] = useState('1');
   const amount = Math.max(1, Math.min(999, Math.trunc(Number(amountText)) || 1));
   const max = safeMaxima(row.data);
@@ -49,17 +52,50 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     sendMessage(tableId, text).catch(() => {});
   }
   return <article className="party-card">
-    <h4>{row.name || 'Sem nome'}</h4>
+    <div className="party-head">
+      <h4>{row.name || 'Sem nome'}</h4>
+      <button type="button" className="outline view-sheet-btn" onClick={() => setViewing(true)}>Ver ficha</button>
+    </div>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
     <MoneyTag value={row.data?.money} />
+    {viewing && <SheetViewModal data={row.data} owner={member.profiles?.display_name} onClose={() => setViewing(false)} />}
     {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
       <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}
         onChange={e => setAmountText(e.target.value)} onBlur={() => setAmountText(String(amount))} onFocus={e => e.target.select()} /></label>}
     {RESOURCES.map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} amount={amount} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
     <IncapPanel state={state} max={max} baseMovement={baseMovement(row.data)} isGm={isGm} closed={closed} onFaint={setFaint} />
     {isGm && !closed && <MoneyGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} />}
+    {isGm && !closed && <XpGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} label="Experiência (XP)" />}
     {error && <p role="alert" className="muted">{error}</p>}
   </article>;
+}
+
+// Mestre: concede XP a uma ficha (ou a todas). O jogador recebe na ficha dele; a mesa ve um aviso no chat.
+function XpGrant({ tableId, targets, label }) {
+  const [text, setText] = useState('1');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const amount = Math.trunc(Number(text));
+  const valid = amount >= 1 && amount <= 10000;
+  async function give(e) {
+    e.preventDefault();
+    if (!valid || busy || !targets.length) return;
+    setBusy(true);
+    setMsg('');
+    try {
+      for (const t of targets) await grantXp(tableId, t.id, amount);
+      const who = targets.length === 1 ? (targets[0].name || 'um personagem') : 'todos os jogadores';
+      sendMessage(tableId, `✨ O mestre concedeu +${amount} XP a ${who}.`).catch(() => {});
+      setMsg(`+${amount} XP enviado${targets.length > 1 ? ' a todos' : ''}.`);
+    } catch (err) { setMsg(err.message); }
+    finally { setBusy(false); }
+  }
+  return <form className="xp-grant" onSubmit={give}>
+    <label><span>{label}</span>
+      <input type="number" min="1" max="10000" value={text} aria-label={label} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()} /></label>
+    <button className="outline" disabled={busy || !valid || !targets.length}>{busy ? 'Enviando…' : 'Dar XP'}</button>
+    {msg && <small role="status" className="muted">{msg}</small>}
+  </form>;
 }
 
 export default function PartyPanel({ tableId, me, isGm, members, characters, states, patchState, closed }) {
@@ -67,10 +103,13 @@ export default function PartyPanel({ tableId, me, isGm, members, characters, sta
   const mine = rows.filter(m => m.user_id === me);
   const shown = isGm ? rows : rows;
   if (!shown.length) return <p className="muted">Nenhuma ficha vinculada à mesa ainda. Escolha a sua em "Gerenciar mesa".</p>;
+  const playerTargets = shown.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
   const moneyTargets = shown.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
   return <div className="party">
     {isGm && !closed && moneyTargets.length > 1 && <section className="party-card"><h4>Dinheiro para todos os jogadores</h4>
       <MoneyGrant tableId={tableId} targets={moneyTargets} label="Dinheiro para cada um" button="Dar a todos" removeButton="Remover de todos" /></section>}
+    {isGm && !closed && playerTargets.length > 1 && <section className="party-card"><h4>XP para todos os jogadores</h4>
+      <XpGrant tableId={tableId} targets={playerTargets} label="XP para cada um" /></section>}
     {[...mine, ...shown.filter(m => m.user_id !== me)].map(m => <CharacterCard key={m.user_id} member={m} row={characters[m.character_id]}
       state={states[m.character_id]} canEdit={isGm || m.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} />)}
   </div>;

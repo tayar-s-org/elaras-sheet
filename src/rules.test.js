@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { applyRace, archetypes, loadArchetype, races } from './templates.js';
 import { createPdfBlob, importPdf } from './pdf.js';
 import {
+  advantageCosts,
   calculate,
   elaraCharacter,
   newCharacter,
@@ -85,7 +86,7 @@ test("Elara usa os custos raciais e os derivados da mesa", () => {
   assert.equal(d.remaining, 8);
 });
 test("vantagens crescentes, pontos extras e bônus de mana são contados", () => {
-  const c = newCharacter();
+  const c = { ...newCharacter(), race: "Outra raça" }; // sem a vantagem gratuita de humano
   c.rules.budget = 20;
   c.advantages = [
     { name: "A", power: true },
@@ -110,4 +111,45 @@ test("importação normaliza dados e rejeita atributos inválidos", () => {
       attributes: { ...original.attributes, Vigor: 100 },
     }),
   );
+});
+
+test('vantagem repetida custa o mesmo que qualquer outra na sua posição', () => {
+  const edge = name => ({ name, description: '', power: false });
+  const c = { ...newCharacter(), race: 'Outra raça' }; // sem vantagem gratuita
+  c.advantages = [edge('Atraente'), edge('Atraente'), edge('atraente')];
+  // posições 1, 2, 3: sem acréscimo por repetir
+  assert.deepEqual(advantageCosts(c, 0).map(x => x.cost), [1, 2, 3]);
+  assert.deepEqual(advantageCosts(c, 0).map(x => x.repeat), [false, true, true]);
+  assert.equal(calculate(c).advantageCost, 6);
+  c.advantages = [edge('Atraente'), edge('Obstinado'), edge('Prontidão')];
+  assert.equal(calculate(c).advantageCost, 6, 'repetir não muda o total em relação a vantagens diferentes');
+});
+
+test('humano tem a primeira vantagem gratuita, com a raça aplicada ou só digitada', () => {
+  const edge = name => ({ name, description: '', power: false });
+  const typed = newCharacter(); // raça padrão "Humano", sem raceId
+  typed.advantages = [edge('Atraente')];
+  assert.equal(calculate(typed).advantageCost, 0);
+  typed.advantages = [edge('Atraente'), edge('Obstinado')];
+  assert.equal(calculate(typed).advantageCost, 1, 'a 2ª vantagem custa 1, fora a gratuita');
+  const applied = applyRace(newCharacter(), 'Humano');
+  applied.advantages = [edge('Atraente')];
+  assert.equal(calculate(applied).advantageCost, 0);
+  const other = { ...newCharacter(), race: 'Goblin' };
+  other.advantages = [edge('Atraente')];
+  assert.equal(calculate(other).advantageCost, 1);
+});
+
+test('cada vantagem Pontos de Poder soma +10 de mana, inclusive repetida', () => {
+  const edge = name => ({ name, description: '', power: false });
+  const c = newCharacter();
+  const base = calculate(c).mana;
+  c.advantages = [edge('Antecedente Arcano (Magia)')];
+  assert.equal(calculate(c).mana, base, 'outras vantagens não mudam a mana');
+  c.advantages = [edge('Antecedente Arcano (Magia)'), edge('Pontos De Poder')];
+  assert.equal(calculate(c).mana, base + 10);
+  c.advantages = [edge('Antecedente Arcano (Magia)'), edge('Pontos de Poder'), edge('pontos de poder')];
+  assert.equal(calculate(c).mana, base + 20);
+  c.manaBonus = 5;
+  assert.equal(calculate(c).mana, base + 25, 'Mana adicional continua somando');
 });
