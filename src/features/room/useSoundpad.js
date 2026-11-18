@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadSounds } from '../../lib/sounds.js';
 import { musicUrl } from '../../lib/music.js';
+import { DEFAULT_SOUNDS } from '../../defaultSounds.js';
 
 const KEY = 'manrakora-sfx-volume';
 const loadVolume = () => {
@@ -9,19 +10,20 @@ const loadVolume = () => {
 
 // Soundpad: lista de sons da mesa e reprodução. O mestre toca (e avisa todos por broadcast); cada um ouve no próprio volume.
 export default function useSoundpad(room, tableId, isGm) {
-  const [sounds, setSounds] = useState([]);
+  const [custom, setCustom] = useState([]);
   const [active, setActive] = useState([]);
   const [vol, setVol] = useState(loadVolume);
   const soundsRef = useRef([]);
   const volRef = useRef(vol);
   const urls = useRef(new Map());
   const audios = useRef(new Map());
+  const sounds = [...DEFAULT_SOUNDS, ...custom];
   soundsRef.current = sounds;
   volRef.current = vol;
   const { onBroadcast, sendBroadcast, ready } = room;
 
   const reload = useCallback(async () => {
-    try { const list = await loadSounds(tableId); setSounds(list); soundsRef.current = list; return list; } catch { return soundsRef.current; }
+    try { const list = await loadSounds(tableId); setCustom(list); soundsRef.current = [...DEFAULT_SOUNDS, ...list]; return soundsRef.current; } catch { return soundsRef.current; }
   }, [tableId]);
 
   useEffect(() => { if (ready) reload(); }, [ready, reload]);
@@ -41,7 +43,7 @@ export default function useSoundpad(room, tableId, isGm) {
     if (!sound) sound = (await reload()).find(s => s.id === id);
     if (!sound) return;
     end(id);
-    let url = urls.current.get(sound.path);
+    let url = sound.url || urls.current.get(sound.path);
     if (!url) { url = await musicUrl(sound.path); urls.current.set(sound.path, url); }
     const a = new Audio(url);
     a.loop = sound.loop;
@@ -67,5 +69,5 @@ export default function useSoundpad(room, tableId, isGm) {
   const stopAll = useCallback(() => { if (!isGm) return; sendBroadcast('sound', { action: 'stopAll' }); stopAllLocal(); }, [isGm, sendBroadcast, stopAllLocal]);
   const changed = useCallback(async () => { await reload(); sendBroadcast('sounds_refresh', {}); }, [reload, sendBroadcast]);
 
-  return { sounds, active, vol, setVol, play, stop, stopAll, changed };
+  return { sounds, custom, active, vol, setVol, play, stop, stopAll, changed };
 }

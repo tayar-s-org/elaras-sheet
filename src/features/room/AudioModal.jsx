@@ -3,6 +3,7 @@ import { updateBoard } from '../../lib/board.js';
 import { uploadMusic, removeMusicFile } from '../../lib/music.js';
 import { addSound, updateSound, deleteSound } from '../../lib/sounds.js';
 import { newMusic, musicTitle, musicFileError } from '../../music.js';
+import { DEFAULT_SOUNDS } from '../../defaultSounds.js';
 import { soundFileError, SOUND_LIMIT } from '../../soundpad.js';
 import './master.css';
 
@@ -53,7 +54,7 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
       {kind === 'sound' && <section className="master-section" aria-labelledby="m-sounds">
         <h3 id="m-sounds">Efeitos sonoros</h3>
         <div className="row master-actions">
-          <button type="button" className="primary" disabled={busy || pad.sounds.length >= SOUND_LIMIT} onClick={() => soundRef.current.click()}>Adicionar sons</button>
+          <button type="button" className="primary" disabled={busy || pad.custom.length >= SOUND_LIMIT} onClick={() => soundRef.current.click()}>Adicionar sons</button>
           <button type="button" className="text-button danger" disabled={!pad.active.length} onClick={pad.stopAll}>Parar efeitos</button>
           <input ref={soundRef} type="file" hidden multiple accept="audio/mpeg,audio/mp4,audio/x-m4a,video/mp4,.mp3,.m4a,.mp4"
             onChange={e => { const files = [...(e.target.files || [])]; e.target.value = ''; if (!files.length) return;
@@ -61,7 +62,11 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
                 await pad.changed(); if (errors.length) throw new Error(errors.join(' ')); }); }} />
         </div>
         <p className="muted">Efeitos curtos (MP3, M4A ou MP4, até 5 MB cada, {SOUND_LIMIT} por mesa). Os botões aparecem acima do tabuleiro e tocam para todos. Use só sons que você tem permissão para usar.</p>
-        {pad.sounds.map(s => <div key={s.id} className="sound-item">
+        <p className="master-sub">Sons padrão ({DEFAULT_SOUNDS.length}) — já disponíveis nos botões acima do tabuleiro</p>
+        <p className="muted">{DEFAULT_SOUNDS.map(s => s.name).join(' · ')}</p>
+        <p className="master-sub">Sons da sua mesa</p>
+        {!pad.custom.length && <p className="muted">Nenhum som próprio ainda.</p>}
+        {pad.custom.map(s => <div key={s.id} className="sound-item">
           <input type="text" maxLength={40} defaultValue={s.name} key={`${s.id}-${s.name}`} aria-label={`Nome do som ${s.name}`}
             onBlur={e => { const v = e.target.value.trim(); if (v && v !== s.name) run(async () => { await updateSound(s.id, { name: v }); await pad.changed(); }); }} />
           <label className="check"><input type="checkbox" checked={s.loop} onChange={e => run(async () => { await updateSound(s.id, { loop: e.target.checked }); await pad.changed(); })} /> Repetir</label>
