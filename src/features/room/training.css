@@ -26,3 +26,37 @@
 .tr-rules h4 { margin: 0 0 4px; font-size: .95rem; }
 .tr-rules p { margin: 0; font-size: .85rem; color: var(--muted); }
 .side-training { width: 100%; }
+
+/* Incapacitacao (estamina) e exaustao (mana) ao lado dos valores */
+.tr-level { display: block; font-size: 0.68rem; font-weight: 600; line-height: 1.2; }
+.tr-level.l1 { color: var(--warning); }
+.tr-level.l2, .tr-level.l3 { color: var(--danger); }
+.tr-table tr.blocked .tr-effect { color: var(--danger); }
+
+/* Planilha compacta: cabe na largura da tela (sem rolagem lateral) e usa menos altura */
+.training-modal { width: min(1180px, 98vw); }
+.tr-scroll { overflow-x: visible; }
+.tr-table { min-width: 0; table-layout: fixed; font-size: .8rem; }
+.tr-table thead th { padding: 5px 3px; font-size: .66rem; }
+.tr-table td, .tr-table tbody th { padding: 2px 4px; }
+.tr-table thead th:nth-child(1), .tr-table tbody th { width: 50px; }
+.tr-table thead th:nth-child(2), .tr-table thead th:nth-child(3) { width: 92px; }
+.tr-table thead th:nth-child(6), .tr-table thead th:nth-child(7) { width: 46px; }
+.tr-table thead th:nth-child(5) { width: 26%; }
+.tr-table td.tr-act { min-width: 0; display: table-cell; }
+.tr-table td.tr-act select, .tr-table td.tr-act input { width: 100%; box-sizing: border-box; padding: 3px 6px; font-size: .8rem; margin: 0; }
+.tr-table td.tr-act select + input { margin-top: 2px; }
+.tr-table td.tr-effect { min-width: 0; font-size: .74rem; line-height: 1.25; overflow-wrap: anywhere; }
+.tr-level { font-size: .62rem; }
+@media (max-width: 760px) {
+  .tr-scroll { overflow-x: auto; }
+  .tr-table { min-width: 640px; }
+}
+
+/* Aprovacao da rotina */
+.tr-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 700; vertical-align: middle; }
+.tr-badge.pending { background: var(--warning); color: #231a00; }
+.tr-badge.approved { background: var(--success); color: #fff; }
+.tr-approval { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 10px; }
+.tr-approval .tr-badge { margin-left: 0; font-size: .8rem; padding: 3px 12px; }
+.tr-badge.draft { background: var(--surface-soft); color: var(--muted); border: 1px solid var(--border); }

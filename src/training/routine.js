@@ -1,3 +1,6 @@
+import { resourceLevel } from '../incapacitation.js';
+import { level as resourceBand } from '../features/room/vitals.js';
+
 // Rotina de treino: simula um dia (de 01:00 a 00:00) com as regras da mesa para atividades físicas,
 // mágicas, descanso e meditação. Tudo calculado a partir do que o jogador escolhe em cada hora.
 
@@ -34,6 +37,16 @@ export function meditationRate(roll) {
 export const maxMeditations = spiritDie => Math.max(1, Math.floor((Number(spiritDie) || 0) / 6));
 // Prática mágica: no máximo metade do dado de Conjurar, em horas por dia.
 export const maxPracticeHours = conjurarDie => Math.floor((Number(conjurarDie) || 0) / 2);
+
+// Com estamina (ou mana) em 1 ou menos, o personagem não pode começar atividade que a consome.
+export const LOW_RESOURCE = 1;
+export const STAMINA_ACTIVITIES = ['fisico'];
+export const MANA_ACTIVITIES = ['estudo', 'pratica'];
+export function blockedReason(activity, stamina, mana) {
+  if (STAMINA_ACTIVITIES.includes(activity) && stamina <= LOW_RESOURCE) return 'Bloqueado: estamina em 1 ou menos, sem forças para este treino';
+  if (MANA_ACTIVITIES.includes(activity) && mana <= LOW_RESOURCE) return 'Bloqueado: mana em 1 ou menos, sem mana para esta atividade';
+  return '';
+}
 
 export const emptyRoutine = () => ({
   period: '', place: '', fed: true, meditRoll: 0, startStamina: null, startMana: null,
@@ -79,6 +92,9 @@ export function simulateRoutine(routine, stats) {
 
   const rows = r.rows.map((row, i) => {
     let ve = 0, vm = 0, effect = '';
+    const staminaBefore = round(stamina), manaBefore = round(mana);
+    const blocked = blockedReason(row.a, stamina, mana);
+    if (blocked) { warn(i, blocked.replace('Bloqueado: ', '') + '.'); previous = ''; return { hour: HOURS[i], a: row.a, n: row.n, effect: blocked, blocked: true, stamina: staminaBefore, mana: manaBefore, staminaBefore, manaBefore, ve: 0, vm: 0, incap: resourceLevel(stamina, maxS), exhaustion: resourceBand(mana, maxM, true) }; }
     switch (row.a) {
       case 'fisico': {
         count.fisico += 1;
@@ -158,7 +174,7 @@ export function simulateRoutine(routine, stats) {
     stamina = Math.min(maxS, Math.max(0, stamina + ve));
     mana = Math.min(maxM, Math.max(0, mana + vm));
     previous = row.a;
-    return { hour: HOURS[i], a: row.a, n: row.n, effect, stamina: round(stamina), mana: round(mana), ve: round(stamina - beforeS), vm: round(mana - beforeM) };
+    return { hour: HOURS[i], a: row.a, n: row.n, effect, blocked: false, stamina: round(stamina), mana: round(mana), staminaBefore, manaBefore, ve: round(stamina - beforeS), vm: round(mana - beforeM), incap: resourceLevel(stamina, maxS), exhaustion: resourceBand(mana, maxM, true) };
   });
 
   // Aprimoramento: cada +1 de mana máxima exige o tempo de recuperar 50 de mana meditando (com mana cheia).

@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { calculate, validateCharacter } from '../../rules.js';
-import { loadRoutines, saveRoutine } from '../../lib/training.js';
+import { loadRoutines, saveRoutine, loadRoutineStatuses, submitRoutine, setRoutineStatus, TRAINING_STATUS } from '../../lib/training.js';
 import {
   ACTIVITIES, emptyRoutine, normalizeRoutine, simulateRoutine, maxMeditations, maxPracticeHours,
-  MANA_IMPROVEMENT_POINTS,
+  MANA_IMPROVEMENT_POINTS, blockedReason,
 } from '../../training/routine.js';
 import '../sheet/modules.css';
 import '../sheet/market.css';
@@ -36,13 +36,15 @@ function Rules({ stats }) {
 }
 
 // Rotina de treino: uma planilha por jogador com o que o personagem faz a cada hora entre as sessões.
-export default function TrainingModal({ tableId, me, members, characters, closed, onClose }) {
+export default function TrainingModal({ tableId, me, isGm, members, characters, closed, onClose }) {
   const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]), [members, characters]);
   const [selected, setSelected] = useState(() => (roster.some(m => m.user_id === me) ? me : roster[0]?.user_id));
   const [routines, setRoutines] = useState({}); // user_id -> rotina (a minha fica aqui também)
   const [available, setAvailable] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState('');
+  const [statuses, setStatuses] = useState(null); // aprovação por jogador; null = migration 0017 pendente
+  const [approvalBusy, setApprovalBusy] = useState(false);
   const dirty = useRef(false);
 
   useEffect(() => {
@@ -55,8 +57,9 @@ export default function TrainingModal({ tableId, me, members, characters, closed
   useEffect(() => {
     let alive = true;
     const pull = async () => {
-      const all = await loadRoutines(tableId);
+      const [all, st] = await Promise.all([loadRoutines(tableId), loadRoutineStatuses(tableId)]);
       if (!alive) return;
+      setStatuses(prev => (dirty.current && prev ? { ...st, [me]: prev[me] } : st));
       if (all === null) { setAvailable(false); setLoaded(true); return; }
       setAvailable(true);
       setRoutines(prev => {
@@ -93,12 +96,32 @@ export default function TrainingModal({ tableId, me, members, characters, closed
 
   const edit = patch => {
     dirty.current = true;
+    setStatuses(prev => (prev && prev[me] && prev[me] !== 'draft' ? { ...prev, [me]: 'draft' } : prev));
     setRoutines(prev => ({ ...prev, [me]: normalizeRoutine({ ...(prev[me] || emptyRoutine()), ...patch }) }));
   };
   const editRow = (i, patch) => {
+    const at = sim.rows[i];
+    if (patch.a && at && blockedReason(patch.a, at.staminaBefore, at.manaBefore)) return;
     const rows = routine.rows.map((r, j) => (j === i ? { ...r, ...patch } : r));
     edit({ rows });
   };
+
+  const act = async fn => {
+    setApprovalBusy(true);
+    try { await fn(); } catch (e) { setStatus(e.message); } finally { setApprovalBusy(false); }
+  };
+  const submit = () => act(async () => {
+    await submitRoutine(tableId, me, routines[me] || emptyRoutine());
+    dirty.current = false;
+    setStatus('Enviada para o mestre');
+    setStatuses(prev => ({ ...(prev || {}), [me]: 'pending' }));
+  });
+  const review = next => act(async () => {
+    await setRoutineStatus(tableId, selected, next);
+    setStatuses(prev => ({ ...(prev || {}), [selected]: next }));
+  });
+  const shown = statuses ? (statuses[selected] || 'draft') : null;
+  const owner = selected === me;
 
   return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="mod-editor training-modal" role="dialog" aria-modal="true" aria-labelledby="training-title">
@@ -113,10 +136,23 @@ export default function TrainingModal({ tableId, me, members, characters, closed
           <div className="tabs-row" role="tablist" aria-label="Jogadores">
             {roster.map(m => <button key={m.user_id} type="button" role="tab" aria-selected={selected === m.user_id} className={selected === m.user_id ? 'primary' : 'outline'} onClick={() => setSelected(m.user_id)}>
               {characters[m.character_id].name || m.profiles?.display_name || 'Jogador'}{m.user_id === me ? ' (você)' : ''}
+              {statuses?.[m.user_id] === 'pending' && <span className="tr-badge pending">Pendente</span>}{statuses?.[m.user_id] === 'approved' && <span className="tr-badge approved">Aprovada</span>}
             </button>)}
           </div>
           {!loaded ? <p className="muted">Carregando…</p> : <>
             <p className="muted tr-owner">Jogador: {member?.profiles?.display_name || '—'}{!editable && member?.user_id !== me ? ' · só leitura' : ''}</p>
+            {shown && <div className="tr-approval" role="group" aria-label="Aprovação da rotina">
+              <span className={`tr-badge ${shown}`}>{TRAINING_STATUS[shown]}</span>
+              {owner && editable && shown === 'draft' && <button type="button" className="primary" disabled={approvalBusy} onClick={submit}>Enviar para aprovação</button>}
+              {owner && editable && shown === 'pending' && <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Retirar envio</button>}
+              {owner && shown === 'approved' && <span className="muted">Aprovada pelo mestre. Se você editar, volta a rascunho.</span>}
+              {isGm && !owner && shown === 'pending' && <>
+                <button type="button" className="primary" disabled={approvalBusy} onClick={() => review('approved')}>Aprovar</button>
+                <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Devolver ao jogador</button>
+              </>}
+              {isGm && !owner && shown === 'approved' && <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Revogar aprovação</button>}
+              {isGm && !owner && shown === 'draft' && <span className="muted">O jogador ainda não enviou para aprovação.</span>}
+            </div>}
             <div className="tr-head">
               <label className="field"><span>Data do período</span>
                 <input value={routine.period} maxLength={60} disabled={!editable} placeholder="Ex.: Dia 3 da semana" onChange={e => edit({ period: e.target.value })} /></label>
@@ -145,13 +181,13 @@ export default function TrainingModal({ tableId, me, members, characters, closed
               <table className="tr-table">
                 <thead><tr><th>Hora</th><th>Estm.</th><th>Mana</th><th>Atividade</th><th>Efeitos</th><th>V.E.</th><th>V.M.</th></tr></thead>
                 <tbody>
-                  {sim.rows.map((row, i) => <tr key={row.hour} className={row.a ? 'on' : ''}>
+                  {sim.rows.map((row, i) => <tr key={row.hour} className={`${row.a ? 'on' : ''}${row.blocked ? ' blocked' : ''}`}>
                     <th scope="row">{row.hour}</th>
-                    <td className="tr-estm">{fmt(row.stamina)}</td>
-                    <td>{fmt(row.mana)}</td>
+                    <td className="tr-estm">{fmt(row.stamina)}{row.incap > 0 && <small className={`tr-level l${row.incap}`}>Incapacitação {row.incap}</small>}</td>
+                    <td>{fmt(row.mana)}{row.exhaustion > 0 && <small className={`tr-level l${row.exhaustion}`}>Exaustão {row.exhaustion}</small>}</td>
                     <td className="tr-act">
                       {editable ? <>
-                        <select aria-label={`Atividade às ${row.hour}`} value={row.a} onChange={e => editRow(i, { a: e.target.value })}>{ACTIVITIES.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}</select>
+                        <select aria-label={`Atividade às ${row.hour}`} value={row.a} onChange={e => editRow(i, { a: e.target.value })}>{ACTIVITIES.map(a => <option key={a.id} value={a.id} disabled={a.id !== row.a && Boolean(blockedReason(a.id, row.staminaBefore, row.manaBefore))}>{a.label}</option>)}</select>
                         <input aria-label={`Observação às ${row.hour}`} value={row.n} maxLength={200} placeholder="O que o personagem faz" onChange={e => editRow(i, { n: e.target.value })} />
                       </> : <>
                         <b>{row.a ? ACTIVITIES.find(a => a.id === row.a)?.label : ''}</b>{row.n && <span> {row.n}</span>}

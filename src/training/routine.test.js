@@ -84,3 +84,24 @@ test('normalizeRoutine corrige dados incompletos ou inválidos', () => {
   assert.equal(n.period.length, 60);
   assert.deepEqual(normalizeRoutine(null), emptyRoutine());
 });
+
+test('estamina ou mana em 1 bloqueia atividades que as consomem', async () => {
+  const { blockedReason, simulateRoutine, emptyRoutine } = await import('./routine.js');
+  assert.ok(blockedReason('fisico', 1, 50));
+  assert.equal(blockedReason('fisico', 2, 0), '');
+  assert.ok(blockedReason('estudo', 10, 1));
+  assert.ok(blockedReason('pratica', 10, 0));
+  assert.equal(blockedReason('meditar', 0, 0), '');
+  assert.equal(blockedReason('descanso', 0, 0), '');
+  const routine = emptyRoutine();
+  routine.startStamina = 1; routine.startMana = 1;
+  routine.rows[0].a = 'fisico'; routine.rows[1].a = 'estudo'; routine.rows[2].a = 'simples';
+  const sim = simulateRoutine(routine, { maxStamina: 10, maxMana: 10, spirit: 6, conjurar: 8 });
+  assert.equal(sim.rows[0].blocked, true);
+  assert.equal(sim.rows[1].blocked, true);
+  assert.deepEqual([sim.rows[0].ve, sim.rows[1].vm], [0, 0]);
+  assert.equal(sim.rows[2].ve, 2);                    // descansar continua permitido
+  assert.equal(sim.rows[0].incap, 2);                 // estamina 1 de 10: abaixo de 25%
+  assert.equal(sim.rows[0].exhaustion, 3);            // mana 1 de 10: no limite de 10%
+  assert.equal(sim.warnings.length, 2);
+});
