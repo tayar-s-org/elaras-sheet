@@ -20,6 +20,12 @@ export async function loadTraining(tableId) {
   return Object.fromEntries(data.map(r => [r.character_id, { study_hours: Number(r.study_hours), astucia_dice_spent: Number(r.astucia_dice_spent) || 0, day_no: r.day_no, day_state: r.day_state || {} }]));
 }
 
+// Dias da campanha já inteiramente processados (a última hora do dia, 05:00, foi processada): Set de day_no.
+export async function loadProcessedDays(tableId, characterId) {
+  const { data, error } = await supabase.from('table_routine_runs').select('day_no').eq('table_id', tableId).eq('character_id', characterId).eq('slot', 23).limit(5000);
+  return error ? null : new Set(data.map(r => r.day_no));
+}
+
 // Ledger do personagem (mais recentes primeiro).
 export async function loadRuns(tableId, characterId, { limit = 1000 } = {}) {
   const { data, error } = await supabase.from('table_routine_runs')

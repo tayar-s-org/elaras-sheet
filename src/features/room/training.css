@@ -177,3 +177,18 @@
   .tr-table td.tr-act { display: block; }
   .tr-table td.tr-act::before { display: block; margin-bottom: 2px; }
 }
+
+/* Tabela com 6 colunas (Hora, Estamina, Mana, Atividade, Efeito, Custo/ganho): larguras para o novo formato */
+@media (min-width: 761px) {
+  .tr-table thead th:nth-child(1), .tr-table tbody th { width: 52px; }
+  .tr-table thead th:nth-child(2), .tr-table thead th:nth-child(3) { width: 70px; }
+  .tr-table thead th:nth-child(5) { width: 24%; }
+  .tr-table thead th:nth-child(6) { width: 118px; }
+  .tr-table td.tr-delta { white-space: normal; }
+  .tr-table td.tr-act select, .tr-table td.tr-act input { max-width: 100%; }
+}
+.tr-clock { flex-shrink: 0; }
+@media (max-width: 560px) {
+  .training-modal .mod-editor-head { flex-wrap: wrap; }
+  .tr-clock { order: 3; width: 100%; text-align: center; }
+}

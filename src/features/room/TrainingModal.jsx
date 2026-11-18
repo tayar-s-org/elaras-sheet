@@ -8,7 +8,7 @@ import { validateCharacter } from '../../rules.js';
 import { emptyRoutine, normalizeRoutine, simulateRoutine, routineProblems } from '../../training/routine.js';
 import { statsFromCharacter } from '../../rpg/processor.js';
 import { blockedReason } from '../../rpg/activities.js';
-import { loadProgress, loadTraining } from '../../lib/engine.js';
+import { loadProgress, loadTraining, loadProcessedDays } from '../../lib/engine.js';
 import { loadRequests, approvedJobs, loadSpellProgress } from '../../lib/requests.js';
 import RequestsPanel from '../routine/Requests.jsx';
 import TrainingHistory from '../routine/TrainingHistory.jsx';
@@ -53,10 +53,12 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const [requests, setRequests] = useState([]);
   const [training, setTraining] = useState({});
   const [spellProgress, setSpellProgress] = useState({});
+  const [processed, setProcessed] = useState(() => new Set());
   const [flagged, setFlagged] = useState([]);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [returning, setReturning] = useState(false);
   const [returnText, setReturnText] = useState('');
+  const selectedRef = useRef(null);
   const dirtyId = useRef(null); // rotina minha com alteração ainda não salva
   const writes = useRef(0); // gravações do calendário em andamento (a leitura periódica não as atropela)
 
@@ -78,6 +80,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     if (reqs) setRequests(reqs);
     if (trn) setTraining(trn);
     if (sp) setSpellProgress(sp);
+    if (selectedRef.current) loadProcessedDays(tableId, selectedRef.current).then(set => set && setProcessed(set)).catch(() => {});
     setAvailable(true);
     setRows(prev => list.map(r => (r.id === dirtyId.current ? (prev.find(p => p.id === r.id) || { ...r, data: normalizeRoutine(r.data) }) : { ...r, data: normalizeRoutine(r.data) })));
     if (!writes.current) setDaysByChar(assigned);
@@ -103,6 +106,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     return () => clearTimeout(timer);
   }, [rows, available]);
 
+  selectedRef.current = selected;
   const member = roster.find(m => m.character_id === selected);
   const character = member ? characters[member.character_id] : null;
   const trained = useMemo(() => [...new Set((progress[selected] || []).filter(p => p.kind === 'spell' && p.earned_total > 0).map(p => p.name))], [progress, selected]);
@@ -187,6 +191,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     setReturnText('');
   });
   useEffect(() => { setReturning(false); setReturnText(''); }, [routineId, selected]);
+  useEffect(() => { if (selected) loadProcessedDays(tableId, selected).then(set => setProcessed(set || new Set())).catch(() => {}); }, [tableId, selected, tick]);
   useEffect(() => { if (routineId && loaded && !theirs.some(r => r.id === routineId)) setRoutineId(null); }, [theirs, routineId, loaded]);
 
   const pendingOf = cid => rows.filter(r => r.character_id === cid && r.status === 'pending').length;
@@ -253,7 +258,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
             {view === 'calendar'
               ? (clockReady && monthView
                 ? <CampaignCalendar view={monthView} days={days} routines={theirs} tick={tick} editable={canEdit}
-                  onShift={shift} onToday={goToday} onAssign={assign} highlight={flagged}
+                  onShift={shift} onToday={goToday} onAssign={assign} highlight={flagged} processed={processed}
                   onOpen={id => { setRoutineId(id); setView('routines'); }} />
                 : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
               : view === 'history'
