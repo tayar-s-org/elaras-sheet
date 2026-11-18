@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { calculate, validateCharacter } from '../../rules.js';
 import {
   loadRoutines, createRoutine, saveRoutine, submitRoutine, setRoutineStatus, deleteRoutine, TRAINING_STATUS,
 } from '../../lib/training.js';
 import { loadRoutineDays, assignDays } from '../../lib/clock.js';
-import {
-  ACTIVITIES, emptyRoutine, normalizeRoutine, simulateRoutine, maxMeditations, maxPracticeHours,
-  MANA_IMPROVEMENT_POINTS, blockedReason,
-} from '../../training/routine.js';
+import { emptyRoutine, normalizeRoutine, simulateRoutine, routineProblems } from '../../training/routine.js';
+import { statsFromCharacter } from '../../rpg/processor.js';
+import { blockedReason } from '../../rpg/activities.js';
+import { loadProgress } from '../../lib/engine.js';
+import RoutineGrid from '../routine/RoutineGrid.jsx';
 import { formatClock, dayParts, dayOfTick, shiftMonth } from '../../rpg/clock.js';
 import CampaignCalendar from '../routine/CampaignCalendar.jsx';
 import ClockPanel from '../routine/ClockPanel.jsx';
@@ -17,30 +17,12 @@ import '../sheet/modules.css';
 import '../sheet/market.css';
 import './training.css';
 
-const fmt = n => (Math.round(n * 100) / 100).toString().replace('.', ',');
-const signed = n => (n > 0 ? `+${fmt(n)}` : n < 0 ? `−${fmt(Math.abs(n))}` : '0');
 const POLL_MS = 8000;
 const viewOfDay = dayNo => { const p = dayParts(dayNo); return { year: p.year, month: p.month }; };
 
-function statsOf(data) {
-  try {
-    const c = validateCharacter(data);
-    const d = calculate(c);
-    return { maxStamina: d.stamina, maxMana: d.mana, spirit: c.attributes.Espírito, conjurar: c.skills.Conjurar || 0, meditar: c.skills.Meditar || 0 };
-  } catch { return { maxStamina: 0, maxMana: 0, spirit: 4, conjurar: 0, meditar: 0 }; }
-}
-
-function Rules({ stats }) {
-  return <details className="tr-rules">
-    <summary>Regras das atividades</summary>
-    <div className="tr-rules-grid">
-      <section><h4>Atividades físicas</h4><p>Horas 1 a 4 de treino: 1 de fadiga por hora. Horas 5 a 8: 2 por hora. Horas 9 a 12: 4 por hora. Assim, 4h custam 4, 8h custam 12 e 12h custam 28. O contador volta a zero após um descanso completo.</p></section>
-      <section><h4>Atividades mágicas</h4><p>Estudar um feitiço de complexidade 1 custa 1 de mana por hora, sem acréscimo ao longo do dia. Praticar custa 1 de mana por hora, com limite de metade de Conjurar por dia (este personagem: {maxPracticeHours(stats.conjurar)}h).</p></section>
-      <section><h4>Recuperação física</h4><p>Exige estar alimentado. 8 horas de descanso completo (dormir) recuperam 12 de fadiga. Descanso simples recupera 2 por hora, até 4 horas por dia.</p></section>
-      <section><h4>Recuperação mágica</h4><p>Meditar recupera 1 / (4 − x/4) de mana por hora, onde x é a rolagem de Meditar (máximo 12, que dá 1 por hora). Você entra em estado meditativo no máximo 1/6 do Espírito vezes ao dia, no mínimo 1 (este personagem: {maxMeditations(stats.spirit)}x).</p></section>
-      <section><h4>Aprimoramento de mana</h4><p>Para cada +1 de mana máxima é preciso meditar o tempo de recuperar {MANA_IMPROVEMENT_POINTS} de mana, já com a mana cheia. O treino pode continuar por até 7 dias; passou disso, falha.</p></section>
-    </div>
-  </details>;
+const FALLBACK_STATS = { maxStamina: 0, maxMana: 0, spirit: { die: 4, bonus: 0 }, conjurar: { die: 0, bonus: 0 }, meditar: { die: 0, bonus: 0 }, skills: [], spells: [], trainedSpells: [] };
+function statsOf(data, trained) {
+  try { return statsFromCharacter(data, trained); } catch { return FALLBACK_STATS; }
 }
 
 const label = r => r?.name?.trim() || 'Sem nome';
@@ -60,6 +42,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const clock = useClock(tableId, true);
   const [monthView, setMonthView] = useState(null);
   const [daysByChar, setDaysByChar] = useState({});
+  const [progress, setProgress] = useState({});
   const [flagged, setFlagged] = useState([]);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [returning, setReturning] = useState(false);
@@ -79,8 +62,9 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
 
   // Carrega e atualiza de tempos em tempos; o que eu estou editando não é sobrescrito.
   const pull = useCallback(async () => {
-    const [list, assigned] = await Promise.all([loadRoutines(tableId), loadRoutineDays(tableId)]);
+    const [list, assigned, prog] = await Promise.all([loadRoutines(tableId), loadRoutineDays(tableId), loadProgress(tableId)]);
     if (list === null || assigned === null) { setAvailable(false); setLoaded(true); return; }
+    if (prog) setProgress(prog);
     setAvailable(true);
     setRows(prev => list.map(r => (r.id === dirtyId.current ? (prev.find(p => p.id === r.id) || { ...r, data: normalizeRoutine(r.data) }) : { ...r, data: normalizeRoutine(r.data) })));
     if (!writes.current) setDaysByChar(assigned);
@@ -108,7 +92,8 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
 
   const member = roster.find(m => m.character_id === selected);
   const character = member ? characters[member.character_id] : null;
-  const stats = useMemo(() => statsOf(character?.data), [character]);
+  const trained = useMemo(() => [...new Set((progress[selected] || []).filter(p => p.kind === 'spell' && p.earned_total > 0).map(p => p.name))], [progress, selected]);
+  const stats = useMemo(() => statsOf(character?.data, trained), [character, trained]);
   const owner = member?.user_id === me;
   const canEdit = owner && !closed && available;
   const theirs = useMemo(() => rows.filter(r => r.character_id === selected), [rows, selected]);
@@ -171,6 +156,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
       pull().catch(() => {});
     });
   };
+  const problems = useMemo(() => (current ? routineProblems(current.data, stats) : []), [current, stats]);
   const submit = () => act(async () => {
     await saveRoutine(current.id, { name: current.name, data: current.data });
     await submitRoutine(current.id, current.data);
@@ -194,7 +180,8 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
       <input value={current.name} maxLength={60} disabled={!canEdit} placeholder="Ex.: Treino pesado, Estudo da biblioteca…" onChange={e => rename(e.target.value)} /></label>
     <div className="tr-approval" role="group" aria-label="Aprovação da rotina">
       <span className={`tr-badge ${shown}`}>{TRAINING_STATUS[shown]}</span>
-      {owner && canEdit && shown === 'draft' && <button type="button" className="primary" disabled={approvalBusy} onClick={submit}>Enviar para aprovação</button>}
+      {owner && canEdit && shown === 'draft' && <button type="button" className="primary" disabled={approvalBusy || problems.length > 0} title={problems.length ? 'Complete as linhas marcadas antes de enviar' : ''} onClick={submit}>Enviar para aprovação</button>}
+      {owner && canEdit && shown === 'draft' && problems.length > 0 && <span className="muted">Faltam dados em {problems.length} linha(s): {problems.slice(0, 3).map(p => `${p.hour} (${p.issue})`).join('; ')}{problems.length > 3 ? '…' : ''}</span>}
       {owner && canEdit && shown === 'pending' && <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Retirar envio</button>}
       {owner && shown === 'approved' && <span className="muted">Aprovada: já pode ir para o calendário. Se você editar, volta a rascunho.</span>}
       {isGm && shown === 'pending' && !returning && <>
@@ -214,58 +201,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
       </div>
     </div>}
     {shown === 'draft' && current.review_note && <p className="callout tr-note" role="note"><b>Devolvida pelo mestre:</b> {current.review_note}</p>}
-    <div className="tr-head">
-      <label className="field"><span>Data do período</span>
-        <input value={current.data.period} maxLength={60} disabled={!canEdit} placeholder="Ex.: Dia 3 da semana" onChange={e => edit({ period: e.target.value })} /></label>
-      <label className="field"><span>Local do treino</span>
-        <input value={current.data.place} maxLength={100} disabled={!canEdit} onChange={e => edit({ place: e.target.value })} /></label>
-      <label className="field"><span>Estamina inicial (máx. {stats.maxStamina})</span>
-        <input type="number" min="0" max={stats.maxStamina} disabled={!canEdit} value={current.data.startStamina ?? stats.maxStamina} onChange={e => edit({ startStamina: e.target.value === '' ? null : Number(e.target.value) })} /></label>
-      <label className="field"><span>Mana inicial (máx. {stats.maxMana})</span>
-        <input type="number" min="0" max={stats.maxMana} disabled={!canEdit} value={current.data.startMana ?? stats.maxMana} onChange={e => edit({ startMana: e.target.value === '' ? null : Number(e.target.value) })} /></label>
-      <div className="field"><span>Rolagem de Meditar (0 a 12)</span>
-        <div className="tr-roll-row">
-          <input type="number" min="0" max="12" disabled={!canEdit || current.data.meditAvg} value={current.data.meditAvg ? sim.roll : current.data.meditRoll} onChange={e => edit({ meditRoll: Number(e.target.value) })} />
-          <label className="check tr-avg" title="Em vez de rolar, usa o valor médio do dado de Meditar da ficha (sem explosão)">
-            <input type="checkbox" checked={current.data.meditAvg} disabled={!canEdit} onChange={e => edit({ meditAvg: e.target.checked })} /> Usar média{current.data.meditAvg ? ` (${stats.meditar ? `d${stats.meditar}` : 'd4−2'})` : ''}</label>
-        </div></div>
-      <label className="check tr-fed"><input type="checkbox" checked={current.data.fed} disabled={!canEdit} onChange={e => edit({ fed: e.target.checked })} /> Alimentado (necessário para recuperar fadiga)</label>
-    </div>
-
-    <div className="tr-summary">
-      <span className="mk-chip">Estamina no fim <b>{fmt(sim.endStamina)} / {stats.maxStamina}</b></span>
-      <span className="mk-chip">Mana no fim <b>{fmt(sim.endMana)} / {stats.maxMana}</b></span>
-      <span className="mk-chip">Fadiga do dia <b>{signed(sim.totalVE)}</b></span>
-      <span className="mk-chip">Mana do dia <b>{signed(sim.totalVM)}</b></span>
-      <span className="mk-chip">Meditação <b>{fmt(sim.rate)} de mana por hora</b></span>
-      {sim.improvement.hours > 0 && <span className="mk-chip">Aprimoramento <b>{sim.improvement.hours}h de {sim.improvement.hoursPerPoint}h por +1 de mana</b></span>}
-    </div>
-    {sim.warnings.length > 0 && <ul className="tr-warnings">{sim.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
-
-    <div className="tr-scroll">
-      <table className="tr-table">
-        <thead><tr><th>Hora</th><th>Estamina</th><th>Mana</th><th>Atividades</th><th>Efeitos</th><th>Valor de estamina</th><th>Valor de mana</th></tr></thead>
-        <tbody>
-          {sim.rows.map((row, i) => <tr key={row.hour} className={`${row.a ? 'on' : ''}${row.blocked ? ' blocked' : ''}`}>
-            <th scope="row">{row.hour}</th>
-            <td className="tr-estm">{fmt(row.stamina)}{row.incap > 0 && <small className={`tr-level l${row.incap}`} title={`Incapacitação ${row.incap}`}>Incap. {row.incap}</small>}</td>
-            <td>{fmt(row.mana)}{row.exhaustion > 0 && <small className={`tr-level l${row.exhaustion}`} title={`Exaustão ${row.exhaustion}`}>Exaust. {row.exhaustion}</small>}</td>
-            <td className="tr-act">
-              {canEdit ? <div className="tr-act-row">
-                <select aria-label={`Atividade às ${row.hour}`} title={ACTIVITIES.find(x => x.id === row.a)?.label} value={row.a} onChange={e => editRow(i, { a: e.target.value })}>{ACTIVITIES.map(a => <option key={a.id} value={a.id} disabled={a.id !== row.a && Boolean(blockedReason(a.id, row.staminaBefore, row.manaBefore))}>{a.label}</option>)}</select>
-                <input aria-label={`Observação às ${row.hour}`} value={row.n} maxLength={200} placeholder="Observação" onChange={e => editRow(i, { n: e.target.value })} />
-              </div> : <>
-                <b>{row.a ? ACTIVITIES.find(a => a.id === row.a)?.label : ''}</b>{row.n && <span> {row.n}</span>}
-              </>}
-            </td>
-            <td className="tr-effect" title={row.effect}>{row.effect}</td>
-            <td className={row.ve < 0 ? 'neg' : row.ve > 0 ? 'pos' : ''}>{signed(row.ve)}</td>
-            <td className={row.vm < 0 ? 'neg' : row.vm > 0 ? 'pos' : ''}>{signed(row.vm)}</td>
-          </tr>)}
-        </tbody>
-      </table>
-    </div>
-    <Rules stats={stats} />
+    <RoutineGrid data={current.data} sim={sim} stats={stats} canEdit={canEdit} onEdit={edit} onRow={editRow} />
   </div>;
 
   const migrationHelp = <p className="callout">O novo sistema de rotinas e calendário ainda não está disponível neste servidor. O mestre da mesa precisa rodar a migration <code>0023_campaign_clock.sql</code> no Supabase.</p>;
@@ -304,7 +240,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
                 : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
               : view === 'time' && isGm
                 ? (clockReady
-                  ? <ClockPanel tableId={tableId} tick={tick} characters={roleCharacters} routines={routinesById} routineDays={daysByChar}
+                  ? <ClockPanel tableId={tableId} members={members} tick={tick} characters={roleCharacters} routines={routinesById} routineDays={daysByChar}
                     nameOf={nameOf} onOpenCalendar={openCalendarOf} onAdvanced={() => { clock.refresh(); pull().catch(() => {}); }} closed={closed} />
                   : <p className="muted">O relógio da campanha depende da migration 0023.</p>)
                 : <div className="tr-routines">

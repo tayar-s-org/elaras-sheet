@@ -54,6 +54,7 @@ export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToa
                   <button type="button" role="radio" aria-checked={!die} className={!die ? "sel" : ""} onClick={() => setDie(name, 0)} title="Sem treino">—</button>
                   {DICE.map(v => <button key={v} type="button" role="radio" aria-checked={die === v} disabled={v < minDie} className={die === v ? "sel" : ""} onClick={() => setDie(name, v)}>d{v}</button>)}
                 </div>
+                {die === 12 && c.bonuses?.skills?.[name] > 0 && <b className="die-bonus" title="Bônus de evolução: rola 1d12 e soma este valor">d12+{c.bonuses.skills[name]}</b>}
                 <span className="skills2-cost" aria-label="Custo">{die ? `${cost(name, die)} pt` : ""}</span>
               </div>;
             })}

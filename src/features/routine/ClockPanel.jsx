@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { formatClock, formatDay, hoursFor, MONTH_NAMES, dayParts } from '../../rpg/clock.js';
 import { checkAdvance } from '../../rpg/readiness.js';
-import { advanceClock, loadClockLog } from '../../lib/clock.js';
+import { loadClockLog } from '../../lib/clock.js';
+import { runAdvance } from './advance.js';
 import './routine.css';
 
 const UNITS = [{ id: 'hours', label: 'hora(s)' }, { id: 'days', label: 'dia(s)' }];
 const REASON = { empty: 'dia sem rotina', pending: 'aguardando aprovação', rejected: 'rotina devolvida', draft: 'rotina em rascunho' };
-const MAX_HOURS = 8640;
+const MAX_HOURS = 240; // 10 dias por avanço: cada hora de cada personagem é processada e gravada
 
 // Painel do mestre: relógio da campanha e passagem de tempo.
 // Antes de avançar mostra o resumo da validação; qualquer pendência bloqueia o avanço e leva direto ao calendário do personagem.
-export default function ClockPanel({ tableId, tick, characters, routines, routineDays, nameOf, onOpenCalendar, onAdvanced, closed }) {
+export default function ClockPanel({ tableId, members, tick, characters, routines, routineDays, nameOf, onOpenCalendar, onAdvanced, closed }) {
   const [plan, setPlan] = useState({ unit: 'hours', amount: 1 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -33,8 +34,8 @@ export default function ClockPanel({ tableId, tick, characters, routines, routin
     setBusy(true);
     setMessage('');
     try {
-      const next = await advanceClock(tableId, hours, tick, plan.unit);
-      setMessage(`Tempo avançado para ${formatClock(next)}.`);
+      const next = await runAdvance({ tableId, members, tick, hours, kind: plan.unit });
+      setMessage(`Tempo avançado para ${formatClock(next)}. As atividades de todos os personagens foram processadas.`);
       onAdvanced?.();
       reloadLog();
     } catch (e) { setMessage(e.message); onAdvanced?.(); } finally { setBusy(false); }
@@ -64,7 +65,7 @@ export default function ClockPanel({ tableId, tick, characters, routines, routin
     </div>
 
     {!valid && <p className="callout" role="alert">Informe um número inteiro maior que zero.</p>}
-    {valid && tooBig && <p className="callout" role="alert">O avanço máximo é de {MAX_HOURS} horas (um ano) por vez.</p>}
+    {valid && tooBig && <p className="callout" role="alert">O avanço máximo é de {MAX_HOURS} horas (10 dias) por vez; avance em etapas.</p>}
 
     {report && <div className="clock-check" aria-live="polite">
       <h4>Conferência antes de avançar</h4>

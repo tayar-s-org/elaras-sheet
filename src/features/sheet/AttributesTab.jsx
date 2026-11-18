@@ -51,6 +51,7 @@ export default function AttributesTab({ c, d, update, rule, setC, setConfirm, se
                         </option>
                       ))}
                     </select>
+                    {c.attributes[name] === 12 && c.bonuses?.attributes?.[name] > 0 && <b className="die-bonus" title="Bônus de evolução: rola 1d12 e soma este valor">d12+{c.bonuses.attributes[name]}</b>}
                   </div>
                 ))}
               </div>

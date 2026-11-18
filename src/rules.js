@@ -107,6 +107,10 @@ export function newCharacter() {
     advantages: [],
     hindrances: [],
     powers: [],
+    // d12+N: o bônus fica separado do dado-base (só existe com dado d12). evolved = passos de dado ganhos por XP de treino,
+    // que não contam como pontos gastos na criação.
+    bonuses: { skills: {}, attributes: {} },
+    evolved: { skills: {}, attributes: {} },
     equipment: "",
     history: "",
     notes: "",
@@ -174,18 +178,21 @@ export function calculate(c) {
   const racial = racialEffects(c);
   const level = Math.floor((c.xp || 0) / 5);
   const progressionPoints = level * 2;
+  // Passos de dado ganhos com XP de treino não gastam pontos de criação (2 por passo de atributo, 1 por passo de perícia).
   const attributeCost = ATTRIBUTES.reduce(
     (sum, name) =>
       sum +
       Math.max(
         0,
-        (a[name] - (racial.base[name] || (name === "Agilidade" && c.rules.racialAgility ? 6 : 4))) / 2,
-      ) *
-        2,
+        Math.max(
+          0,
+          (a[name] - (racial.base[name] || (name === "Agilidade" && c.rules.racialAgility ? 6 : 4))) / 2,
+        ) * 2 - (c.evolved?.attributes?.[name] || 0) * 2,
+      ),
     0,
   );
   const skillCost = Object.entries(c.skills).reduce(
-    (sum, [name, die]) => sum + Math.max(0, (die ? (die - 2) / 2 : 0) - (name === racial.skill ? 2 : 0)),
+    (sum, [name, die]) => sum + Math.max(0, (die ? (die - 2) / 2 : 0) - (name === racial.skill ? 2 : 0) - (c.evolved?.skills?.[name] || 0)),
     0,
   );
   const advantageCost =
@@ -240,6 +247,12 @@ function integer(value, min, max, fallback = 0) {
     ? value
     : fallback;
 }
+function powerId(index, name) {
+  let h = 0;
+  for (const ch of String(name || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `p${index}-${h.toString(36)}`;
+}
+
 export function validateCharacter(raw) {
   if (!raw || raw.schemaVersion !== 1 || !raw.attributes || !raw.rules)
     throw new Error("Formato de ficha incompatível.");
@@ -291,6 +304,18 @@ export function validateCharacter(raw) {
       ([name]) => [name, raw.skills[name]],
     ),
   );
+  // Bônus de d12+N e passos de evolução: só valem para traços que existem e (no caso do bônus) com dado d12.
+  const counts = (source, group, names, max, only12) => {
+    const out = {};
+    for (const name of names) {
+      const v = integer(source?.[group]?.[name], 0, max);
+      if (v > 0 && (!only12 || c[group][name] === 12)) out[name] = v;
+    }
+    return out;
+  };
+  const skillNames = SKILLS.map(([n]) => n);
+  c.bonuses = { skills: counts(raw.bonuses, "skills", skillNames, 50, true), attributes: counts(raw.bonuses, "attributes", ATTRIBUTES, 50, true) };
+  c.evolved = { skills: counts(raw.evolved, "skills", skillNames, 20, false), attributes: counts(raw.evolved, "attributes", ATTRIBUTES, 20, false) };
   c.advantages = (Array.isArray(raw.advantages) ? raw.advantages : [])
     .slice(0, 100)
     .map((x) => ({
@@ -307,10 +332,17 @@ export function validateCharacter(raw) {
     }));
   c.powers = (Array.isArray(raw.powers) ? raw.powers : [])
     .slice(0, 100)
-    .map((x) => ({
+    .map((x, i) => ({
+      // id estável do feitiço (treino e melhorias se ligam a ele). Quem não tem ganha um determinístico (posição + nome),
+      // que passa a valer quando a ficha é salva; ids já gravados nunca mudam.
+      id: /^[A-Za-z0-9_-]{1,64}$/.test(x.id || "") ? x.id : powerId(i, x.name),
       name: string(x.name, 200),
       description: string(x.description),
       cost: string(x.cost, 100),
+      // Melhorias conquistadas no Estudo Mágico: { n, description, at }.
+      upgrades: (Array.isArray(x.upgrades) ? x.upgrades : []).slice(0, 20).map((u, i) => ({
+        n: integer(u?.n, 1, 20, i + 1), description: string(u?.description, 2000), at: string(u?.at, 40),
+      })),
     }));
   for (const key of ["armor", "movementBonus", "parryBonus", "manaBonus"])
     c[key] = integer(raw[key], -100, 1000);

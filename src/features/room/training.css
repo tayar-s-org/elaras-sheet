@@ -159,3 +159,21 @@
 
 /* Relogio no cabecalho da janela */
 .tr-clock { padding: 3px 12px; border: 1px solid var(--gold); border-radius: 999px; color: var(--gold); font-size: .85rem; font-weight: 700; white-space: nowrap; }
+
+/* Campos dinamicos da rotina (Fase 3) */
+.tr-act-row { display: grid; gap: 3px; }
+.tr-issue { display: block; color: var(--danger); font-size: .7rem; }
+.tr-table tr.incomplete { background: color-mix(in srgb, var(--danger) 7%, var(--surface)); }
+.tr-day-note { margin: 0 0 8px; font-size: .8rem; }
+.tr-delta { font-size: .76rem; white-space: nowrap; }
+@media (max-width: 760px) {
+  /* telas estreitas: cada hora vira um cartao em vez de uma tabela que estoura a largura */
+  .tr-scroll { overflow-x: visible; }
+  .tr-table, .tr-table tbody, .tr-table tr, .tr-table td, .tr-table th { display: block; min-width: 0; width: auto; }
+  .tr-table thead { display: none; }
+  .tr-table tr { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; padding: 6px 8px; }
+  .tr-table td, .tr-table tbody th { text-align: left; border-top: 0; display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+  .tr-table td::before, .tr-table tbody th::before { content: attr(data-label); flex: 0 0 84px; color: var(--muted); font-size: .68rem; text-transform: uppercase; }
+  .tr-table td.tr-act { display: block; }
+  .tr-table td.tr-act::before { display: block; margin-bottom: 2px; }
+}

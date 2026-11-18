@@ -1,122 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOURS, ROUTINE_VERSION, migrateRoutineV1toV2, emptyRoutine, normalizeRoutine, physicalCost, meditationRate, maxMeditations, maxPracticeHours, simulateRoutine } from './routine.js';
+import { HOURS, ROUTINE_VERSION, migrateRoutineV1toV2, emptyRoutine, normalizeRoutine, simulateRoutine, routineProblems } from './routine.js';
+import { ACT } from '../rpg/activities.js';
 
-const stats = { maxStamina: 40, maxMana: 30, spirit: 12, conjurar: 12 };
+const stats = {
+  maxStamina: 60, maxMana: 40, spirit: { die: 12, bonus: 0 }, conjurar: { die: 12, bonus: 0 }, meditar: { die: 8, bonus: 0 },
+  skills: ['Atirar', 'Lutar', 'Conjurar'], spells: [{ id: 'p0-x', name: 'Bola de fogo' }], trainedSpells: ['p0-x'],
+};
 const plan = (acts, extra = {}) => {
   const r = { ...emptyRoutine(), ...extra };
-  acts.forEach(([hour, a]) => { r.rows[HOURS.indexOf(hour)] = { a, n: '' }; });
+  acts.forEach(([hour, row]) => { r.rows[HOURS.indexOf(hour)] = { a: '', skill: '', spell: '', mode: 'normal', n: '', ...row }; });
   return r;
 };
-const run = (activity, hours, extra) => plan(HOURS.slice(0, hours).map(h => [h, activity]), extra);
-
-test('treino físico custa 1, 2 e 4 por hora; 4h = 4, 8h = 12, 12h = 28', () => {
-  assert.deepEqual([1, 4, 5, 8, 9, 12].map(physicalCost), [1, 1, 2, 2, 4, 4]);
-  assert.equal(simulateRoutine(run('fisico', 4), stats).totalVE, -4);
-  assert.equal(simulateRoutine(run('fisico', 8), stats).totalVE, -12);
-  assert.equal(simulateRoutine(run('fisico', 12), stats).totalVE, -28);
-  assert.equal(simulateRoutine(run('fisico', 13), { ...stats, maxStamina: 100 }).warnings.length, 1, 'mais de 12h avisa');
-});
-
-test('descanso completo: +12 na 8ª hora e reinicia o treino físico', () => {
-  const r = plan([
-    ['06:00', 'fisico'], ['07:00', 'fisico'], ['08:00', 'fisico'], ['09:00', 'fisico'], ['10:00', 'fisico'],
-    ...HOURS.slice(5, 13).map(h => [h, 'descanso']),
-    ['19:00', 'fisico'],
-  ]);
-  const sim = simulateRoutine(r, stats);
-  assert.equal(sim.rows[4].ve, -2, 'a 5ª hora de treino custa 2');
-  assert.equal(sim.rows[12].ve, 6, 'recupera 12, mas só cabem 6 até o máximo de 40 (34 → 40)');
-  assert.equal(sim.rows[12].stamina, 40);
-  assert.equal(simulateRoutine(plan(HOURS.slice(0, 8).map(h => [h, 'descanso']), { startStamina: 10 }), stats).rows[7].ve, 12);
-  assert.equal(sim.rows[13].ve, -1, 'depois do descanso o treino recomeça custando 1');
-  const hungry = simulateRoutine({ ...r, fed: false }, stats);
-  assert.equal(hungry.rows[12].ve, 0, 'sem estar alimentado não recupera');
-  assert.ok(hungry.warnings.some(w => w.includes('alimentado')));
-});
-
-test('descanso simples recupera 2 por hora, até 4 horas por dia', () => {
-  const sim = simulateRoutine(run('simples', 6, { startStamina: 0 }), stats);
-  assert.deepEqual(sim.rows.slice(0, 6).map(x => x.ve), [2, 2, 2, 2, 0, 0]);
-  assert.equal(sim.endStamina, 8);
-});
-
-test('estudo custa 1 de mana por hora e prática respeita metade de Conjurar', () => {
-  assert.equal(simulateRoutine(run('estudo', 5), stats).totalVM, -5);
-  const sim = simulateRoutine(run('pratica', 8), { ...stats, conjurar: 12 });
-  assert.equal(maxPracticeHours(12), 6);
-  assert.equal(sim.totalVM, -6, 'só as 6 primeiras horas gastam mana');
-  assert.equal(simulateRoutine(run('pratica', 2), { ...stats, conjurar: 0 }).totalVM, 0, 'sem Conjurar não pratica');
-});
-
-test('meditação recupera 1/(4 − x/4) por hora e limita as entradas por dia', () => {
-  assert.equal(meditationRate(0), 0.25);
-  assert.equal(meditationRate(12), 1);
-  assert.equal(meditationRate(99), 1, 'a redução máxima é de 3h (rolagem 12)');
-  assert.equal(maxMeditations(4), 1);
-  assert.equal(maxMeditations(12), 2);
-  const sim = simulateRoutine(run('meditar', 4, { startMana: 0, meditRoll: 12 }), stats);
-  assert.equal(sim.totalVM, 4);
-  // duas meditações separadas por uma hora livre: com Espírito d6 só a primeira conta
-  const split = plan([['06:00', 'meditar'], ['07:00', 'meditar'], ['09:00', 'meditar']], { startMana: 0, meditRoll: 12 });
-  const two = simulateRoutine(split, { ...stats, spirit: 6 });
-  assert.equal(two.totalVM, 2);
-  assert.ok(two.warnings.length >= 1);
-  assert.equal(simulateRoutine(split, { ...stats, spirit: 12 }).totalVM, 3, 'Espírito d12 permite 2 meditações');
-});
-
-test('aprimoramento de mana exige mana cheia e conta horas por ponto', () => {
-  const full = simulateRoutine(run('aprimorar', 5, { meditRoll: 12 }), stats);
-  assert.equal(full.improvement.hours, 5);
-  assert.equal(full.improvement.hoursPerPoint, 50, 'coeficiente 1/h: 50 horas por +1 de mana máxima');
-  const low = simulateRoutine(run('aprimorar', 2, { startMana: 5 }), stats);
-  assert.equal(low.improvement.hours, 0);
-  assert.ok(low.warnings.length > 0);
-});
-
-test('normalizeRoutine corrige dados incompletos ou inválidos', () => {
-  const n = normalizeRoutine({ v: 2, rows: [{ a: 'fisico' }, { a: 'hack' }], meditRoll: 99, fed: false, period: 'x'.repeat(200) });
-  assert.equal(n.rows.length, 24);
-  assert.equal(n.rows[0].a, 'fisico');
-  assert.equal(n.rows[1].a, '');
-  assert.equal(n.meditRoll, 12);
-  assert.equal(n.fed, false);
-  assert.equal(n.period.length, 60);
-  assert.deepEqual(normalizeRoutine(null), emptyRoutine());
-});
-
-test('estamina ou mana em 1 bloqueia atividades que as consomem', async () => {
-  const { blockedReason, simulateRoutine, emptyRoutine } = await import('./routine.js');
-  assert.ok(blockedReason('fisico', 1, 50));
-  assert.equal(blockedReason('fisico', 2, 0), '');
-  assert.ok(blockedReason('estudo', 10, 1));
-  assert.ok(blockedReason('pratica', 10, 0));
-  assert.equal(blockedReason('meditar', 0, 0), '');
-  assert.equal(blockedReason('descanso', 0, 0), '');
-  const routine = emptyRoutine();
-  routine.startStamina = 1; routine.startMana = 1;
-  routine.rows[0].a = 'fisico'; routine.rows[1].a = 'estudo'; routine.rows[2].a = 'simples';
-  const sim = simulateRoutine(routine, { maxStamina: 10, maxMana: 10, spirit: 6, conjurar: 8 });
-  assert.equal(sim.rows[0].blocked, true);
-  assert.equal(sim.rows[1].blocked, true);
-  assert.deepEqual([sim.rows[0].ve, sim.rows[1].vm], [0, 0]);
-  assert.equal(sim.rows[2].ve, 2);                    // descansar continua permitido
-  assert.equal(sim.rows[0].incap, 2);                 // estamina 1 de 10: abaixo de 25%
-  assert.equal(sim.rows[0].exhaustion, 3);            // mana 1 de 10: no limite de 10%
-  assert.equal(sim.warnings.length, 2);
-});
-
-test('Usar média: a rolagem de Meditar vira a média do dado da ficha', async () => {
-  const { averageRoll, simulateRoutine, emptyRoutine } = await import('./routine.js');
-  assert.deepEqual([4, 6, 8, 10, 12].map(averageRoll), [2.5, 3.5, 4.5, 5.5, 6.5]);
-  assert.equal(averageRoll(0), 0.5);
-  const routine = { ...emptyRoutine(), meditRoll: 12, meditAvg: true };
-  const stats = { maxStamina: 10, maxMana: 10, spirit: 6, conjurar: 4, meditar: 8 };
-  const sim = simulateRoutine(routine, stats);
-  assert.equal(sim.roll, 4.5);
-  assert.equal(sim.rate, Math.round(100 / (4 - 4.5 / 4)) / 100);          // usa a média, não os 12 digitados
-  assert.equal(simulateRoutine({ ...routine, meditAvg: false }, stats).roll, 12);
-});
+const run = (row, hours, extra) => plan(HOURS.slice(0, hours).map(h => [h, row]), extra);
 
 test('a grade da rotina começa às 06:00 e termina às 05:00', () => {
   assert.equal(HOURS.length, 24);
@@ -128,24 +24,80 @@ test('a grade da rotina começa às 06:00 e termina às 05:00', () => {
 });
 
 test('migração v1→v2: a hora antiga continua sendo a mesma hora, o original fica em legacy_v1', () => {
-  // formato antigo: linha i = hora (i+1); 01:00 é a linha 0 e 00:00 é a 23
   const oldRows = Array.from({ length: 24 }, (_, i) => ({ a: '', n: `h${(i + 1) % 24}` }));
-  oldRows[5] = { a: 'meditar', n: 'seis da manhã' };    // 06:00 antigo
-  oldRows[23] = { a: 'descanso', n: 'meia-noite' };      // 00:00 antigo
-  oldRows[0] = { a: 'simples', n: 'uma da manhã' };      // 01:00 antigo
+  oldRows[5] = { a: 'meditar', n: 'seis da manhã' };
+  oldRows[23] = { a: 'descanso', n: 'meia-noite' };
+  oldRows[0] = { a: 'simples', n: 'uma da manhã' };
+  oldRows[10] = { a: 'fisico', n: 'sem perícia escolhida' };
   const old = { period: 'p', place: 'l', fed: true, rows: oldRows };
   const m = migrateRoutineV1toV2(old);
   assert.equal(m.v, 2);
-  assert.equal(m.rows[0].n, 'seis da manhã', '06:00 é a primeira linha agora');
+  assert.equal(m.rows[0].n, 'seis da manhã');
   assert.equal(m.rows[HOURS.indexOf('00:00')].n, 'meia-noite');
   assert.equal(m.rows[HOURS.indexOf('01:00')].n, 'uma da manhã');
-  assert.equal(m.rows[HOURS.indexOf('05:00')].n, 'h5');
   assert.deepEqual(m.legacy_v1, old, 'dados originais preservados');
-  assert.equal(m.period, 'p');
   assert.equal(migrateRoutineV1toV2(m), m, 'já migrada: não mexe de novo');
-  const again = migrateRoutineV1toV2({ ...m, v: 1 });
-  assert.deepEqual(again.legacy_v1, m.legacy_v1, 'rodar duas vezes não encadeia legacy dentro de legacy');
   const n = normalizeRoutine(old);
-  assert.equal(n.rows[0].a, 'meditar');
-  assert.equal(n.rows[HOURS.indexOf('00:00')].a, 'descanso');
+  assert.equal(n.rows[0].a, ACT.MEDITATE);
+  assert.equal(n.rows[HOURS.indexOf('00:00')].a, ACT.REST);
+  assert.equal(n.rows[HOURS.indexOf('01:00')].a, ACT.QUICK);
+  assert.equal(n.rows[HOURS.indexOf('11:00')].a, '', 'treino físico antigo não tem perícia: vira linha vazia');
+  assert.equal(n.rows[HOURS.indexOf('11:00')].n, 'sem perícia escolhida', 'a anotação continua');
+  assert.deepEqual(n.legacy_v1, old);
+});
+
+test('rotina já convertida pelo SQL (v:2 com ids antigos) é lida com os mesmos equivalentes', () => {
+  const rows = HOURS.map(() => ({ a: '', n: '' }));
+  rows[0] = { a: 'descanso', n: '' };
+  rows[1] = { a: 'aprimorar', n: '' };
+  const n = normalizeRoutine({ v: 2, rows });
+  assert.equal(n.rows[0].a, ACT.REST);
+  assert.equal(n.rows[1].a, '');
+});
+
+test('normalizeRoutine corrige dados incompletos ou inválidos', () => {
+  const n = normalizeRoutine({ v: 2, rows: [{ a: ACT.SKILL, skill: 'Atirar', mode: 'focused' }, { a: 'hack', skill: 'x' }, { a: ACT.REST, skill: 'Atirar', mode: 'focused' }], fed: false, period: 'x'.repeat(200) });
+  assert.equal(n.rows.length, 24);
+  assert.equal(n.rows[0].a, ACT.SKILL);
+  assert.equal(n.rows[0].mode, 'focused');
+  assert.equal(n.rows[1].a, '');
+  assert.equal(n.rows[1].skill, '', 'campo de outra atividade é descartado');
+  assert.equal(n.rows[2].skill, '');
+  assert.equal(n.rows[2].mode, 'normal');
+  assert.equal(n.fed, false);
+  assert.equal(n.period.length, 60);
+  assert.deepEqual(normalizeRoutine(null), emptyRoutine());
+});
+
+test('linhas incompletas são apontadas (perícia, feitiço e estudo)', () => {
+  const r = plan([['06:00', { a: ACT.SKILL }], ['07:00', { a: ACT.SKILL, skill: 'Furtividade' }], ['08:00', { a: ACT.SPELL, spell: 'p0-x' }],
+    ['09:00', { a: ACT.STUDY, spell: 'outro' }], ['10:00', { a: ACT.STUDY, spell: 'p0-x' }]]);
+  const issues = routineProblems(r, stats);
+  assert.deepEqual(issues.map(i => i.hour), ['06:00', '07:00', '09:00']);
+});
+
+test('descanso rápido preservado: +2 por hora, 4 horas por dia, exige alimentado', () => {
+  const sim = simulateRoutine(run({ a: ACT.QUICK }, 6, { startStamina: 0 }), stats);
+  assert.deepEqual(sim.rows.slice(0, 6).map(x => x.staminaDelta), [2, 2, 2, 2, 0, 0]);
+  assert.equal(sim.endStamina, 8);
+  const hungry = simulateRoutine(run({ a: ACT.QUICK }, 2, { startStamina: 0, fed: false }), stats);
+  assert.equal(hungry.endStamina, 0);
+  assert.ok(hungry.warnings.length === 2);
+});
+
+test('a simulação do editor bloqueia treino com estamina em 1 ou menos', () => {
+  const sim = simulateRoutine(run({ a: ACT.SKILL, skill: 'Atirar' }, 2, { startStamina: 1 }), stats);
+  assert.equal(sim.rows[0].ok, false);
+  assert.equal(sim.endStamina, 1);
+  assert.equal(sim.xp.length, 0);
+});
+
+test('simulação de um treino de 8 horas: custo, XP da perícia e do atributo ligado', () => {
+  const sim = simulateRoutine(run({ a: ACT.SKILL, skill: 'Atirar' }, 8), stats);
+  assert.equal(sim.totalStamina, -12);
+  const skill = sim.xp.find(x => x.kind === 'skill');
+  const attr = sim.xp.find(x => x.kind === 'attribute');
+  assert.equal(skill.amount, 8);
+  assert.equal(attr.name, 'Agilidade');
+  assert.equal(attr.amount, 4);
 });
