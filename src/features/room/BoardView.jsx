@@ -4,6 +4,8 @@ import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
 import MusicPlayer from './MusicPlayer.jsx';
+import SoundBar from './SoundBar.jsx';
+import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
 import { creatureOf, metaWithHp, metaWithMaxHp, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import SheetPeek from './SheetPeek.jsx';
@@ -204,6 +206,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     try { await updateToken(g.id, final); } catch (err) { setError(err.message); local.reloadItems(); }
   }
 
+  const pad = useSoundpad(room, tableId, isGm);
   const myToken = myCharacter ? tokens.find(t => t.character_id === myCharacter) : null;
   const imageOf = t => tokenUrl(t.image_path || characters[t.character_id]?.data?.tokenImage);
   const place = () => ({ x: (board?.width || 2000) / 2 + (tokens.length % 5) * 20, y: (board?.height || 1400) / 2 + (tokens.length % 5) * 20 });
@@ -289,6 +292,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       </div>}
     </div>
     {board.settings?.music && <MusicPlayer board={board} isGm={isGm} local={local} setError={setError} />}
+    <SoundBar pad={pad} isGm={isGm} />
     <div className="board-wrap">
     <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img"
       aria-label="Tabuleiro compartilhado" onPointerDown={onPointerDown} onPointerMove={onPointerMove}
@@ -333,7 +337,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     {logSlot}
     {error && <p role="alert" className="muted">{error}</p>}
     {isGm && masterOpen && <MasterModule board={board} tokens={tokens} marks={marks} members={members} characters={characters}
-      selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} onClose={() => setMasterOpen(false)}
+      selected={sel} onSelect={setSelected} room={room} pad={pad} local={local} setError={setError} onClose={() => setMasterOpen(false)}
       onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
       onEditImage={t => { setMasterOpen(false); setMaker({ token: t, creature: Boolean(creatureOf(t)) }); }} />}
     {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}

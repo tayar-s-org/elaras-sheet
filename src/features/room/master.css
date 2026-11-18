@@ -42,3 +42,9 @@
 .preset-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
 .preset-item img, .preset-dot { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #2a1414; flex: none; }
 .preset-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Soundpad */
+.sfx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; margin: 6px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--field); }
+.sfx-pads { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.sound-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
+.sound-item input[type=text] { flex: 1; min-width: 8ch; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }

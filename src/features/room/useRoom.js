@@ -58,6 +58,8 @@ export function useRoom(tableId, user, displayName) {
           .on('presence', { event: 'sync' }, () => setOnline(Object.values(channel.presenceState()).flat()))
           .on('broadcast', { event: 'drag' }, ({ payload }) => (listeners.current.drag || []).forEach(fn => fn(payload)))
           .on('broadcast', { event: 'board_refresh' }, ({ payload }) => (listeners.current.board_refresh || []).forEach(fn => fn(payload)))
+          .on('broadcast', { event: 'sound' }, ({ payload }) => (listeners.current.sound || []).forEach(fn => fn(payload)))
+          .on('broadcast', { event: 'sounds_refresh' }, ({ payload }) => (listeners.current.sounds_refresh || []).forEach(fn => fn(payload)))
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_messages', filter: `table_id=eq.${tableId}` },
             p => setMessages(prev => prev.some(m => m.id === p.new.id) ? prev : [...prev, p.new]))
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_rolls', filter: `table_id=eq.${tableId}` },

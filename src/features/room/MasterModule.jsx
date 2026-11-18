@@ -3,6 +3,8 @@ import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, 
 import { creatureOf, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
 import { loadPresets, savePreset, deletePreset } from '../../lib/presets.js';
 import { uploadMusic, removeMusicFile } from '../../lib/music.js';
+import { addSound, updateSound, deleteSound } from '../../lib/sounds.js';
+import { soundFileError, SOUND_LIMIT } from '../../soundpad.js';
 import { newMusic, musicTitle, musicFileError } from '../../music.js';
 import { tokenUrl } from '../../lib/tokens.js';
 import './master.css';
@@ -11,9 +13,10 @@ const COLORS = ['#7a4dff', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
 
 // Módulo do mestre (janela aberta pelo botão ao lado de "Trocar imagem do token"): mapa, grade, criaturas,
 // token selecionado e marcadores. Substitui o antigo bloco "Ferramentas do mestre" que ficava abaixo do registro.
-export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, setError, onClose, onCreateCreature, onEditImage }) {
+export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, pad, local, setError, onClose, onCreateCreature, onEditImage }) {
   const fileRef = useRef(null);
   const musicRef = useRef(null);
+  const soundRef = useRef(null);
   const [presets, setPresets] = useState(null);
   const [presetNote, setPresetNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -143,6 +146,26 @@ export default function MasterModule({ board, tokens, marks, members, characters
               run(async () => { const path = await uploadMusic(board.table_id, f, music?.path); await setMusic(newMusic(path, musicTitle(f.name))); }); }} />
         </div>
         <p className="muted">{music ? `Carregada: ${music.name}. Use a barra de música acima do tabuleiro para tocar, pausar e parar.` : 'MP4, M4A ou MP3 até 30 MB. Toca para todos na mesa ao mesmo tempo; cada um ajusta o próprio volume.'}</p>
+      </section>
+
+      <section className="master-section" aria-labelledby="m-sounds">
+        <h3 id="m-sounds">Soundpad</h3>
+        <div className="row master-actions">
+          <button type="button" className="outline" disabled={busy || pad.sounds.length >= SOUND_LIMIT} onClick={() => soundRef.current.click()}>Adicionar sons</button>
+          <button type="button" className="text-button danger" disabled={!pad.active.length} onClick={pad.stopAll}>Parar efeitos</button>
+          <input ref={soundRef} type="file" hidden multiple accept="audio/mpeg,audio/mp4,audio/x-m4a,video/mp4,.mp3,.m4a,.mp4"
+            onChange={e => { const files = [...(e.target.files || [])]; e.target.value = ''; if (!files.length) return;
+              run(async () => { const errors = []; for (const f of files) { const bad = soundFileError(f); if (bad) { errors.push(`${f.name}: ${bad}`); continue; } try { await addSound(board.table_id, f); } catch (err) { errors.push(`${f.name}: ${err.message}`); } }
+                await pad.changed(); if (errors.length) throw new Error(errors.join(' ')); }); }} />
+        </div>
+        <p className="muted">Efeitos curtos (MP3, M4A ou MP4, até 5 MB cada, {SOUND_LIMIT} por mesa). Os botões aparecem acima do tabuleiro e tocam para todos. Use só sons que você tem permissão para usar.</p>
+        {pad.sounds.map(s => <div key={s.id} className="sound-item">
+          <input type="text" maxLength={40} defaultValue={s.name} key={`${s.id}-${s.name}`} aria-label={`Nome do som ${s.name}`}
+            onBlur={e => { const v = e.target.value.trim(); if (v && v !== s.name) run(async () => { await updateSound(s.id, { name: v }); await pad.changed(); }); }} />
+          <label className="check"><input type="checkbox" checked={s.loop} onChange={e => run(async () => { await updateSound(s.id, { loop: e.target.checked }); await pad.changed(); })} /> Repetir</label>
+          <button type="button" className="outline" onClick={() => (pad.active.includes(s.id) ? pad.stop(s.id) : pad.play(s.id))}>{pad.active.includes(s.id) ? 'Parar' : 'Tocar'}</button>
+          <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm(`Apagar o som ${s.name}?`) && run(async () => { pad.stop(s.id); await deleteSound(s); await pad.changed(); })}>Apagar</button>
+        </div>)}
       </section>
 
       <section className="master-section" aria-labelledby="m-selected">
