@@ -52,6 +52,8 @@ export function buildRecords(runs, names = {}) {
       const e = (cur.xp[k] ||= { kind: x.kind, name: x.name, modality: x.modality, amount: 0, discarded: 0 });
       e.amount = round(e.amount + Number(x.amount || 0));
       e.discarded = round(e.discarded + Number(x.discarded || 0));
+      e.base = round((e.base || 0) + Number(x.base ?? x.amount ?? 0));
+      if (x.bonusPct) e.bonusPct = Number(x.bonusPct);
       e.availableAfter = Number(x.availableAfter);
       e.earnedAfter = Number(x.earnedAfter);
     }

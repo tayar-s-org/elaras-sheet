@@ -8,6 +8,7 @@ import { evolutionCost, MODALITY_LABEL } from '../../rpg/progression.js';
 import { readDie, describeDie, stepUp } from '../../rpg/dice.js';
 import { astuciaDice, attemptDifficulty, MAX_IMPROVEMENTS } from '../../rpg/magicStudy.js';
 import { tickToParts, formatDay } from '../../rpg/clock.js';
+import { accumulationCap, pointsOf } from '../../rpg/aptitude.js';
 import { fmt, signed } from '../../rpg/describe.js';
 import './routine.css';
 
@@ -26,7 +27,7 @@ function Stat({ label, value, hint }) {
 
 // "Ver Meus Treinamentos": o que o personagem está treinando, quanto já treinou, quanta XP ganhou e o que pode evoluir.
 // Registros já processados são só leitura (nem o jogador nem o mestre editam o que já foi processado).
-export default function TrainingHistory({ tableId, characterId, owner, closed, stats, character, tick, progress, training, spellProgress, requests, onGo, refresh }) {
+export default function TrainingHistory({ tableId, characterId, owner, closed, stats, character, tick, progress, training, spellProgress, requests, allocation, onGo, refresh }) {
   const [runs, setRuns] = useState(null);
   const [attempts, setAttempts] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -134,7 +135,7 @@ export default function TrainingHistory({ tableId, characterId, owner, closed, s
               <tbody>{['normal', 'focused'].map(m => {
                 const p = g[m];
                 return <tr key={m}><th scope="row">{MODALITY_LABEL[m]}</th>
-                  <td>{p ? `${fmt(p.available)} / ${fmt(p.cap || 5000)}` : '—'}</td><td>{p ? fmt(p.earned_total) : '—'}</td><td>{p ? fmt(p.spent_total) : '—'}</td></tr>;
+                  <td>{p ? `${fmt(p.available)} / ${fmt(accumulationCap(g.kind, pointsOf(allocation, g.kind, g.name)))}` : '—'}</td><td>{p ? fmt(p.earned_total) : '—'}</td><td>{p ? fmt(p.spent_total) : '—'}</td></tr>;
               })}</tbody></table>
             {evolvable ? <div className="th-evolve">
               <span className="muted">Próxima evolução: {describeDie(stepUp(die))} · custa {cost} XP</span>
@@ -179,7 +180,7 @@ export default function TrainingHistory({ tableId, characterId, owner, closed, s
                   <td data-label="Data">{w.date}<br /><small>{w.time}</small></td>
                   <td data-label="Duração">{rec.hours} h</td>
                   <td data-label="Recursos">{resources || '—'}{rec.pay ? ` · +$${fmt(rec.pay)}` : ''}</td>
-                  <td data-label="XP recebida">{xpMain.length ? xpMain.map(x => <div key={x.kind + x.name + x.modality}>+{fmt(x.amount)} {x.kind === 'spell' ? spellName(x.name) : x.name}</div>) : rec.studyHours ? `${rec.studyHours} h de estudo` : '—'}</td>
+                  <td data-label="XP recebida">{xpMain.length ? xpMain.map(x => <div key={x.kind + x.name + x.modality}>+{fmt(x.amount)} {x.kind === 'spell' ? spellName(x.name) : x.name}{x.bonusPct ? <small title={`Ganho-base ${fmt(x.base)} com +${fmt(x.bonusPct)}% de Aptidão`}> (Aptidão +{fmt(x.bonusPct)}%)</small> : null}</div>) : rec.studyHours ? `${rec.studyHours} h de estudo` : '—'}</td>
                   <td data-label="XP disponível">{xpMain.length ? xpMain.map(x => <div key={x.kind + x.name + x.modality}>{fmt(x.availableAfter)}</div>) : '—'}</td>
                   <td data-label="XP total">{xpMain.length ? xpMain.map(x => <div key={x.kind + x.name + x.modality}>{fmt(x.earnedAfter)}</div>) : '—'}</td>
                   <td data-label="Resultado">{rec.resultText}</td>

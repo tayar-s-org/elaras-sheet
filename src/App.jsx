@@ -14,6 +14,7 @@ import { useAutosave } from "./features/library/useAutosave.js";
 import { useMoneyClaims } from "./features/library/useMoneyClaims.js";
 import { useCustomItemClaims } from "./features/library/useCustomItemClaims.js";
 import { useEvolutionClaims } from "./features/library/useEvolutionClaims.js";
+import { useAptitudeNotice } from "./features/library/useAptitudeNotice.js";
 import { listMine, getCharacter, deleteCharacter } from "./lib/cloud.js";
 import { claimXp } from "./lib/xp.js";
 import TablesPage from "./features/tables/TablesPage.jsx";
@@ -77,6 +78,7 @@ export default function App() {
   useMoneyClaims(session, setSession, auth.user, setToast);
   useCustomItemClaims(session, setSession, auth.user, setToast);
   useEvolutionClaims(session, setSession, auth.user, setToast);
+  useAptitudeNotice(auth.user, setToast);
   const [storageError, setStorageError] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [requestedPage, setRequestedPage] = useState(null);

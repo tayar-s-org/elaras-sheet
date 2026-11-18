@@ -60,7 +60,7 @@ const STEPS = [
   {
     title: "Confira os números derivados",
     body: [
-      "O app calcula sozinho: Movimento = soma dos dados dos atributos ÷ 12 (arredondado para baixo, mínimo 1), Aparar = 2 + metade do dado de Lutar, Resistência = 2 + metade do Vigor + armadura, Vida e Stamina = Vigor, e Mana = 10 + 2 × Espírito (+10 por Pontos de Poder).",
+      "O app calcula sozinho: Movimento = soma dos dados dos atributos ÷ 12 (arredondado para baixo) + 1, Aparar = 2 + metade do dado de Lutar, Resistência = 2 + metade do Vigor + armadura, Vida e Stamina = Vigor, e Mana = 10 + 2 × Espírito (+10 por Pontos de Poder).",
     ],
   },
   {

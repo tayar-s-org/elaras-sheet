@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { applyRace, archetypes, loadArchetype, races } from './templates.js';
 import { createPdfBlob, importPdf } from './pdf.js';
 import {
+  ATTRIBUTES as ATTRIBUTE_NAMES,
   advantageCosts,
   calculate,
   elaraCharacter,
@@ -67,7 +68,7 @@ test('progressão segue os limites de XP e mantém Aparar ligado a Lutar', () =>
   }
   c.skills = {Lutar:8, Jogar:12};
   assert.equal(calculate(c).parry, 6);
-  assert.equal(calculate(c).movement, 1);
+  assert.equal(calculate(c).movement, 2); // cinco d4: 20 ÷ 12 = 1 (para baixo) + 1
   c.advantages = [{name:'Arcano',power:true}];
   assert.equal(calculate(c).mana, 18);
   const old = {...newCharacter(),rules:{...newCharacter().rules,budget:''}};
@@ -81,7 +82,7 @@ test("Elara usa os custos raciais e os derivados da mesa", () => {
   const d = calculate(elaraCharacter());
   assert.deepEqual(
     [d.attributeCost, d.skillCost, d.movement, d.parry, d.toughness, d.mana],
-    [10, 12, 2, 4, 5, 26],
+    [10, 12, 3, 4, 5, 26],
   );
   assert.equal(d.remaining, 8);
 });
@@ -152,4 +153,19 @@ test('cada vantagem Pontos de Poder soma +10 de mana, inclusive repetida', () =>
   assert.equal(calculate(c).mana, base + 20);
   c.manaBonus = 5;
   assert.equal(calculate(c).mana, base + 25, 'Mana adicional continua somando');
+});
+
+test('Movimentação = soma dos dados ÷ 12 (para baixo) + 1', () => {
+  const withDice = dice => {
+    const c = { ...newCharacter(), race: 'Outra raça' };
+    ATTRIBUTE_NAMES.forEach((name, i) => { c.attributes[name] = dice[i]; });
+    return calculate(c).movement;
+  };
+  assert.equal(withDice([12, 12, 12, 12, 12]), 6, 'exemplo da mesa: 60 ÷ 12 + 1');
+  assert.equal(withDice([4, 4, 4, 4, 4]), 2, '20 ÷ 12 = 1,67 → 1, mais 1');
+  assert.equal(withDice([6, 6, 6, 6, 6]), 3, '30 ÷ 12 = 2,5 → 2, mais 1');
+  assert.equal(withDice([8, 8, 8, 8, 8]), 4, '40 ÷ 12 = 3,33 → 3, mais 1');
+  assert.equal(withDice([10, 10, 10, 10, 10]), 5, '50 ÷ 12 = 4,17 → 4, mais 1');
+  assert.equal(withDice([12, 12, 12, 4, 4]), 4, '44 ÷ 12 = 3,67 → 3, mais 1');
+  assert.equal(withDice([12, 10, 10, 8, 8]), 5, '48 ÷ 12 = 4 exato, mais 1');
 });

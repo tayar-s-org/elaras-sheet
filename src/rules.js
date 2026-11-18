@@ -55,7 +55,7 @@ export const MASTER_RULES = [
   ],
   [
     "Atributos e derivados",
-    "Agilidade governa mobilidade e fuga de armadilhas. Astúcia influencia aprendizado e limite de conhecimentos ativos. Espírito governa perícias arcanas e mana. Força governa impacto corpo a corpo e carga. Vigor determina vida e stamina. Movimentação = piso(soma dos atributos / 12). Aparar = Lutar / 2 + 2. Resistência = Vigor / 2 + 2.",
+    "Agilidade governa mobilidade e fuga de armadilhas. Astúcia influencia aprendizado e limite de conhecimentos ativos. Espírito governa perícias arcanas e mana. Força governa impacto corpo a corpo e carga. Vigor determina vida e stamina. Movimentação = piso(soma dos atributos / 12) + 1. Aparar = Lutar / 2 + 2. Resistência = Vigor / 2 + 2.",
   ],
   [
     "Ataques",
@@ -223,7 +223,8 @@ export function calculate(c) {
       Number(c.rules.budget === "" ? 30 : c.rules.budget) + progressionPoints + extra - spent,
     movement: Math.max(
       1,
-      Math.floor(ATTRIBUTES.reduce((sum, name) => sum + a[name], 0) / 12) +
+      // soma dos dados dos atributos ÷ 12, arredondado para baixo, mais 1 (cinco d12: 60 ÷ 12 + 1 = 6)
+      Math.floor(ATTRIBUTES.reduce((sum, name) => sum + a[name], 0) / 12) + 1 +
         c.movementBonus + racial.movement + inv.movement - inv.overload,
     ),
     parry: 2 + (c.skills.Lutar || 0) / 2 + c.parryBonus + inv.parry,

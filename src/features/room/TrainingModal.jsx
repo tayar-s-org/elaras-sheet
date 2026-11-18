@@ -12,6 +12,9 @@ import { loadProgress, loadTraining, loadProcessedDays } from '../../lib/engine.
 import { loadRequests, approvedJobs, loadSpellProgress } from '../../lib/requests.js';
 import RequestsPanel from '../routine/Requests.jsx';
 import TrainingHistory from '../routine/TrainingHistory.jsx';
+import AptitudePanel from '../routine/AptitudePanel.jsx';
+import { loadAptitude } from '../../lib/aptitude.js';
+import { aptitudeSummary } from '../../rpg/aptitude.js';
 import RoutineGrid from '../routine/RoutineGrid.jsx';
 import { formatClock, dayParts, dayOfTick, shiftMonth } from '../../rpg/clock.js';
 import CampaignCalendar from '../routine/CampaignCalendar.jsx';
@@ -54,6 +57,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const [training, setTraining] = useState({});
   const [spellProgress, setSpellProgress] = useState({});
   const [processed, setProcessed] = useState(() => new Set());
+  const [aptitude, setAptitude] = useState(null);
   const [flagged, setFlagged] = useState([]);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [returning, setReturning] = useState(false);
@@ -80,6 +84,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     if (reqs) setRequests(reqs);
     if (trn) setTraining(trn);
     if (sp) setSpellProgress(sp);
+    loadAptitude(tableId).then(a => a && setAptitude(a)).catch(() => {});
     if (selectedRef.current) loadProcessedDays(tableId, selectedRef.current).then(set => set && setProcessed(set)).catch(() => {});
     setAvailable(true);
     setRows(prev => list.map(r => (r.id === dirtyId.current ? (prev.find(p => p.id === r.id) || { ...r, data: normalizeRoutine(r.data) }) : { ...r, data: normalizeRoutine(r.data) })));
@@ -111,8 +116,10 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const character = member ? characters[member.character_id] : null;
   const trained = useMemo(() => [...new Set((progress[selected] || []).filter(p => p.kind === 'spell' && p.earned_total > 0).map(p => p.name))], [progress, selected]);
   const jobs = useMemo(() => approvedJobs(requests, selected), [requests, selected]);
-  const stats = useMemo(() => statsOf(character?.data, trained, jobs), [character, trained, jobs]);
+  const baseStats = useMemo(() => statsOf(character?.data, trained, jobs), [character, trained, jobs]);
+  const stats = useMemo(() => ({ ...baseStats, aptitude: aptitude?.allocation?.[selected] || {} }), [baseStats, aptitude, selected]);
   const refreshAll = useCallback(() => pull().catch(() => {}), [pull]);
+  const aptPoints = useMemo(() => (aptitude ? aptitudeSummary(aptitude.grants?.[selected], aptitude.allocation?.[selected]).available : 0), [aptitude, selected]);
   const pendingRequests = useMemo(() => requests.filter(r => r.character_id === selected && r.status === 'pending').length, [requests, selected]);
   const owner = member?.user_id === me;
   const canEdit = owner && !closed && available;
@@ -251,6 +258,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
               <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'primary' : 'outline'} onClick={() => setView('calendar')}>Calendário</button>
               <button type="button" role="tab" aria-selected={view === 'routines'} className={view === 'routines' ? 'primary' : 'outline'} onClick={() => setView('routines')}>Rotinas ({theirs.length})</button>
               <button type="button" role="tab" aria-selected={view === 'history'} className={view === 'history' ? 'primary' : 'outline'} onClick={() => setView('history')}>{owner ? 'Ver Meus Treinamentos' : 'Treinamentos'}</button>
+              <button type="button" role="tab" aria-selected={view === 'aptitude'} className={view === 'aptitude' ? 'primary' : 'outline'} onClick={() => setView('aptitude')}>Aptidão{aptPoints > 0 ? ` (${aptPoints})` : ''}</button>
               <button type="button" role="tab" aria-selected={view === 'requests'} className={view === 'requests' ? 'primary' : 'outline'} onClick={() => setView('requests')}>Solicitações{pendingRequests ? ` (${pendingRequests})` : ''}</button>
               {isGm && <button type="button" role="tab" aria-selected={view === 'time'} className={view === 'time' ? 'primary' : 'outline'} onClick={() => setView('time')}>Tempo da campanha</button>}
             </div>
@@ -263,7 +271,10 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
                 : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
               : view === 'history'
                 ? <TrainingHistory tableId={tableId} characterId={selected} owner={owner} closed={closed} stats={stats} character={character?.data ? validatedSheet(character.data) : null}
-                  tick={tick} progress={progress[selected] || []} training={training[selected]} spellProgress={spellProgress[selected]} requests={requests} onGo={setView} refresh={refreshAll} />
+                  tick={tick} progress={progress[selected] || []} training={training[selected]} spellProgress={spellProgress[selected]} requests={requests} allocation={aptitude?.allocation?.[selected]} onGo={setView} refresh={refreshAll} />
+              : view === 'aptitude'
+                ? <AptitudePanel tableId={tableId} characterId={selected} owner={owner} isGm={isGm} closed={closed} character={character?.data ? validatedSheet(character.data) : null}
+                  aptitude={aptitude} progress={progress[selected] || []} refresh={refreshAll} />
               : view === 'requests'
                 ? <RequestsPanel tableId={tableId} characterId={selected} owner={owner} isGm={isGm} closed={closed} requests={requests} stats={stats}
                   training={training[selected]} spellProgress={spellProgress[selected]} refresh={refreshAll} />

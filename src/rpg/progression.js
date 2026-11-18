@@ -11,8 +11,8 @@ export const MODALITY_LABEL = { normal: 'Normal', focused: 'Focado' };
 export const BASE_XP_CAP = 5000;
 export const XP_PER_STEP = 100;
 
-// Teto de XP acumulada. Aptidão e Grau de Cultivo (ainda não existem) entrarão como modificadores futuros;
-// por enquanto nenhum modificador é aplicado e o teto é sempre 5.000.
+// Teto-base de XP acumulada (5.000). A Aptidão aumenta o teto por alvo (src/rpg/aptitude.js: accumulationCap) e o servidor
+// aplica a mesma fórmula ao gravar o XP; Grau de Cultivo (ainda não existe) entrará como outro modificador.
 export function xpCap(_ctx = {}, modifiers = []) {
   return modifiers.reduce((cap, mod) => (typeof mod === 'function' ? mod(cap, _ctx) : cap), BASE_XP_CAP);
 }

@@ -139,3 +139,33 @@
   .th-table td::before { content: attr(data-label); flex: 0 0 96px; color: var(--muted); font-size: .66rem; text-transform: uppercase; }
   .th-hours { columns: 1; }
 }
+
+/* Aptidao */
+.ap { display: grid; gap: 16px; }
+.ap h4 { margin: 0 0 6px; font-family: var(--font-display); color: var(--accent); }
+.ap h4 small { font-family: inherit; font-weight: 400; }
+.ap-summary, .ap-gm { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.ap-gm { border-color: var(--accent); }
+.ap-numbers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ap-numbers div { display: grid; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.ap-numbers b { font-family: var(--font-display); font-size: 1.6rem; color: var(--gold); }
+.ap-numbers span { font-size: .78rem; color: var(--muted); }
+.ap-numbers .bad b { color: var(--danger); }
+.ap-rule { margin: 0; font-size: .8rem; }
+.ap-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.ap-table th, .ap-table td { padding: 5px 8px; border-top: 1px solid var(--border); text-align: left; }
+.ap-table thead th { background: var(--surface-soft); color: var(--muted); font-size: .68rem; text-transform: uppercase; border-top: 0; }
+.ap-table tr.on { background: var(--selection); }
+.ap-table .pos { color: var(--success); font-weight: 700; }
+.ap-table .neg { color: var(--danger); }
+.ap-ctl { display: flex; align-items: center; gap: 6px; }
+.ap-ctl input { width: 64px; text-align: center; }
+.ap-ctl button { min-width: 34px; padding: 2px 8px; }
+.ap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; position: sticky; bottom: 0; padding: 8px 0; background: var(--surface); }
+@media (max-width: 760px) {
+  .ap-table thead { display: none; }
+  .ap-table, .ap-table tbody, .ap-table tr, .ap-table td, .ap-table th { display: block; }
+  .ap-table tr { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; padding: 6px 8px; }
+  .ap-table td, .ap-table th { border-top: 0; padding: 2px 0; }
+  .ap-table td[data-label]::before { content: attr(data-label) ': '; color: var(--muted); font-size: .72rem; }
+}

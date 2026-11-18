@@ -2,6 +2,7 @@ import { calculate, validateCharacter } from '../rules.js';
 import { readDie } from './dice.js';
 import { processHour, newDay, ACT } from './activities.js';
 import { dayOfTick, slotOfTick } from './clock.js';
+import { xpWithAptitude, pointsOf } from './aptitude.js';
 
 // Processador de tempo: transforma "a campanha andou de tick A a tick B" em eventos do ledger, hora a hora.
 // É puro (não acessa rede); quem grava é o servidor (advance_time), que garante unicidade e atomicidade.
@@ -64,13 +65,15 @@ export function simulateDay(rows, { stats, fed = true, startStamina, startMana }
   });
   const xp = {};
   for (const e of out) for (const x of e.xp) { const k = `${x.kind}:${x.name}:${x.modality}`; xp[k] = { ...x, amount: (xp[k]?.amount || 0) + x.amount }; }
+  // Prévia: o servidor aplica a Aptidão ao gravar; aqui só mostramos o ganho já com o bônus (stats.aptitude = distribuição confirmada).
+  const preview = Object.values(xp).map(x => ({ ...x, base: x.amount, amount: xpWithAptitude(x.amount, x.kind, pointsOf(stats.aptitude, x.kind, x.name)) }));
   return {
     rows: out,
     endStamina: state.stamina,
     endMana: state.mana,
     totalStamina: out.reduce((s, e) => s + e.staminaDelta, 0),
     totalMana: out.reduce((s, e) => s + e.manaDelta, 0),
-    xp: Object.values(xp),
+    xp: preview,
     day,
     warnings: out.filter(e => e.reason).map(e => ({ slot: e.slot, text: e.reason })),
   };
