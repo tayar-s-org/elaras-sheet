@@ -29,6 +29,7 @@ import TopBar from "./features/sheet/TopBar.jsx";
 import SheetSummary from "./features/sheet/SheetSummary.jsx";
 import SheetModules from "./features/sheet/SheetModules.jsx";
 import Toast from "./ui/Toast.jsx";
+import Assistant from "./assistant/Assistant.jsx";
 
 const OWNER_KEY = "manrakora-sheets-owner";
 export default function App() {
@@ -236,7 +237,7 @@ export default function App() {
     : route.startsWith("/sala/") ? <RoomPage auth={auth} id={route.slice(6)} />
     : route.startsWith("/convite/") ? <InvitePage auth={auth} code={route.slice(9)} />
     : <HomePage auth={auth} />;
-  if (page) return <>{topbar}{page}</>;
+  if (page) return <>{topbar}{page}<Assistant /></>;
   return (
     <>
       {topbar}
@@ -326,6 +327,7 @@ export default function App() {
         <SheetSummary c={c} d={d} tableId={activeSheet?.tableId} cloudId={activeSheet?.cloud?.id} />
       </main>}
       <Toast toast={toast} onClose={() => setToast("")} />
+      <Assistant />
     </>
   );
 }

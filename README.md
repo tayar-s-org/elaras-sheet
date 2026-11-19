@@ -34,6 +34,12 @@ Dano exige configurar os dados da arma. Atirar usa Agilidade; Lutar e Arremessar
 
 O padrão atual é 30 pontos iniciais. Nível = piso(XP/5), com +2 pontos disponíveis por nível. Movimento = piso(soma dos atributos/12), respeitando o mínimo 1 e ajustes raciais/manuais. Mana = 10 + 2×Espírito + ajuste manual; vantagens não concedem mana automaticamente. Aparar permanece 2 + Lutar/2 + ajuste manual. Estas definições substituem as observações antigas de orçamento em aberto e bônus automático de mana abaixo. XP e nível constam da ficha e do PDF; PDFs antigos sem XP abrem com zero.
 
+## Assistente do livro (botão flutuante)
+
+O botão redondo no canto da tela abre o **Arquivista**, um chat que responde dúvidas de regras (poderes, vantagens, complicações, perícias, armas e armaduras, criaturas, combate, criação e evolução). **Não usa API nem IA generativa**: ele entende a pergunta com regras (assunto + o que se quer saber) e responde só com dados e trechos do próprio livro (`public/assets/book.json`), sempre citando a página, com botão para ver a página original. Perguntas simples ("qual o dano da Espada Longa?") têm resposta curta; as demais mostram o trecho do livro. Se o livro não cobre, ele diz que não achou. As regras da mesa que mudam o livro (como os 30 pontos iniciais) não entram.
+
+O código fica em `src/assistant/` (`knowledge.js` lê o livro, `engine.js` responde, `topics.js` é a árvore de perguntas prontas, `Assistant.jsx` é a interface; a foto é `public/assets/logo.png`). O livro só é carregado na primeira pergunta. Os testes (`src/assistant/assistant.test.js`) conferem, por exemplo, que o custo, o alcance e a duração de cada um dos 50 poderes batem com a página do livro.
+
 ## Catálogos e início rápido
 
 Em **Vantagens**, filtre pelo estágio mínimo ou mostre só opções cujos requisitos a ficha confirma. Os estágios do livro usam os limites de 0/20/40/60/80 XP; isso não altera o nível nem o orçamento da mesa. O catálogo verifica atributos, perícias, vantagens conhecidas e pontos livres. Requisitos especiais ou que dependem de informações não registradas ficam para revisão do mestre. A edição manual continua disponível para exceções da campanha.
