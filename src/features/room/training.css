@@ -119,7 +119,7 @@
 .training-modal .mod-editor-head { @apply pt-[4px] pb-[4px]; }
 
 /* Janela maior: ocupa quase toda a tela e a altura das linhas acompanha a altura disponivel */
-.training-modal, .mod-editor.training-modal { width: min(1600px, 97vw); @apply max-w-[97vw] max-h-[97vh]; }
+.training-modal, .mod-editor.training-modal { width: min(1600px, 100%); @apply max-w-full; max-height: calc(100dvh - 48px); }
 .training-modal .mod-editor-body { @apply pl-[18px] pr-[18px]; }
 .tr-table { font-size: clamp(.76rem, 1.5vh, .92rem); }
 .tr-table td, .tr-table tbody th { height: clamp(19px, calc((100vh - 330px) / 25), 32px); }
@@ -195,9 +195,19 @@
 }
 
 /* Nome de cada jogador: maior e com uma cor propria */
-.tabs-row button.tr-who { font-size: 1.15rem; @apply font-bold p-[8px_18px]; color: var(--who); border: 2px solid var(--who); background: transparent; }
-.tabs-row button.tr-who:hover { background: color-mix(in srgb, var(--who) 18%, transparent); }
-.tabs-row button.tr-who.on { background: var(--who); color: #16131f; box-shadow: 0 0 0 3px color-mix(in srgb, var(--who) 30%, transparent); }
+.tabs-row button.tr-who { font-size: .9rem; @apply font-semibold p-[4px_14px]; color: var(--text); border: 2px solid var(--who); background: transparent; }
+.tabs-row button.tr-who:hover { background: color-mix(in srgb, var(--who) 16%, transparent); }
+.tabs-row button.tr-who.on { background: color-mix(in srgb, var(--who) 24%, var(--surface)); color: var(--text); }
 .tr-who .tr-badge { font-size: .7rem; vertical-align: middle; }
 .tr-owner { font-size: .9rem; }
-.tr-owner::first-line { color: var(--who); @apply font-bold; }
+.tr-owner::first-line { color: color-mix(in srgb, var(--who) 40%, var(--text)); @apply font-bold; }
+
+/* A rotina: o bloco do quadro é uma coluna própria para a barra fixa poder grudar no topo da rolagem */
+.tr-editor { grid-template-columns: minmax(0, 1fr); }
+.tr-grid { @apply flex flex-col gap-[4px] min-w-0; }
+.tr-approval.tr-workflow, .tr-approval.tr-notes { @apply m-0; }
+@media (max-width: 900px) { .tr-head .tr-fed { grid-column: 1 / -1; } }
+.tr-notes:empty { @apply hidden; }
+.tr-warnings { @apply p-[4px_10px]; }
+.tr-warnings > summary { @apply cursor-pointer font-semibold; }
+.tr-warnings > ul { @apply m-[4px_0_0] pl-[18px]; }

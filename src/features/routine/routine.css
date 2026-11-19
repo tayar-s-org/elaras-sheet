@@ -183,46 +183,53 @@
 .apt-grant { @apply grid gap-[4px] mt-[6px]; }
 
 /* Rotina em botoes de acao e duas planilhas de 12 horas */
-.rb-palette h4 { @apply m-0; font-family: var(--font-display); @apply text-app-accent; }
 .rb-builder { @apply grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); @apply gap-[8px] items-end; }
 .rb-hint { @apply m-0; font-size: .8rem; }
 .rb-chipwrap { @apply relative inline-flex; }
 .rb-del { @apply top-[-6px] right-[-4px]; background: var(--surface); border: 1px solid var(--border); @apply rounded-[50%] w-[18px] h-[18px] p-0; font-size: .8rem; }
 .rb-tools { @apply flex justify-end m-[4px_0]; }
 .rb-boards { @apply grid; grid-template-columns: repeat(2, minmax(0, 1fr)); @apply gap-[12px] mt-[8px]; }
-.rb-board h4 { @apply m-[0_0_6px]; font-family: var(--font-display); @apply text-app-accent; }
-.rb-board h4 small { font-family: inherit; @apply font-normal ml-[6px]; }
+.rb-board h3 { @apply m-[0_0_6px]; font-family: var(--font-display); font-size: 1.05rem; @apply text-app-accent; }
+.rb-board h3 small { font-family: inherit; @apply font-normal ml-[6px]; }
 .rb-list { list-style: none; @apply m-0 p-0; border: 1px solid var(--border); @apply rounded-[10px] overflow-hidden select-none; }
-.rb-slot { @apply grid; grid-template-columns: 52px minmax(0, 1fr) auto; grid-template-areas: "hour cell delta" "hour res res"; @apply gap-[2px_8px] p-[6px_8px]; border-top: 1px solid var(--border); background: var(--surface); @apply items-center; }
+.rb-slot { @apply grid; grid-template-columns: 52px minmax(0, 1fr) auto; grid-template-areas: "hour cell delta" "hour res res"; @apply gap-[2px_8px] p-[6px_8px]; border-top: 1px solid var(--border); @apply items-center; }
 .rb-slot:first-child { border-top: 0; }
-.rb-slot.on { background: var(--selection); }
-.rb-slot.over { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--selection); }
+.rb-slot.over { outline: 2px dashed var(--accent); outline-offset: -3px; }
 .rb-slot.paintable { cursor: copy; }
-.rb-slot.fail { background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
-.rb-slot.incomplete { background: color-mix(in srgb, var(--warning) 9%, var(--surface)); }
 .rb-hour { grid-area: hour; @apply font-bold text-app-accent; }
-.rb-res { grid-area: res; font-size: .7rem; @apply text-app-muted; }
-.rb-res b { color: var(--gold); @apply font-bold; }
+.rb-hour-apply { align-self: stretch; min-height: 44px; padding: 0; border: 1px dashed var(--accent); @apply rounded-[8px]; background: transparent; font: inherit; font-weight: 700; cursor: copy; }
+.rb-hour-apply:hover { background: var(--selection); }
+.rb-res { grid-area: res; font-size: .75rem; @apply text-app-muted; }
+.rb-res b { color: var(--rb-gold); @apply font-bold; }
 .rb-cell { grid-area: cell; @apply grid gap-[2px] min-w-0; }
-.rb-delta { grid-area: delta; @apply grid; justify-items: end; font-size: .74rem; @apply font-bold whitespace-nowrap; }
+.rb-delta { grid-area: delta; @apply grid; justify-items: end; font-size: .78rem; @apply font-bold whitespace-nowrap; }
 .rb-delta .neg { color: var(--danger); }
-.rb-delta .pos { color: var(--success); }
-.rb-action { @apply relative block p-[4px_22px_4px_8px]; border-left: 4px solid var(--tc); @apply rounded-[4px]; background: color-mix(in srgb, var(--tc) 22%, var(--surface)); font-size: .8rem; line-height: 1.2; @apply cursor-grab; }
+.rb-delta .pos { color: var(--rb-pos); }
+.rb-action { @apply relative block p-[4px_22px_4px_24px]; @apply rounded-[6px]; background: color-mix(in srgb, var(--tc) 22%, var(--surface)); font-size: .8rem; line-height: 1.2; @apply cursor-grab; }
+.rb-action::before { content: ""; @apply absolute left-[8px] top-1/2 w-[8px] h-[8px] -mt-[4px] rounded-[50%]; background: var(--tc); }
 .rb-name { @apply font-bold wrap-anywhere; }
 .rb-empty { font-size: .78rem; @apply text-app-muted p-[4px_0]; }
-.rb-effect { font-size: .68rem; @apply text-app-muted; line-height: 1.25; @apply wrap-anywhere; }
+.rb-effect { font-size: .75rem; @apply text-app-muted; line-height: 1.35; @apply wrap-anywhere; }
 .rb-effect.bad { color: var(--danger); }
 @media (max-width: 860px) {
   .rb-boards { grid-template-columns: 1fr; }
 }
 
-/* Fundo das horas mais escuro (as acoes continuam destacadas) */
-.rb-list { background: color-mix(in srgb, var(--surface) 55%, #000); }
-.rb-slot { background: color-mix(in srgb, var(--surface) 55%, #000); }
-.rb-slot.on { background: color-mix(in srgb, var(--selection) 70%, #000); }
-.rb-slot.over { background: color-mix(in srgb, var(--selection) 85%, #000); }
-.rb-slot.fail { background: color-mix(in srgb, var(--danger) 12%, color-mix(in srgb, var(--surface) 55%, #000)); }
-.rb-slot.incomplete { background: color-mix(in srgb, var(--warning) 12%, color-mix(in srgb, var(--surface) 55%, #000)); }
+/* Fundo das horas: no tema escuro afunda em direcao ao preto; no claro usa o tom suave do tema (misturar com preto deixava o texto ilegivel). */
+.rb-list, .rb-slot { --rb-bg: var(--surface-soft); --rb-on: var(--selection); --rb-over: var(--selection); --rb-gold: color-mix(in srgb, var(--gold) 70%, var(--text)); --rb-pos: color-mix(in srgb, var(--success) 82%, #000); }
+:root[data-theme="dark"] .rb-list, :root[data-theme="dark"] .rb-slot {
+  --rb-bg: color-mix(in srgb, var(--surface) 55%, #000);
+  --rb-on: color-mix(in srgb, var(--selection) 70%, #000);
+  --rb-over: color-mix(in srgb, var(--selection) 85%, #000);
+  --rb-gold: var(--gold);
+  --rb-pos: var(--success);
+}
+.rb-list, .rb-slot { background: var(--rb-bg); }
+.rb-slot.on { background: var(--rb-on); }
+.rb-slot.over { background: var(--rb-over); }
+.rb-slot.fail { background: color-mix(in srgb, var(--danger) 12%, var(--rb-bg)); }
+.rb-slot.incomplete { background: color-mix(in srgb, var(--warning) 12%, var(--rb-bg)); }
+.rb-res, .rb-empty, .rb-effect:not(.bad) { color: color-mix(in srgb, var(--muted) 78%, var(--text)); }
 
 /* Barras de acao com a mesma largura: a coluna de custo/ganho tem largura fixa em todas as horas */
 .rb-slot { grid-template-columns: 52px minmax(0, 1fr) 92px; }
@@ -303,4 +310,21 @@
   font-variant-numeric: tabular-nums;
 }
 .cc-day-action[aria-pressed="true"] { background: var(--selection); }
-.rb-apply.outline { @apply min-h-[32px]; justify-self: start; }
+
+/* Barra fixa da rotina: saldo, aprovação e pincel ficam à vista enquanto se pintam as horas */
+.rb-dock { @apply sticky top-0 z-[6] grid grid-cols-[minmax(0,1fr)] gap-[6px] p-[6px_0_8px]; background: var(--surface); border-bottom: 1px solid var(--border); }
+.rb-dock-top { @apply flex flex-wrap items-center gap-[6px_12px]; }
+.rb-balance { @apply flex flex-wrap gap-[4px_6px] ml-auto; }
+.rb-balance .mk-chip { font-size: .8rem; }
+.rb-strip { @apply flex items-center gap-[8px]; }
+.rb-chips { @apply flex flex-1 min-w-0 gap-[8px] overflow-x-auto p-[8px_6px_4px_2px] -mt-[4px]; scrollbar-width: thin; }
+.rb-chips .rb-chipwrap { @apply shrink-0; }
+.rb-chips .tc-chip { @apply whitespace-nowrap; }
+.rb-none { @apply whitespace-nowrap; font-size: .85rem; }
+.rb-new { @apply shrink-0 whitespace-nowrap; }
+.rb-builder-anchor { scroll-margin-top: 140px; }
+.rb-builder-box { @apply p-[8px_12px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface-soft); scroll-margin-top: 140px; }
+.rb-builder-box > summary { @apply cursor-pointer font-bold text-app-accent; font-family: var(--font-display); }
+.rb-builder-box[open] > summary { @apply mb-[8px]; }
+.tr-daysum > summary { @apply cursor-pointer text-app-muted; font-size: .85rem; }
+.tr-daysum[open] > .tr-summary { @apply mt-[6px]; }

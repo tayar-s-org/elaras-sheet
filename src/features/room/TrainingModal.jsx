@@ -202,23 +202,27 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
 
   const pendingOf = cid => rows.filter(r => r.character_id === cid && r.status === 'pending').length;
   const shown = current?.status || 'draft';
-  const editor = current && <div className="tr-editor">
-    <label className="field tr-name"><span>Nome da rotina</span>
-      <input value={current.name} maxLength={60} disabled={!canEdit} placeholder="Ex.: Treino pesado, Estudo da biblioteca…" onChange={e => rename(e.target.value)} /></label>
-    <div className="tr-approval" role="group" aria-label="Aprovação da rotina">
+  // Botões do fluxo de aprovação: vão na barra fixa da rotina, perto das horas. Avisos e "Apagar" ficam no fluxo normal.
+  const workflow = current && <div className="tr-approval tr-workflow" role="group" aria-label="Aprovação da rotina">
       <span className={`tr-badge ${shown}`}>{TRAINING_STATUS[shown]}</span>
       {owner && canEdit && shown === 'draft' && <button type="button" className="primary" disabled={approvalBusy || problems.length > 0} title={problems.length ? 'Complete as linhas marcadas antes de enviar' : ''} onClick={submit}>Enviar para aprovação</button>}
-      {owner && canEdit && shown === 'draft' && problems.length > 0 && <span className="muted">Faltam dados em {problems.length} linha(s): {problems.slice(0, 3).map(p => `${p.hour} (${p.issue})`).join('; ')}{problems.length > 3 ? '…' : ''}</span>}
       {owner && canEdit && shown === 'pending' && <button type="button" className="outline" disabled={approvalBusy} onClick={() => review('draft')}>Retirar envio</button>}
-      {owner && shown === 'approved' && <span className="muted">Aprovada: já pode ir para o calendário. Se você editar, volta a rascunho.</span>}
       {isGm && shown === 'pending' && !returning && <>
         <button type="button" className="primary" disabled={approvalBusy} onClick={() => review('approved')}>Aprovar</button>
         <button type="button" className="outline" disabled={approvalBusy} onClick={() => setReturning(true)}>Devolver ao jogador</button>
       </>}
       {isGm && shown === 'approved' && !returning && <button type="button" className="outline" disabled={approvalBusy} onClick={() => setReturning(true)}>Revogar aprovação</button>}
+    </div>;
+  const notes = current && <div className="tr-approval tr-notes">
+      {owner && canEdit && shown === 'draft' && problems.length > 0 && <span className="muted">Faltam dados em {problems.length} linha(s): {problems.slice(0, 3).map(p => `${p.hour} (${p.issue})`).join('; ')}{problems.length > 3 ? '…' : ''}</span>}
+      {owner && shown === 'approved' && <span className="muted">Aprovada: já pode ir para o calendário. Se você editar, volta a rascunho.</span>}
       {isGm && !owner && shown === 'draft' && <span className="muted">{current.review_note ? 'Devolvida ao jogador.' : 'O jogador ainda não enviou para aprovação.'}</span>}
       {owner && canEdit && <button type="button" className="text-button danger tr-delete" disabled={approvalBusy} onClick={remove}>Apagar rotina</button>}
-    </div>
+    </div>;
+  const editor = current && <div className="tr-editor">
+    <label className="field tr-name"><span>Nome da rotina</span>
+      <input value={current.name} maxLength={60} disabled={!canEdit} placeholder="Ex.: Treino pesado, Estudo da biblioteca…" onChange={e => rename(e.target.value)} /></label>
+    {notes}
     {isGm && returning && <div className="tr-return">
       <label className="field"><span>Por que está devolvendo? (o jogador vai ler)</span>
         <textarea rows={3} maxLength={500} value={returnText} autoFocus onChange={e => setReturnText(e.target.value)} placeholder="Ex.: 8h de treino físico seguidas passam do limite; ajuste a partir das 14h." /></label>
@@ -228,7 +232,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
       </div>
     </div>}
     {shown === 'draft' && current.review_note && <p className="callout tr-note" role="note"><b>Devolvida pelo mestre:</b> {current.review_note}</p>}
-    <RoutineGrid data={current.data} sim={sim} stats={stats} canEdit={canEdit} onEdit={edit} onRow={editRow} storageKey={current.id} onClearAll={() => edit({ rows: emptyRoutine().rows })} />
+    <RoutineGrid data={current.data} sim={sim} stats={stats} canEdit={canEdit} onEdit={edit} onRow={editRow} storageKey={current.id} workflow={workflow} onClearAll={() => edit({ rows: emptyRoutine().rows })} />
   </div>;
 
   const migrationHelp = <p className="callout">O novo sistema de rotinas e calendário ainda não está disponível neste servidor. O mestre da mesa precisa rodar a migration <code>0023_campaign_clock.sql</code> no Supabase.</p>;

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import RoutineBoard from './RoutineBoard.jsx';
+import { BrushStrip, ActionBuilder, keyOf, useActionButtons } from './ActionDock.jsx';
 import { HOURS } from '../../training/routine.js';
 import { SKILL_TRAIN_MAX_HOURS, REST_MAX_HOURS, QUICK_MAX_HOURS } from '../../rpg/activities.js';
 import { meditationSessionsPerDay, spellTrainingHoursPerDay } from '../../rpg/tiers.js';
@@ -22,26 +23,53 @@ function Rules({ stats }) {
   </details>;
 }
 
-// Cabeçalho, resumo e tabela horária da rotina. Os campos de cada atividade aparecem só quando ela é escolhida.
-export default function RoutineGrid({ data, sim, stats, canEdit, onEdit, onRow, onClearAll, storageKey }) {
-  const skillOptions = stats.skills;
+// Barra fixa (saldo, aprovação e pincel), resumo do dia e quadro horário da rotina. Os campos de cada atividade aparecem só quando ela é escolhida.
+export default function RoutineGrid({ data, sim, stats, canEdit, onEdit, onRow, onClearAll, storageKey, workflow }) {
+  const [brush, setBrush] = useState(null);
+  const [builderOpen, setBuilderOpen] = useState(null); // null = automático: aberto enquanto não há nenhum botão
+  const builderRef = useRef(null);
+  const { saved, persist, chips } = useActionButtons(storageKey, data.rows);
+  const brushRow = brush ? chips.find(r => keyOf(r) === brush) || null : null;
+  const open = builderOpen ?? chips.length === 0;
+  const toggleBuilder = () => {
+    const next = !open;
+    setBuilderOpen(next);
+    if (next) requestAnimationFrame(() => builderRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  };
   const label = (kind, id) => (kind === 'spell' ? stats.spells.find(s => s.id === id)?.name : id) || '';
-  return <>
+  return <div className="tr-grid">
+    <div className="rb-dock">
+      <div className="rb-dock-top">
+        {workflow}
+        <div className="rb-balance">
+          <span className="mk-chip">Estamina no fim <b>{fmt(sim.endStamina)} / {fmt(stats.maxStamina)}</b></span>
+          <span className="mk-chip">Mana no fim <b>{fmt(sim.endMana)} / {fmt(stats.maxMana)}</b></span>
+        </div>
+      </div>
+      {canEdit && <BrushStrip chips={chips} saved={saved} persist={persist} rows={data.rows} stats={stats} brush={brush} setBrush={setBrush}
+        builderOpen={open} onToggleBuilder={toggleBuilder} />}
+    </div>
+
     <div className="tr-head">
       <label className="check tr-fed"><input type="checkbox" checked={data.fed} disabled={!canEdit} onChange={e => onEdit({ fed: e.target.checked })} /> Alimentado (necessário para o Descanso Rápido recuperar)</label>
     </div>
 
-    <div className="tr-summary">
-      <span className="mk-chip">Estamina no fim <b>{fmt(sim.endStamina)} / {fmt(stats.maxStamina)}</b></span>
-      <span className="mk-chip">Mana no fim <b>{fmt(sim.endMana)} / {fmt(stats.maxMana)}</b></span>
-      <span className="mk-chip">Estamina do dia <b>{signed(sim.totalStamina)}</b></span>
-      <span className="mk-chip">Mana do dia <b>{signed(sim.totalMana)}</b></span>
-      {sim.xp.map(x => <span key={`${x.kind}${x.name}${x.modality}`} className="mk-chip">XP {label(x.kind, x.name)} ({KIND_LABEL[x.kind]}, {MODALITY_LABEL[x.modality].toLowerCase()}) <b>+{fmt(x.amount)}</b></span>)}
-    </div>
-    {sim.warnings.length > 0 && <ul className="tr-warnings">{sim.warnings.map((w, i) => <li key={i}>{HOURS[w.slot]}: {w.text}</li>)}</ul>}
+    <details className="tr-daysum">
+      <summary>Resumo do dia{sim.xp.length ? ` · ${sim.xp.length} ${sim.xp.length > 1 ? 'ganhos' : 'ganho'} de XP` : ''}</summary>
+      <div className="tr-summary">
+        <span className="mk-chip">Estamina do dia <b>{signed(sim.totalStamina)}</b></span>
+        <span className="mk-chip">Mana do dia <b>{signed(sim.totalMana)}</b></span>
+        {sim.xp.map(x => <span key={`${x.kind}${x.name}${x.modality}`} className="mk-chip">XP {label(x.kind, x.name)} ({KIND_LABEL[x.kind]}, {MODALITY_LABEL[x.modality].toLowerCase()}) <b>+{fmt(x.amount)}</b></span>)}
+      </div>
+    </details>
+    {sim.warnings.length > 0 && <details className="tr-warnings">
+      <summary>{sim.warnings.length} {sim.warnings.length > 1 ? 'avisos' : 'aviso'} nesta rotina</summary>
+      <ul>{sim.warnings.map((w, i) => <li key={i}>{HOURS[w.slot]}: {w.text}</li>)}</ul>
+    </details>}
     <p className="muted tr-day-note">{describeDay()}</p>
 
-    <RoutineBoard data={data} sim={sim} stats={stats} canEdit={canEdit} storageKey={storageKey} onRow={onRow} onClearAll={onClearAll} />
+    {canEdit && <div ref={builderRef} className="rb-builder-anchor"><ActionBuilder saved={saved} persist={persist} stats={stats} setBrush={setBrush} open={open} onToggle={setBuilderOpen} /></div>}
+    <RoutineBoard data={data} sim={sim} stats={stats} canEdit={canEdit} brushRow={brushRow} onRow={onRow} onClearAll={onClearAll} />
     <Rules stats={stats} />
-  </>;
+  </div>;
 }
