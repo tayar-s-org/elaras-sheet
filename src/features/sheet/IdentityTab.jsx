@@ -3,7 +3,7 @@ import { Field, NumberField } from "../../ui/Field.jsx";
 import { stageForXP } from "../../catalogRules.js";
 import { MAX_MONEY } from "../../money.js";
 import TokenMaker from "../token/TokenMaker.jsx";
-import { uploadTokenImage, tokenUrl } from "../../lib/tokens.js";
+import { uploadTokenImage, tokenUrl, saveTokenArtwork } from "../../lib/tokens.js";
 
 /* eslint-disable-next-line no-unused-vars */
 export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage }) {
@@ -77,14 +77,19 @@ export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm
                   <b>Token do personagem</b>
                   <p className="muted">A imagem que representa você no tabuleiro da mesa. Crie com um retrato, forma e moldura.</p>
                   <div className="row token-row">
-                    <button type="button" className="outline" disabled={!userId} onClick={() => setMaker(true)}>{c.tokenImage ? "Refazer token" : "Criar token"}</button>
-                    {c.tokenImage && <button type="button" className="text-button danger" onClick={() => update("tokenImage", "")}>Remover</button>}
+                    <button type="button" className="outline" disabled={!userId} onClick={() => setMaker(true)}>{c.tokenImage ? "Editar token" : "Criar token"}</button>
+                    {c.tokenImage && <button type="button" className="text-button danger" onClick={() => setC(prev => ({ ...prev, tokenImage: "", tokenArtwork: undefined }))}>Remover</button>}
                   </div>
                   {!userId && <p className="muted">Entre na sua conta para salvar o token.</p>}
                 </div>
               </div>
-              {maker && <TokenMaker name={c.name} onClose={() => setMaker(false)}
-                onSave={async blob => { const path = await uploadTokenImage(userId, blob, c.tokenImage); update("tokenImage", path); setToast("Token salvo na ficha."); }} />}
+              {maker && <TokenMaker name={c.name} artwork={c.tokenArtwork} imagePath={c.tokenImage} onClose={() => setMaker(false)}
+                onSave={async (blob, extra) => {
+                  const tokenArtwork = await saveTokenArtwork(userId, extra.artwork);
+                  const tokenImage = await uploadTokenImage(userId, blob);
+                  setC(prev => ({ ...prev, tokenImage, tokenArtwork }));
+                  setToast("Token salvo na ficha.");
+                }} />}
               <div className="callout">
                 <b>As florestas de Sylvargan</b>
                 <p>

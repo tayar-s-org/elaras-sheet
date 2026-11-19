@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { cleanCreatureSheet, tokenArtwork } from './tokenArtwork.js';
+import { validateCharacter, newCharacter } from './rules.js';
 import { MAX_HP, parseHp, newCreatureMeta, creatureOf, metaWithHp, metaWithMaxHp, hpTone, hpLabel, uniqueName, metaForCopy } from './creature.js';
 
 const token = (hp, maxHp, extra = {}) => ({ id: 't', meta: { creature: true, hp, maxHp, ...extra } });
@@ -100,4 +102,24 @@ test('a cópia de uma criatura volta com a vida cheia e mantém a vida oculta', 
   assert.deepEqual(metaForCopy(token(5, 30)), { creature: true, hp: 30, maxHp: 30 });
   assert.deepEqual(metaForCopy(token(0, 12, { hideHp: true })), { creature: true, hp: 12, maxHp: 12, hideHp: true });
   assert.deepEqual(metaForCopy({ meta: { creature: true, noHp: true } }), { creature: true, noHp: true });
+});
+
+
+test('ficha de inimigo aceita preenchimento parcial e usa a validação de dados da sala', () => {
+  const sheet = cleanCreatureSheet({ attributes: { Força: '1d8+2' }, attacks: [{ name: 'Mordida', damage: '2d6!' }] });
+  assert.equal(sheet.attributes.Força, '1d8+2');
+  assert.deepEqual(sheet.attacks, [{ name: 'Mordida', attack: '', damage: '2d6!' }]);
+  assert.equal(cleanCreatureSheet({}), null);
+  assert.throws(() => cleanCreatureSheet({ skills: [{ name: 'Lutar', formula: '3d13' }] }), /d13/);
+});
+
+test('a ficha do jogador preserva a origem privada e a aparência sem depender do PNG final', () => {
+  const folder = '11111111-1111-4111-8111-111111111111';
+  const file = '22222222-2222-4222-8222-222222222222';
+  const sourcePath = `${folder}/${file}`;
+  const art = { sourcePath, design: { shape: 'shield', bg: '#654321', frame: 'custom', frameColor: '#123456', zoom: 1.8, x: 0.2 } };
+  const restored = validateCharacter({ ...newCharacter(), tokenImage: `${sourcePath}.png`, tokenArtwork: art });
+  assert.deepEqual(restored.tokenArtwork, tokenArtwork(art));
+  assert.equal(restored.tokenArtwork.design.frameColor, '#123456');
+  assert.equal(validateCharacter({ ...restored, tokenImage: '' }).tokenArtwork, undefined);
 });

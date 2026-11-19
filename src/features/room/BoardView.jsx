@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { updateToken, removeToken, addToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
-import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
+import { updateToken, removeToken, addToken, loadCreatureDetails, saveCreatureToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
+import { uploadTokenImage, tokenUrl, saveTokenArtwork } from '../../lib/tokens.js';
 import { setCharacterTokenImage } from '../../lib/cloud.js';
 import { loadPresets, savePreset } from '../../lib/presets.js';
 import TokenMaker from '../token/TokenMaker.jsx';
@@ -10,6 +10,7 @@ import SoundBar from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
+import CreatureSheetPeek from './CreatureSheetPeek.jsx';
 import { creatureOf, uniqueName, metaForCopy, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import { displayName, imageVisible, isNameHidden, effectsOf, addEffect, removeEffect, effectBadges } from '../../tokenState.js';
 import SheetPeek from './SheetPeek.jsx';
@@ -52,6 +53,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const [selected, setSelected] = useState(null);
   const [movingToken, setMovingToken] = useState(false);
   const [moveNotice, setMoveNotice] = useState('');
+  const [creatureRevision, setCreatureRevision] = useState(0);
   const [maker, setMaker] = useState(null); // { token } para um token existente, { token: null } para o meu token ainda sem lugar
   const [tokenOverride, setTokenOverride] = useState({}); // ficha -> imagem recém-salva, até a leitura periódica das fichas trazer a nova
   const [busy, setBusy] = useState(false);
@@ -246,7 +248,11 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const pad = useSoundpad(room, tableId, isGm);
   const myToken = myCharacter ? tokens.find(t => t.character_id === myCharacter) : null;
   // Token de personagem: a imagem é a da ficha (sempre sincronizada); a gravada no token só vale para tokens antigos, de ficha sem imagem.
-  const sheetImage = characterId => (characterId ? tokenOverride[characterId] ?? characters[characterId]?.data?.tokenImage : '') || '';
+  const newerArtwork = characterId => {
+    const cached = tokenOverride[characterId];
+    return cached && cached.revision > (characters[characterId]?.revision || 0) ? cached : null;
+  };
+  const sheetImage = characterId => (characterId ? newerArtwork(characterId)?.path ?? characters[characterId]?.data?.tokenImage : '') || '';
   const imageOf = t => tokenUrl(sheetImage(t.character_id) || t.image_path);
   const place = () => ({ x: (board?.width || 2000) / 2 + (tokens.length % 5) * 20, y: (board?.height || 1400) / 2 + (tokens.length % 5) * 20 });
   const addMine = async imagePath => {
@@ -273,20 +279,33 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     if (effects.length !== effectsOf(token).length) patchCreature(token, { effects });
   };
   const removeTokenEffect = (token, id) => patchCreature(token, { effects: removeEffect(token.effects, id) });
-  // Mestre: cria uma criatura (nome, foto e vida; moldura e cor unicas) ou troca imagem/nome/vida de uma existente.
+  const editCreature = async token => {
+    try {
+      const details = await loadCreatureDetails(token.id);
+      setMasterOpen(false);
+      setMaker({ creature: true, token, details });
+    } catch (err) { setError(err.message); }
+  };
+
   const saveCreature = async (blob, extra) => {
-    const target = maker?.token;
-    // Sem apagar a imagem anterior: ela pode estar em uso por uma predefinição ou outro token.
-    const path = await uploadTokenImage(me, blob, '');
-    if (target) {
-      const patch = { name: extra.name, image_path: path, meta: metaWithHideHp({ meta: metaWithMaxHp(target, extra.hp) }, extra.hideHp), name_hidden: Boolean(extra.hideName) };
-      await updateToken(target.id, patch);
-      local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, ...patch } : t)));
-    } else {
-      const t = await addToken(board, { kind: 'npc', name: extra.name, color: CREATURE_COLOR, size: 1, image_path: path, meta: newCreatureMeta(extra.hp, extra.hideHp), name_hidden: Boolean(extra.hideName), ...place() });
-      putToken(t);
-      setSelected(t.id);
-    }
+    const editing = maker?.token;
+    const target = editing && tokens.find(t => t.id === editing.id);
+    if (editing && !target) throw new Error('Esta criatura não está mais no tabuleiro.');
+    const artwork = await saveTokenArtwork(me, extra.artwork);
+    const image_path = await uploadTokenImage(me, blob);
+    const position = target || place();
+    const half = tokenHalf({ size: extra.size });
+    const meta = target && extra.hp !== null
+      ? metaWithHideHp({ meta: metaWithMaxHp(target, extra.hp) }, extra.hideHp)
+      : newCreatureMeta(extra.hp, extra.hideHp);
+    const next = await saveCreatureToken(board, target?.id || null, {
+      name: extra.name, image_path, size: extra.size, meta, name_hidden: extra.hideName,
+      color: CREATURE_COLOR,
+      ...(!target || target.size !== extra.size ? { x: keepIn(position.x, half, W), y: keepIn(position.y, half, H) } : {}),
+    }, { artwork, sheet: extra.sheet });
+    local.setTokens(prev => prev.some(t => t.id === next.id) ? prev.map(t => t.id === next.id ? next : t) : [...prev, next]);
+    setCreatureRevision(rev => rev + 1);
+    setSelected(next.id);
   };
   const adjustHp = async (token, delta) => {
     const c = creatureOf(token);
@@ -297,16 +316,22 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   };
   // Mestre: guarda a criatura so como predefinicao da mesa (nao poe no mapa). Devolve o nome salvo.
   const saveCreaturePreset = async (blob, extra) => {
-    const path = await uploadTokenImage(me, blob, '');
-    const taken = (await loadPresets(board.table_id)).map(p => p.name);
-    const p = await savePreset(board.table_id, { name: uniqueName(extra.name, taken), image_path: path, max_hp: extra.hp, size: 1 });
+    const artwork = await saveTokenArtwork(me, extra.artwork);
+    const image_path = await uploadTokenImage(me, blob);
+    const previous = maker?.preset;
+    const taken = (await loadPresets(board.table_id)).filter(p => p.id !== previous?.id).map(p => p.name);
+    const p = await savePreset(board.table_id, {
+      name: uniqueName(extra.name, taken), image_path, max_hp: extra.hp, size: extra.size,
+      details: { artwork, sheet: extra.sheet, hideHp: extra.hideHp, hideName: extra.hideName },
+    }, previous?.id);
     return p.name;
   };
   // Duplica a criatura (so o mestre): mesmo nome (com numero), foto, vida cheia e nome oculto; efeitos nao vao junto. Fica na celula ao lado.
   const duplicateCreature = async token => {
     const spot = { x: keepIn(token.x + gsize, tokenHalf(token), W), y: keepIn(token.y, tokenHalf(token), H) };
     try {
-      const t = await addToken(board, { kind: 'npc', name: uniqueName(token.name, tokens.map(x => x.name)), color: token.color, size: token.size, image_path: token.image_path || null, meta: metaForCopy(token), name_hidden: isNameHidden(token), effects: [], ...spot });
+      const details = await loadCreatureDetails(token.id);
+      const t = await saveCreatureToken(board, null, { name: uniqueName(token.name, tokens.map(x => x.name)), color: token.color, size: token.size, image_path: token.image_path || null, meta: metaForCopy(token), name_hidden: isNameHidden(token), ...spot }, details);
       putToken(t);
       setSelected(t.id);
     } catch (err) { setError(err.message); }
@@ -322,20 +347,19 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   };
   // Envia a imagem do token; atualiza o token existente ou, se ainda nao ha token do jogador, cria um.
   const saveTokenImage = async (blob, extra) => {
+    if (maker?.preset) return saveCreaturePreset(blob, extra);
     if (maker?.creature) return saveCreature(blob, extra);
     const target = maker?.token;
     // Token do próprio jogador: a imagem vai para a ficha (e o token a acompanha); o token não guarda imagem própria.
     if (myCharacter && (!target || target.character_id === myCharacter)) {
-      const previous = characters[myCharacter]?.data?.tokenImage || '';
-      const path = await uploadTokenImage(me, blob, previous.startsWith(`${me}/`) ? previous : '');
-      await setCharacterTokenImage(myCharacter, path);
-      setTokenOverride(prev => ({ ...prev, [myCharacter]: path }));
-      if (target) {
-        if (target.image_path) { await updateToken(target.id, { image_path: null }); local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, image_path: null } : t))); }
-      } else await addMine(null);
+      const artwork = await saveTokenArtwork(me, extra.artwork);
+      const path = await uploadTokenImage(me, blob);
+      const saved = await setCharacterTokenImage(myCharacter, path, artwork);
+      setTokenOverride(prev => ({ ...prev, [myCharacter]: { path, artwork, revision: saved.revision } }));
+      if (!target) await addMine(null);
       return;
     }
-    const path = await uploadTokenImage(me, blob, target?.image_path && target.image_path.startsWith(`${me}/`) ? target.image_path : '');
+    const path = await uploadTokenImage(me, blob);
     if (target) {
       await updateToken(target.id, { image_path: path });
       local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, image_path: path } : t)));
@@ -403,7 +427,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       {!closed && (myCharacter || isGm) && <div className="toolbar-end">
         {myCharacter && <div role="group" aria-label="Meu token" className="tabs-row">
           {!myToken && <button className="primary" disabled={busy} onClick={placeMine}>Colocar meu token</button>}
-          <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken ? 'Trocar imagem do token' : 'Criar token'}</button>
+          <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken || sheetImage(myCharacter) ? 'Editar token' : 'Criar token'}</button>
         </div>}
         {isGm && <div role="group" aria-label="Mestre" className="tabs-row">
           <button type="button" className="outline master-button" onClick={() => setMasterOpen(true)}>Módulo do mestre</button>
@@ -484,7 +508,10 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     </svg>
     {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek aptitude={selectedAptitude} data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
     {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)}
-      onDuplicate={isGm ? () => duplicateCreature(sel) : undefined} onToggleName={isGm ? hide => toggleName(sel, hide) : undefined} onAddEffect={input => addTokenEffect(sel, input)} onRemoveEffect={id => removeTokenEffect(sel, id)} />}
+      onDuplicate={isGm ? () => duplicateCreature(sel) : undefined} onToggleName={isGm ? hide => toggleName(sel, hide) : undefined} onAddEffect={input => addTokenEffect(sel, input)} onRemoveEffect={id => removeTokenEffect(sel, id)}>
+      {isGm && <CreatureSheetPeek key={sel.id} token={sel} tableId={tableId} room={room} closed={closed}
+        revision={creatureRevision} onEdit={() => editCreature(sel)} />}
+    </CreaturePeek>}
     <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>
     {logSlot}
@@ -493,9 +520,27 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     {isGm && masterOpen && <MasterModule board={board} tokens={tokens} marks={marks} members={members} characters={characters}
       selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} onClose={() => setMasterOpen(false)}
       onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
-      onEditImage={t => { setMasterOpen(false); setMaker({ token: t, creature: Boolean(creatureOf(t)) }); }} />}
-    {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
-      creature={maker.creature ? { name: maker.token?.name || '', hp: creatureOf(maker.token)?.noHp ? undefined : creatureOf(maker.token)?.maxHp, hideHp: Boolean(creatureOf(maker.token)?.hideHp), hideName: isNameHidden(maker.token), editing: Boolean(maker.token) } : undefined}
-      onSave={saveTokenImage} onSavePreset={maker.creature && !maker.token ? saveCreaturePreset : undefined} onClose={() => setMaker(null)} />}
+      onEditPreset={preset => { setMasterOpen(false); setMaker({ creature: true, preset, details: preset.details }); }}
+      onEditImage={t => {
+        if (creatureOf(t)) editCreature(t);
+        else { setMasterOpen(false); setMaker({ token: t }); }
+      }} />}
+    {maker && <TokenMaker name={maker.preset?.name || maker.token?.name || characters[myCharacter]?.name || ''}
+      saveLabel={maker.preset ? 'Salvar predefinição' : maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
+      imagePath={maker.creature ? maker.preset?.image_path || maker.token?.image_path
+        : maker.token && maker.token.character_id !== myCharacter ? maker.token.image_path : sheetImage(myCharacter) || maker.token?.image_path}
+      artwork={maker.creature ? maker.details?.artwork
+        : !maker.token || maker.token.character_id === myCharacter ? newerArtwork(myCharacter)?.artwork || characters[myCharacter]?.data?.tokenArtwork : undefined}
+      creature={maker.creature ? {
+        name: maker.preset?.name || maker.token?.name || '', size: maker.preset?.size || maker.token?.size,
+        hp: maker.preset?.max_hp || (creatureOf(maker.token)?.noHp ? undefined : creatureOf(maker.token)?.maxHp),
+        noHp: Boolean(creatureOf(maker.token)?.noHp), sheet: maker.details?.sheet,
+        hideHp: maker.preset ? maker.details?.hideHp : Boolean(creatureOf(maker.token)?.hideHp),
+        hideName: maker.preset ? maker.details?.hideName : isNameHidden(maker.token),
+        editing: Boolean(maker.token || maker.preset),
+      } : undefined}
+      onSave={saveTokenImage}
+      onSavePreset={maker.creature && !maker.preset && !creatureOf(maker.token)?.noHp ? saveCreaturePreset : undefined}
+      onClose={() => setMaker(null)} />}
   </div>;
 }

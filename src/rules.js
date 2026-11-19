@@ -1,3 +1,4 @@
+import { tokenArtwork } from './tokenArtwork.js';
 import { racialEffects } from "./templates.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
 import { inventoryEffects, itemById } from "./market/items.js";
@@ -295,6 +296,7 @@ export function validateCharacter(raw) {
     return [{ id: item.id, qty: integer(entry.qty, 1, 99, 1), equipped }];
   });
   c.tokenImage = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(raw.tokenImage) ? raw.tokenImage : "";
+  if (c.tokenImage && raw.tokenArtwork) c.tokenArtwork = tokenArtwork(raw.tokenArtwork);
   c.age = string(raw.age, 30);
   c.raceId = ["Androide","Anão","Atlante","Aviano","Elfo","Humano","Meio-elfo","Meio-orc","Pequenino","Rakashano","Sáurio"].includes(raw.raceId) ? raw.raceId : "";
   c.raceChoice = raw.raceChoice === "Vantagem" ? "Vantagem" : "Agilidade";

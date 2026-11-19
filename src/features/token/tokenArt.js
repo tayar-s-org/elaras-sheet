@@ -71,7 +71,8 @@ function shapePath(ctx, shape, cx, cy, r) {
   addShape(ctx, shape, cx, cy, r);
 }
 
-function frameStyle(ctx, frame, size) {
+function frameStyle(ctx, frame, size, color) {
+  if (frame === 'custom') return color;
   const f = FRAMES.find(x => x.id === frame) || FRAMES[0];
   if (!f.colors) return null;
   const g = ctx.createLinearGradient(0, 0, size, size);
@@ -97,14 +98,17 @@ export function drawToken(canvas, size, design, image) {
 
   // Fundo + retrato recortados na forma interna.
   ctx.save();
-  shapePath(ctx, shape, c, c, inner);
-  ctx.clip();
-  ctx.fillStyle = d.bg;
-  ctx.fillRect(0, 0, size, size);
+  if (!d.legacyBase) {
+    shapePath(ctx, shape, c, c, inner);
+    ctx.clip();
+    ctx.fillStyle = d.bg;
+    ctx.fillRect(0, 0, size, size);
+  }
   if (image) {
     ctx.save();
     const iw = image.naturalWidth || image.width, ih = image.naturalHeight || image.height;
-    const cover = Math.max((inner * 2) / iw, (inner * 2) / ih) * d.zoom;
+    const diameter = d.legacyBase ? size : inner * 2;
+    const cover = Math.max(diameter / iw, diameter / ih) * d.zoom;
     ctx.translate(c + d.x * size, c + d.y * size);
     ctx.rotate((d.rotate * Math.PI) / 180);
     ctx.scale(d.flip ? -1 : 1, 1);
@@ -117,7 +121,7 @@ export function drawToken(canvas, size, design, image) {
     ctx.textBaseline = 'middle';
     ctx.fillText(d.initials.slice(0, 2).toUpperCase(), c, c + inner * 0.06);
   }
-  if (d.shine) {
+  if (d.shine && !d.legacyBase) {
     const g = ctx.createRadialGradient(c - inner * 0.35, c - inner * 0.45, inner * 0.1, c, c, inner * 1.1);
     g.addColorStop(0, 'rgba(255,255,255,0.22)');
     g.addColorStop(0.45, 'rgba(255,255,255,0)');
@@ -127,6 +131,8 @@ export function drawToken(canvas, size, design, image) {
   }
   ctx.restore();
 
+  if (d.legacyBase) return;
+
   // Moldura em imagem: desenhada por cima do retrato, ocupando o token inteiro.
   if (imgFrame) {
     ctx.drawImage(imgFrame, 0, 0, size, size);
@@ -134,7 +140,7 @@ export function drawToken(canvas, size, design, image) {
   }
 
   // Moldura: anel entre a forma externa e a interna (regra even-odd).
-  const stroke = frameStyle(ctx, d.frame, size);
+  const stroke = frameStyle(ctx, d.frame, size, d.frameColor);
   ctx.save();
   if (stroke) {
     ctx.fillStyle = stroke;

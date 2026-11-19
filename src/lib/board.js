@@ -147,3 +147,17 @@ export async function gatherTokens(board, tokens) {
 export function snapToGrid(value, size) {
   return Math.round(value / size - 0.5) * size + size / 2;
 }
+
+export async function loadCreatureDetails(id) {
+  const { data, error } = await supabase.from('creature_token_details').select('details').eq('token_id', id).maybeSingle();
+  fail(error);
+  return data?.details || {};
+}
+
+export async function saveCreatureToken(board, targetId, token, details) {
+  const { data, error } = await supabase.rpc('save_creature_token', {
+    p_board: board.id, p_token: targetId, p_data: token, p_details: details,
+  }).single();
+  fail(error);
+  return data.name_hidden ? { ...data, name: token.name, image_path: token.image_path } : data;
+}

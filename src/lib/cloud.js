@@ -45,10 +45,10 @@ export async function updateCharacter(id, revision, character) {
   return { id: data[0].id, revision: data[0].revision, character: c };
 }
 // A imagem do token mora na ficha (a ficha manda no token): grava o caminho nela. Tenta de novo uma vez se a ficha mudou no meio.
-export async function setCharacterTokenImage(id, path) {
+export async function setCharacterTokenImage(id, path, artwork) {
   for (let attempt = 0; ; attempt += 1) {
     const { revision, character } = await getCharacter(id);
-    try { return await updateCharacter(id, revision, { ...character, tokenImage: path }); }
+    try { return await updateCharacter(id, revision, { ...character, tokenImage: path, tokenArtwork: artwork }); }
     catch (e) { if (!(e instanceof ConflictError) || attempt >= 1) throw e; }
   }
 }

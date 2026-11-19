@@ -1,7 +1,7 @@
 // Criaturas do mestre no tabuleiro: token com vida. Ficam na coluna `meta` do token: { creature: true, hp, maxHp }.
 // Criatura com "vida oculta" ({ ..., hideHp: true }) tem vida normal para o mestre; os jogadores não veem barra nem números.
 // (Criaturas antigas "sem vida" — { creature: true, noHp: true } — continuam sem barra nem controle até o mestre dar uma vida.)
-// Moldura e cor são únicas para todas as criaturas (o mestre só escolhe nome, foto e vida).
+// A moldura e as cores abaixo são os padrões do editor de criaturas.
 
 export const CREATURE_FRAME = 'blood';
 export const CREATURE_COLOR = '#b3382c';

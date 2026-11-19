@@ -6,7 +6,7 @@ import './master.css';
 
 // Painel ao clicar numa criatura: barra de vida para todos; o mestre vê os números e ajusta a vida com − e +.
 // Nome oculto: jogadores veem "?"; o mestre vê o nome real e liga/desliga a opção. Efeitos: todos veem, o mestre adiciona e remove.
-export default function CreaturePeek({ token, isGm, onAdjust, onRemove, onClose, onDuplicate, onToggleName, onAddEffect, onRemoveEffect, busy }) {
+export default function CreaturePeek({ token, isGm, onAdjust, onRemove, onClose, onDuplicate, onToggleName, onAddEffect, onRemoveEffect, busy, children }) {
   const c = creatureOf(token);
   const [text, setText] = useState('1');
   if (!c) return null;
@@ -49,5 +49,6 @@ export default function CreaturePeek({ token, isGm, onAdjust, onRemove, onClose,
         <EffectEditor effects={effects} disabled={busy} onAdd={onAddEffect} onRemove={onRemoveEffect} />
       </div>
     </div>}
+    {children}
   </aside>;
 }

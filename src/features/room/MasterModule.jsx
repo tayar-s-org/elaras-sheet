@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../../ui/Modal.jsx';
-import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
+import { updateBoard, uploadMap, removeMap, addToken, loadCreatureDetails, saveCreatureToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
 import { creatureOf, metaWithHideHp, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
 import { loadPresets, savePreset, deletePreset } from '../../lib/presets.js';
 import { tokenUrl } from '../../lib/tokens.js';
@@ -10,7 +10,7 @@ const COLORS = ['#7a4dff', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
 
 // Módulo do mestre (janela aberta pelo botão ao lado de "Trocar imagem do token"): mapa, grade, criaturas,
 // token selecionado e marcadores. Substitui o antigo bloco "Ferramentas do mestre" que ficava abaixo do registro.
-export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, setError, onClose, onCreateCreature, onEditImage }) {
+export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, setError, onClose, onCreateCreature, onEditImage, onEditPreset }) {
   const fileRef = useRef(null);
   const [presets, setPresets] = useState(null);
   const [presetNote, setPresetNote] = useState('');
@@ -110,10 +110,11 @@ export default function MasterModule({ board, tokens, marks, members, characters
             {p.image_path ? <img src={tokenUrl(p.image_path)} alt="" width="36" height="36" /> : <span className="preset-dot" aria-hidden="true" />}
             <span className="preset-name"><strong>{p.name}</strong> <small className="muted">vida {p.max_hp}</small></span>
             <button type="button" className="outline" disabled={busy} onClick={() => run(async () => {
-              const t = await addToken(board, { kind: 'npc', name: uniqueName(p.name, nameTaken()), color: CREATURE_COLOR, size: p.size || 1, image_path: p.image_path, meta: newCreatureMeta(p.max_hp), ...placeAt(tokens.length) });
+              const t = await saveCreatureToken(board, null, { name: uniqueName(p.name, nameTaken()), color: CREATURE_COLOR, size: p.size || 1, image_path: p.image_path, meta: newCreatureMeta(p.max_hp, p.details?.hideHp), name_hidden: Boolean(p.details?.hideName), ...placeAt(tokens.length) }, p.details || {});
               local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev : [...prev, t]));
               onSelect(t.id);
             })}>Colocar no mapa</button>
+            <button type="button" className="outline" disabled={busy} onClick={() => onEditPreset(p)}>Editar</button>
             <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm(`Apagar a predefinição ${p.name}?`) && run(async () => { await deletePreset(p.id); setPresets(prev => prev.filter(x => x.id !== p.id)); })}>Apagar</button>
           </li>)}
         </ul>
@@ -148,7 +149,12 @@ export default function MasterModule({ board, tokens, marks, members, characters
               : <button type="button" className="outline" disabled={busy} onClick={() => onEditImage(selected)}>
                 {creature ? 'Trocar imagem da criatura' : selected.image_path ? 'Trocar imagem' : 'Criar imagem do token'}</button>}
             {creature && !creature.noHp && <button type="button" className="outline" disabled={busy || !presets} onClick={() => run(async () => {
-              const p = await savePreset(board.table_id, { name: uniqueName(selected.name, (presets || []).map(x => x.name)), image_path: selected.image_path, max_hp: creature.maxHp, size: selected.size });
+              const details = await loadCreatureDetails(selected.id);
+              const p = await savePreset(board.table_id, {
+                name: uniqueName(selected.name, (presets || []).map(x => x.name)), image_path: selected.image_path,
+                max_hp: creature.maxHp, size: selected.size,
+                details: { ...details, hideHp: Boolean(creature.hideHp), hideName: Boolean(selected.name_hidden) },
+              });
               setPresets(prev => [...(prev || []), p]);
             })}>Salvar como predefinição</button>}
             {!creature && !selected.character_id && selected.image_path && <button type="button" className="text-button" disabled={busy} onClick={() => patchToken(selected, { image_path: null })}>Tirar imagem</button>}

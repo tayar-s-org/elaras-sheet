@@ -16,3 +16,19 @@ export function tokenUrl(path) {
   if (!path || !supabase) return null;
   return supabase.storage.from('tokens').getPublicUrl(path).data.publicUrl;
 }
+
+export async function tokenSourceUrl(path) {
+  const { data, error } = await supabase.storage.from('token-sources').createSignedUrl(path, 600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function saveTokenArtwork(userId, { design, sourcePath, legacyPath, sourceFile }) {
+  if (sourceFile) {
+    sourcePath = `${userId}/${crypto.randomUUID()}`;
+    const { error } = await supabase.storage.from('token-sources').upload(sourcePath, sourceFile, { contentType: sourceFile.type });
+    if (error) throw error;
+    legacyPath = '';
+  }
+  return { design, sourcePath, legacyPath };
+}

@@ -41,7 +41,7 @@ export async function recentStateLog(tableId, limit = 100) {
 }
 export async function loadCharacters(ids) {
   if (!ids.length) return {};
-  const { data, error } = await supabase.from('characters').select('id,name,data').in('id', ids);
+  const { data, error } = await supabase.from('characters').select('id,name,data,revision').in('id', ids);
   fail(error);
   return Object.fromEntries(data.map(r => [r.id, r]));
 }

@@ -16,7 +16,14 @@
 .token-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .token-swatches input[type="color"] { width: 36px; height: 32px; padding: 0; border: 0; background: none; }
 .token-row { justify-content: flex-start; }
-.token-actions { margin-top: 18px; }
+.token-actions {
+  position: sticky;
+  bottom: -28px;
+  margin: 18px -28px -28px;
+  padding: 12px 28px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
 .token-actions-right { display: flex; gap: 10px; }
 .token-error { color: var(--danger); margin: 12px 0 0; }
 .token-maker .check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
@@ -28,3 +35,19 @@
 @media (max-width: 720px) {
   .token-maker-body { grid-template-columns: 1fr; }
 }
+
+.token-creature > label:first-child, .token-creature > .check { grid-column: 1 / -1; }
+.token-set[open] > summary { margin-bottom: 8px; }
+@media (max-width: 720px) {
+  .token-drop canvas { max-width: 190px; }
+}
+@media (min-width: 721px) {
+  .token-stage { position: sticky; top: 0; align-self: start; }
+}
+.token-color { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.token-color input[type="color"] { width: 48px; min-height: 38px; padding: 3px; }
+.token-color input:not([type]) { width: 8ch; }
+.token-actions-right { flex-wrap: wrap; }
+.token-set summary { cursor: pointer; }
+
+.creature-sheet-notes { white-space: pre-wrap; overflow-wrap: anywhere; }

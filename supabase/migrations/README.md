@@ -29,3 +29,5 @@ Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replac
   recebida, então entram mesmo com o app do jogador fechado. O app do jogador (`useRewardSync` + `sheetRebase.js`) só atualiza a ficha aberta.
   **Publique o app novo antes de rodar**, senão um app antigo aberto acusa "ficha mudou em outro lugar". Pode ser repetida.
 - `0036_xp_remove.sql`: o mestre pode remover XP (valor negativo em `grant_xp`; a ficha nunca fica abaixo de 0). Depende da 0035; pode ser repetida.
+
+- `0037_creature_editor.sql`: adiciona fichas rápidas e aparência editável a criaturas e predefinições. O formato privado dos tokens depende da 0034. Aplique antes de publicar o frontend que usa o novo editor. Tokens antigos continuam usando o PNG existente até serem editados.
