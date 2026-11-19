@@ -192,3 +192,11 @@
   .training-modal .mod-editor-head { flex-wrap: wrap; }
   .tr-clock { order: 3; width: 100%; text-align: center; }
 }
+
+/* Nome de cada jogador: maior e com uma cor propria */
+.tabs-row button.tr-who { font-size: 1.15rem; font-weight: 700; padding: 8px 18px; color: var(--who); border: 2px solid var(--who); background: transparent; }
+.tabs-row button.tr-who:hover { background: color-mix(in srgb, var(--who) 18%, transparent); }
+.tabs-row button.tr-who.on { background: var(--who); color: #16131f; box-shadow: 0 0 0 3px color-mix(in srgb, var(--who) 30%, transparent); }
+.tr-who .tr-badge { font-size: .7rem; vertical-align: middle; }
+.tr-owner { font-size: .9rem; }
+.tr-owner::first-line { color: var(--who); font-weight: 700; }

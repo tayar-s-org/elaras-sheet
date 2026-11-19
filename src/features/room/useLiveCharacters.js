@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { loadCharacters } from '../../lib/room.js';
 
-const POLL_MS = 10000;
+const POLL_MS = 5000;
 
 // Mantém atualizadas as fichas dos jogadores vinculados à mesa (dinheiro, XP, dados...). Elas pertencem aos
 // jogadores e não têm tempo real próprio, então: relê a cada 10 s, ao voltar o foco da aba e logo depois que
-// um dinheiro é recolhido (o jogador salva a ficha ~1 s depois de receber). Devolve as fichas da sala já mescladas.
+// um dinheiro é recolhido (o jogador salva a ficha ~1 s depois de receber) ou o mestre concede XP/dinheiro (a nuvem muda na hora). Devolve as fichas da sala já mescladas.
 export function useLiveCharacters(tableId, members, base, enabled) {
   const [fresh, setFresh] = useState({});
   const ids = useMemo(
@@ -33,6 +33,8 @@ export function useLiveCharacters(tableId, members, base, enabled) {
     // Dinheiro recolhido pelo jogador (UPDATE em money_awards): relê depois que ele salvar a ficha.
     const channel = supabase.channel(`livechars:${tableId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'money_awards', filter: `table_id=eq.${tableId}` }, () => { later(2500); later(6000); })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'money_awards', filter: `table_id=eq.${tableId}` }, () => later(400))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'xp_awards', filter: `table_id=eq.${tableId}` }, () => later(400))
       .subscribe();
     return () => {
       alive = false;

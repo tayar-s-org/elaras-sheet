@@ -25,7 +25,7 @@ export default function SkillApprovals({ items, available, refresh, members, cha
   const card = (row, actions) => <article key={row.id} className="mk-item">
     <div className="mk-main">
       <h4>Perícia: {row.name}<span className={`ci-status ${row.status}`}>{SKILL_STATUS[row.status]}</span></h4>
-      <p className="mk-meta">{who(row)} · começa em d{row.die} ({skillPoints(row.die)} {skillPoints(row.die) === 1 ? 'ponto' : 'pontos'})</p>
+      <p className="mk-meta">{who(row)} · atributo {row.attribute || 'não informado'} · começa em d{row.die} ({skillPoints(row.die)} {skillPoints(row.die) === 1 ? 'ponto' : 'pontos'})</p>
       {row.gm_note && <p className="mk-notes"><b>Sua nota:</b> {row.gm_note}</p>}
       {actions}
     </div>

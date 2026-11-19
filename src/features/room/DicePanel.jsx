@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { ATTRIBUTES, SKILLS } from '../../rules.js';
 import { rollDice } from '../../lib/room.js';
 import { ROOM_DICE, parseFormula, traitSpec, describeRoll } from '../../diceRoll.js';
-import { calculate, validateCharacter } from '../../rules.js';
+import { rollableTraits, rollBonuses, modifierBonuses } from '../../rpg/sheetRoll.js';
 import './roompanels.css';
 
 const when = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -21,37 +20,35 @@ export function RollHistory({ rolls: all, hidden, members, me }) {
         </div>
         <div className="roll-total"><b>{d.total}</b>{d.outcome && <span className="roll-outcome">{d.outcome}</span>}</div>
         <div className="muted">{r.label ? `${r.label} · ` : ''}{d.title}</div>
-        <div className="roll-detail">{d.detail}</div>
+        <div className="roll-detail">{d.lines.map((line, i) => <span key={i} className="roll-step">{line}</span>)}</div>
       </li>;
     })}
   </ol>;
 }
 
-export default function DicePanel({ tableId, me, members, characters, onRolled, disabled, settings, onSettings }) {
+const signed = n => (n > 0 ? `+${n}` : `−${Math.abs(n)}`);
+
+export default function DicePanel({ tableId, me, members, characters, states, onRolled, disabled, settings, onSettings }) {
   const [formula, setFormula] = useState('1d20');
-  const [mode, setMode] = useState('normal');
   const [visibility, setVisibility] = useState('public');
   const [traitKey, setTraitKey] = useState('attribute:Agilidade');
   const [modifier, setModifier] = useState(0);
-  const [target, setTarget] = useState(4);
-  const [wild, setWild] = useState(true);
+  const [optionalIds, setOptionalIds] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const mine = members.find(m => m.user_id === me);
   const character = mine?.character_id ? characters[mine.character_id] : null;
-  // Perícias personalizadas aprovadas pelo mestre (guardam o dado em data.skills, que é onde o servidor lê para rolar).
-  const customSkillNames = (() => {
-    if (!character) return [];
-    try { return validateCharacter(character.data).customSkills.map(s => s.name); } catch { return []; }
+  // Só o que a ficha tem: atributos e perícias treinadas (inclusive as personalizadas aprovadas), com o dado que vale agora.
+  const traits = (() => {
+    if (!character) return null;
+    try { return rollableTraits(character.data, states?.[character.id]); } catch { return null; }
   })();
-  // Bonus dos itens equipados (customizados) para o atributo ou pericia escolhido; entra no modificador da rolagem.
-  const itemBonus = (() => {
-    if (!character) return 0;
-    try {
-      const [type, ...rest] = traitKey.split(':');
-      return calculate(validateCharacter(character.data)).inventory.rollBonus[type]?.[rest.join(':')] || 0;
-    } catch { return 0; }
-  })();
+  const all = traits ? [...traits.attributes, ...traits.skills, ...traits.customSkills] : [];
+  const trait = all.find(t => t.key === traitKey) || all[0] || null;
+  const bonuses = trait ? rollBonuses(trait, { optionalIds: optionalIds.filter(id => trait.optional.some(o => o.id === id)), manual: modifier }) : [];
+  const totalBonus = bonuses.reduce((n, b) => n + b.value, 0);
+  // O servidor soma o d12+N da ficha por conta própria; só o resto vai no modificador.
+  const sent = modifierBonuses(bonuses);
 
   async function run(spec, label = '', characterId = null) {
     setBusy(true);
@@ -60,12 +57,13 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
-  const rollFormula = text => { try { run(parseFormula(text, mode)); } catch (e) { setError(e.message); } };
+  const rollFormula = text => { try { run(parseFormula(text)); } catch (e) { setError(e.message); } };
   const rollTrait = () => {
-    const [type, ...rest] = traitKey.split(':');
-    const name = rest.join(':');
-    run(traitSpec({ type, name, wild, modifier: (Number(modifier) || 0) + itemBonus, target: Number(target) || 4 }), name, character.id);
+    if (!trait) return;
+    run(traitSpec({ type: trait.type, name: trait.name, modifier: sent.reduce((n, b) => n + b.value, 0), bonuses: sent }), trait.name, character.id);
   };
+  const toggleOptional = id => setOptionalIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  const option = t => `${t.name} · ${t.label}${t.autoBonus ? ` ${signed(t.autoBonus)}` : ''}`;
 
   const off = disabled || busy;
   return <div className="dice2">
@@ -75,34 +73,32 @@ export default function DicePanel({ tableId, me, members, characters, onRolled, 
         {ROOM_DICE.map(sides => <button key={sides} type="button" className="dice2-die" disabled={off} onClick={() => rollFormula(`1d${sides}`)}>d{sides}</button>)}
       </div>
       <form className="dice2-formula" onSubmit={e => { e.preventDefault(); rollFormula(formula); }}>
-        <input aria-label="Fórmula" value={formula} maxLength={80} onChange={e => setFormula(e.target.value)} placeholder="2d6+3, 1d20 vantagem" />
+        <input aria-label="Fórmula" value={formula} maxLength={80} onChange={e => setFormula(e.target.value)} placeholder="2d6+3, 1d8!" />
         <button className="primary" disabled={off}>Rolar</button>
       </form>
-      <div className="dice2-label"><span>Modo</span>
-        <div className="seg" role="group" aria-label="Modo">
-          {[['normal', 'Normal'], ['advantage', 'Vantagem'], ['disadvantage', 'Desvantagem']].map(([v, l]) => <button key={v} type="button" aria-pressed={mode === v} onClick={() => setMode(v)}>{l}</button>)}
-        </div></div>
     </section>
 
     <section className="dice2-section" aria-label="Rolar da ficha">
-      <h4 className="dice2-title">Rolar da ficha (Savage Worlds)</h4>
-      {!character ? <p className="muted">Vincule uma ficha sua na aba "Mesa" para rolar atributos e perícias.</p> : <>
+      <h4 className="dice2-title">Rolar da ficha</h4>
+      {!character ? <p className="muted">Vincule uma ficha sua na aba "Mesa" para rolar atributos e perícias.</p>
+        : !trait ? <p className="muted">Não consegui ler a ficha vinculada. Abra a ficha e confira se ela está salva.</p> : <>
         <div className="dice2-char">{character.name || 'Sem nome'}</div>
         <label className="dice2-label"><span>Atributo ou perícia</span>
-          <select value={traitKey} onChange={e => setTraitKey(e.target.value)}>
-            <optgroup label="Atributos">{ATTRIBUTES.map(a => <option key={a} value={`attribute:${a}`}>{a}</option>)}</optgroup>
-            <optgroup label="Perícias">{SKILLS.map(([name]) => <option key={name} value={`skill:${name}`}>{name}</option>)}</optgroup>
-            {customSkillNames.length > 0 && <optgroup label="Perícias personalizadas">{customSkillNames.map(name => <option key={name} value={`skill:${name}`}>{name}</option>)}</optgroup>}
+          <select value={trait.key} onChange={e => { setTraitKey(e.target.value); setOptionalIds([]); }}>
+            <optgroup label="Atributos">{traits.attributes.map(t => <option key={t.key} value={t.key}>{option(t)}</option>)}</optgroup>
+            {traits.skills.length > 0 && <optgroup label="Perícias">{traits.skills.map(t => <option key={t.key} value={t.key}>{option(t)}</option>)}</optgroup>}
+            {traits.customSkills.length > 0 && <optgroup label="Perícias personalizadas">{traits.customSkills.map(t => <option key={t.key} value={t.key}>{option(t)}</option>)}</optgroup>}
           </select></label>
-        <div className="dice2-row2">
-          <label className="dice2-label"><span>Modificador</span>
-            <input type="number" min="-20" max="20" value={modifier} onChange={e => setModifier(e.target.value)} />
-            {itemBonus !== 0 && <small className="dice2-item-bonus">Itens equipados: {itemBonus > 0 ? `+${itemBonus}` : `−${Math.abs(itemBonus)}`} (somado à rolagem)</small>}</label>
-          <label className="dice2-label"><span>Dificuldade</span>
-            <input type="number" min="2" max="30" value={target} onChange={e => setTarget(e.target.value)} /></label>
+        <div className="dice2-breakdown" aria-label={`Como ${trait.name} será rolado`}>
+          <div className="dice2-die-line"><span>Dado</span><b>{trait.label}</b></div>
+          {trait.stepped && <small className="dice2-incap">Incapacitação {traits.incapacitation.total}: o dado caiu de {trait.baseLabel} para {trait.currentLabel}.</small>}
+          {bonuses.map((b, i) => <div key={i} className="dice2-bonus-line"><span>{b.label}</span><b>{signed(b.value)}</b></div>)}
+          {!bonuses.length && <small className="muted">Sem bônus nem penalidades de itens, raça, vantagens, complicações ou evolução.</small>}
         </div>
-        <label className="check"><input type="checkbox" checked={wild} onChange={e => setWild(e.target.checked)} /> Dado selvagem (d6)</label>
-        <button type="button" className="primary dice2-roll-big" disabled={off} onClick={rollTrait}>Rolar {traitKey.split(':').slice(1).join(':')}</button>
+        {trait.optional.map(o => <label key={o.id} className="check"><input type="checkbox" checked={optionalIds.includes(o.id)} onChange={() => toggleOptional(o.id)} /> {o.label} ({signed(o.value)})</label>)}
+        <label className="dice2-label"><span>Modificador situacional</span>
+          <input type="number" min="-20" max="20" value={modifier} onChange={e => setModifier(e.target.value)} /></label>
+        <button type="button" className="primary dice2-roll-big" disabled={off} onClick={rollTrait}>Rolar {trait.name} ({trait.label}{totalBonus ? ` ${signed(totalBonus)}` : ''})</button>
       </>}
     </section>
 

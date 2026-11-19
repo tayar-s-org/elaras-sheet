@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { DICE, SKILLS } from "../../rules.js";
+import { DICE, SKILLS, ATTRIBUTES } from "../../rules.js";
 import { MAX_SKILL_NAME, MAX_CUSTOM_SKILLS, cleanSkillName, skillNameTaken, skillPoints } from "../../skills/custom.js";
 import { myMemberships } from "../../lib/tables.js";
 import { listMyCustomSkills, submitCustomSkill, deleteCustomSkill, SKILL_STATUS } from "../../lib/customSkills.js";
@@ -11,7 +11,7 @@ const FIXED = SKILLS.map(([name]) => name);
 export default function CustomSkillForm({ c, cloudId, tableId: sheetTable }) {
   const [tables, setTables] = useState(null);
   const [mine, setMine] = useState(undefined); // undefined carregando; null migration pendente
-  const [form, setForm] = useState({ name: "", die: 4, tableId: "" });
+  const [form, setForm] = useState({ name: "", die: 4, attribute: "", tableId: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const set = patch => setForm(f => ({ ...f, ...patch }));
@@ -34,6 +34,7 @@ export default function CustomSkillForm({ c, cloudId, tableId: sheetTable }) {
   const reason = !cloudId ? "Aguarde o salvamento automático da ficha na sua conta para enviar pedidos."
     : tables && !tables.length ? "Você precisa participar de uma mesa para pedir uma perícia ao mestre."
     : !name ? "Dê um nome à perícia."
+    : !form.attribute ? "Escolha o atributo ao qual a perícia pertence."
     : skillNameTaken(name, c, FIXED) ? "Esse nome já existe na sua ficha (perícia do livro ou personalizada)."
     : (c.customSkills || []).length >= MAX_CUSTOM_SKILLS ? `Você já tem ${MAX_CUSTOM_SKILLS} perícias personalizadas.`
     : pendingSame ? "Você já enviou um pedido com esse nome para esta mesa." : "";
@@ -44,8 +45,8 @@ export default function CustomSkillForm({ c, cloudId, tableId: sheetTable }) {
     setBusy(true);
     setMsg("");
     try {
-      await submitCustomSkill(form.tableId, cloudId, name, form.die);
-      setForm(f => ({ ...f, name: "" }));
+      await submitCustomSkill(form.tableId, cloudId, name, form.die, form.attribute);
+      setForm(f => ({ ...f, name: "", attribute: "" }));
       setMsg("Pedido enviado. Quando o mestre aprovar, a perícia aparece aqui, já com o dado que você escolheu.");
       await refresh();
     } catch (err) { setMsg(err.message); } finally { setBusy(false); }
@@ -55,10 +56,16 @@ export default function CustomSkillForm({ c, cloudId, tableId: sheetTable }) {
   }
 
   return <div className="ci">
-    <p className="muted">Precisa de uma perícia que não está no livro? Escolha o nome e o dado inicial e envie ao mestre. Se ele aprovar, a perícia entra na ficha e custa pontos como as outras (d4 custa 1, d6 custa 2, d8 custa 3, d10 custa 4 e d12 custa 5).</p>
+    <p className="muted">Precisa de uma perícia que não está no livro? Escolha o nome, o atributo e o dado inicial e envie ao mestre. Se ele aprovar, a perícia entra na ficha e custa pontos como as outras (d4 custa 1, d6 custa 2, d8 custa 3, d10 custa 4 e d12 custa 5).</p>
     <form className="ci-form" onSubmit={submit}>
       <label className="field"><span>Nome da perícia</span>
         <input maxLength={MAX_SKILL_NAME} value={form.name} onChange={e => set({ name: e.target.value })} placeholder="Ex.: Alquimia, Cartografia, Herbalismo…" /></label>
+      <label className="field"><span>Atributo da perícia</span>
+        <select value={form.attribute} onChange={e => set({ attribute: e.target.value })} required>
+          <option value="">Escolha o atributo…</option>
+          {ATTRIBUTES.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <small className="muted">No treino da rotina, cada hora rende 1 de XP na perícia e 0,5 de XP neste atributo.</small></label>
       <div className="field"><span>Dado inicial</span>
         <div className="die-picker" role="radiogroup" aria-label="Dado inicial da perícia">
           {DICE.map(v => <button key={v} type="button" role="radio" aria-checked={form.die === v} className={form.die === v ? "sel" : ""} onClick={() => set({ die: v })}>d{v}</button>)}
@@ -76,12 +83,12 @@ export default function CustomSkillForm({ c, cloudId, tableId: sheetTable }) {
 
     <h3>Meus pedidos de perícia</h3>
     {mine === undefined ? <p className="muted">Carregando…</p>
-      : mine === null ? <p className="callout">As perícias personalizadas ainda não estão disponíveis neste servidor. Falta rodar a migration <code>0027_custom_skills.sql</code> no Supabase.</p>
+      : mine === null ? <p className="callout">As perícias personalizadas ainda não estão disponíveis neste servidor. Falta rodar as migrations <code>0027_custom_skills.sql</code> e <code>0032_custom_skill_attribute.sql</code> no Supabase.</p>
         : !mine.length ? <p className="muted">Você ainda não pediu nenhuma perícia.</p>
           : <div className="mk-list">{mine.map(row => <article key={row.id} className="mk-item">
             <div className="mk-main">
               <h4>{row.name}<span className={`ci-status ${row.status}`}>{SKILL_STATUS[row.status]}</span></h4>
-              <p className="mk-meta">{row.tables?.name || "Mesa"} · d{row.die}</p>
+              <p className="mk-meta">{row.tables?.name || "Mesa"} · {row.attribute || "sem atributo"} · d{row.die}</p>
               {row.gm_note && <p className="mk-notes"><b>Mestre:</b> {row.gm_note}</p>}
             </div>
             {row.status === "pending" && <div className="mk-buy"><button type="button" className="text-button danger" onClick={() => cancel(row.id)}>Cancelar pedido</button></div>}

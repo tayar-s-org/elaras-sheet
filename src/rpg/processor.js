@@ -19,6 +19,8 @@ export function statsFromCharacter(data, trainedSpells = [], jobs = []) {
     conjurar: readDie(c, 'skill', 'Conjurar'),
     meditar: readDie(c, 'skill', 'Meditar'),
     skills: Object.keys(c.skills).filter(k => c.skills[k] > 0),
+    // Perícias personalizadas: nome -> atributo (treinam como as do livro: 1 de XP da perícia e 0,5 do atributo).
+    customAttrs: Object.fromEntries(c.customSkills.filter(s => s.attr).map(s => [s.name, s.attr])),
     spells: c.powers.map(p => ({ id: p.id, name: p.name })),
     trainedSpells,
     jobs: Object.fromEntries(jobs.map(j => [j.id, j])),

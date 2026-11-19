@@ -61,6 +61,13 @@ export function metaWithMaxHp(token, maxHp) {
   return { ...rest, creature: true, maxHp: max, hp: Math.min(c && !c.noHp ? c.hp : max, max) };
 }
 
+// Meta da cópia de uma criatura: mesma vida máxima (e vida oculta), mas com a vida cheia.
+export function metaForCopy(token) {
+  const c = creatureOf(token);
+  if (!c) return { ...(token?.meta || {}) };
+  return c.noHp ? { creature: true, noHp: true } : newCreatureMeta(c.maxHp, c.hideHp === true);
+}
+
 // Nome único numa lista: "Goblin" -> "Goblin (2)" se já existir (sem diferenciar maiúsculas).
 export function uniqueName(base, names) {
   const taken = new Set((names || []).map(n => String(n).trim().toLowerCase()));

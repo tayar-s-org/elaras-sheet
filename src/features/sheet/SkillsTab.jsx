@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { DICE, SKILLS } from "../../rules.js";
+import { DICE, SKILLS, ATTRIBUTES } from "../../rules.js";
 import { racialEffects } from "../../templates.js";
 import CustomSkillForm from "./CustomSkillForm.jsx";
-import { removeCustomSkill } from "../../skills/custom.js";
+import { removeCustomSkill, setCustomSkillAttr } from "../../skills/custom.js";
 import "./skills.css";
 
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -73,7 +73,9 @@ export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToa
           {customVisible.map(s => {
             const die = c.skills[s.name] || 0;
             return <div className={`skills2-row${die ? " on" : ""}`} key={s.id}>
-              <span className="skills2-name">{s.name}</span>
+              <span className="skills2-name">{s.name}{s.attr ? <small>{s.attr}</small>
+                : <select className="skills2-attr-pick" aria-label={`Atributo de ${s.name}`} value="" onChange={e => setC(prev => setCustomSkillAttr(prev, s.id, e.target.value))}>
+                  <option value="">Defina o atributo…</option>{ATTRIBUTES.map(a => <option key={a} value={a}>{a}</option>)}</select>}</span>
               <div className="die-picker" role="radiogroup" aria-label={`Dado de ${s.name}`}>
                 <button type="button" role="radio" aria-checked={!die} className={!die ? "sel" : ""} onClick={() => setDie(s.name, 0)} title="Sem treino">—</button>
                 {DICE.map(v => <button key={v} type="button" role="radio" aria-checked={die === v} className={die === v ? "sel" : ""} onClick={() => setDie(s.name, v)}>d{v}</button>)}

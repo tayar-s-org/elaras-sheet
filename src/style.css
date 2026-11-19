@@ -986,3 +986,6 @@ h3 {
 .token-label{fill:#fff;paint-order:stroke;stroke:#000;stroke-width:4px}
 .board-mark{cursor:pointer}
 .board-tools{display:grid;gap:8px}
+
+.roll-step{display:block}
+.roll-step:last-child{font-weight:600}

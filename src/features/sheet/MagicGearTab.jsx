@@ -41,6 +41,18 @@ export default function MagicGearTab({ c, d, update, rule, setC, setConfirm, set
                         }
                       />
                     </Field>
+                    <Field label="Dano">
+                      <input value={x.damage || ""} maxLength={100} placeholder="Ex.: 2d6, Espírito+d6"
+                        onChange={(e) => changeItem("powers", i, "damage", e.target.value)} />
+                    </Field>
+                    <Field label="Distância">
+                      <input value={x.range || ""} maxLength={100} placeholder="Ex.: 12 metros, toque"
+                        onChange={(e) => changeItem("powers", i, "range", e.target.value)} />
+                    </Field>
+                    <Field label="Duração">
+                      <input value={x.duration || ""} maxLength={100} placeholder="Ex.: instantânea, 5 turnos"
+                        onChange={(e) => changeItem("powers", i, "duration", e.target.value)} />
+                    </Field>
                   </div>
                   <Field label="Efeito, alcance e conjuração">
                     <textarea

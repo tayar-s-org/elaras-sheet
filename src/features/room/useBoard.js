@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { loadBoard, loadBoardItems, mapUrl } from '../../lib/board.js';
+import { applyTokenRow } from '../../tokenState.js';
 
 const upsert = (list, row) => (list.some(x => x.id === row.id) ? list.map(x => (x.id === row.id ? { ...x, ...row } : x)) : [...list, row]);
 
@@ -48,7 +49,7 @@ export function useBoard(tableId, user, room) {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'board_tokens', filter: `table_id=eq.${tableId}` }, p => {
             if (p.eventType === 'DELETE') setTokens(prev => prev.filter(t => t.id !== p.old.id));
             else if (!dragging.current.has(p.new.id)) {
-              setTokens(prev => upsert(prev, p.new));
+              setTokens(prev => applyTokenRow(prev, p.new)); // token com nome oculto chega em branco: o mestre mantém o nome real
               setDrags(prev => { if (!(p.new.id in prev)) return prev; const { [p.new.id]: _, ...rest } = prev; return rest; });
             }
           })

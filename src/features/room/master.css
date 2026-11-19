@@ -18,6 +18,8 @@
 .hp-word.warn { color: var(--warning); }
 .hp-word.bad, .hp-word.down { color: var(--danger); }
 .creature-controls { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.creature-dup { margin-left: auto; padding: 6px 10px; }
+.creature-dup + .creature-delete { margin-left: 0; }
 .creature-delete { margin-left: auto; color: var(--danger); border-color: var(--danger); padding: 6px 10px; }
 .creature-controls input { width: 7ch; padding: 6px 8px; text-align: center; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }
 .hp-track { fill: rgba(0, 0, 0, 0.6); stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
@@ -58,3 +60,20 @@
 .token-nohp { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: .88rem; }
 .sfx-bar.sfx-min { padding: 2px 8px; }
 .sfx-toggle { order: 3; }
+
+/* Efeitos e nome oculto das criaturas (cartão do token e criador) */
+.creature-flags { display: grid; gap: 8px; margin-top: 10px; }
+.creature-flags .check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+.creature-section-title { margin: 12px 0 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.effects { display: grid; gap: 8px; }
+.effect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.effect-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 999px; background: var(--field); border: 1px solid var(--border); font-size: .85rem; }
+.effect-chip:not(:has(.effect-x)) { padding-right: 9px; }
+.effect-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 6px; }
+.effect-x:hover:not(:disabled) { color: var(--danger); }
+.effect-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.effect-add { padding: 3px 9px; font-size: .8rem; }
+.effect-free { display: flex; gap: 6px; }
+.effect-free input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }
+.name-hidden-note { color: var(--warning); }
+.board-token .token-effects text { font-size: inherit; }

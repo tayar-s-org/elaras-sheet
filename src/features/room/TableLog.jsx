@@ -58,7 +58,7 @@ export default function TableLog({ messages, rolls, stateLog, rewards, hidden, m
             <span> rolou {r.label ? `${r.label} · ` : ''}{d.title}{r.visibility === 'gm' ? ' (só mestre)' : ''} → </span>
             <b className="log-total">{d.total}</b>
             {d.outcome && <span className="log-outcome"> {d.outcome}</span>}
-            <span className="log-detail"> · {d.detail}</span>
+            <span className="log-steps">{d.lines.map((line, i) => <span key={i} className="log-step">{line}</span>)}</span>
           </p>;
         })}
       </> : tab === 'rewards' ? <>

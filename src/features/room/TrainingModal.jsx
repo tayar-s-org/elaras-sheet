@@ -7,14 +7,11 @@ import { loadRoutineDays, assignDays } from '../../lib/clock.js';
 import { validateCharacter } from '../../rules.js';
 import { emptyRoutine, normalizeRoutine, simulateRoutine, routineProblems } from '../../training/routine.js';
 import { statsFromCharacter } from '../../rpg/processor.js';
-import { blockedReason } from '../../rpg/activities.js';
 import { loadProgress, loadTraining, loadProcessedDays } from '../../lib/engine.js';
 import { loadRequests, approvedJobs, loadSpellProgress } from '../../lib/requests.js';
 import RequestsPanel from '../routine/Requests.jsx';
 import TrainingHistory from '../routine/TrainingHistory.jsx';
-import AptitudePanel from '../routine/AptitudePanel.jsx';
 import { loadAptitude } from '../../lib/aptitude.js';
-import { aptitudeSummary } from '../../rpg/aptitude.js';
 import RoutineGrid from '../routine/RoutineGrid.jsx';
 import { formatClock, dayParts, dayOfTick, shiftMonth } from '../../rpg/clock.js';
 import CampaignCalendar from '../routine/CampaignCalendar.jsx';
@@ -40,10 +37,19 @@ const label = r => r?.name?.trim() || 'Sem nome';
 // Rotina de treino: cada ficha tem várias rotinas com nome (um dia, hora a hora) e uma agenda por dia da campanha
 // onde coloca as rotinas aprovadas pelo mestre. O mestre também controla o tempo da campanha aqui.
 // Tudo é por PERSONAGEM (character_id): trocar de ficha na mesa não leva as rotinas da ficha antiga.
-export default function TrainingModal({ tableId, me, isGm, initial, initialRoutine, initialView, members, characters, closed, onClose }) {
-  const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]), [members, characters]);
+// Uma cor por jogador, fixa para o mesmo personagem (vem do id, não da ordem da lista).
+const WHO_COLORS = ['#ff7a7a', '#ffb347', '#f2d94e', '#7be07b', '#4fd1c5', '#63b3ff', '#b794f4', '#ff8ad8'];
+const whoColor = id => {
+  let h = 0;
+  for (const ch of String(id || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return WHO_COLORS[h % WHO_COLORS.length];
+};
+
+// only="history": janela separada "Ver Meus Treinamentos" (só o histórico, sem a rotina); onGo(view) pede para abrir a Rotina de Treino naquela aba.
+export default function TrainingModal({ tableId, me, isGm, initial, initialRoutine, initialView, only, onGo, members, characters, closed, onClose }) {
+  const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id] && (only !== 'history' || isGm || m.user_id === me)), [members, characters, only, isGm, me]);
   const [selected, setSelected] = useState(() => (initial && roster.some(m => m.character_id === initial) ? initial : roster.find(m => m.user_id === me)?.character_id || roster[0]?.character_id));
-  const [view, setView] = useState(initialView || (initialRoutine ? 'routines' : 'calendar'));
+  const [view, setView] = useState(only === 'history' ? 'history' : initialView || (initialRoutine ? 'routines' : 'calendar'));
   const [rows, setRows] = useState([]); // todas as rotinas da mesa
   const [routineId, setRoutineId] = useState(initialRoutine || null);
   const [available, setAvailable] = useState(true);
@@ -119,7 +125,6 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const baseStats = useMemo(() => statsOf(character?.data, trained, jobs), [character, trained, jobs]);
   const stats = useMemo(() => ({ ...baseStats, aptitude: aptitude?.allocation?.[selected] || {} }), [baseStats, aptitude, selected]);
   const refreshAll = useCallback(() => pull().catch(() => {}), [pull]);
-  const aptPoints = useMemo(() => (aptitude ? aptitudeSummary(aptitude.grants?.[selected], aptitude.allocation?.[selected]).available : 0), [aptitude, selected]);
   const pendingRequests = useMemo(() => requests.filter(r => r.character_id === selected && r.status === 'pending').length, [requests, selected]);
   const owner = member?.user_id === me;
   const canEdit = owner && !closed && available;
@@ -160,8 +165,6 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const edit = patch => patchRow(current.id, r => ({ ...r, status: 'draft', data: normalizeRoutine({ ...r.data, ...patch }) }));
   const rename = name => patchRow(current.id, r => ({ ...r, name: name.slice(0, 60) }));
   const editRow = (i, patch) => {
-    const at = sim.rows[i];
-    if (patch.a && at && blockedReason(patch.a, at.staminaBefore, at.manaBefore)) return;
     edit({ rows: current.data.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
   };
   const act = async fn => {
@@ -229,7 +232,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
       </div>
     </div>}
     {shown === 'draft' && current.review_note && <p className="callout tr-note" role="note"><b>Devolvida pelo mestre:</b> {current.review_note}</p>}
-    <RoutineGrid data={current.data} sim={sim} stats={stats} canEdit={canEdit} onEdit={edit} onRow={editRow} />
+    <RoutineGrid data={current.data} sim={sim} stats={stats} canEdit={canEdit} onEdit={edit} onRow={editRow} storageKey={current.id} onClearAll={() => edit({ rows: emptyRoutine().rows })} />
   </div>;
 
   const migrationHelp = <p className="callout">O novo sistema de rotinas e calendário ainda não está disponível neste servidor. O mestre da mesa precisa rodar a migration <code>0023_campaign_clock.sql</code> no Supabase.</p>;
@@ -237,7 +240,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="mod-editor training-modal" role="dialog" aria-modal="true" aria-labelledby="training-title">
       <header className="mod-editor-head">
-        <h2 id="training-title">Rotina de Treino</h2>
+        <h2 id="training-title">{only === 'history' ? (isGm ? 'Treinamentos dos jogadores' : 'Ver Meus Treinamentos') : 'Rotina de Treino'}</h2>
         {clockReady && <span className="tr-clock" title="Data e hora da campanha, iguais para todos da mesa">{formatClock(tick)}</span>}
         <span className="tr-status" role="status">{owner ? status : ''}</span>
         <button type="button" className="primary" onClick={onClose}>Fechar</button>
@@ -247,21 +250,19 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
         {available && !clock.available && migrationHelp}
         {!roster.length ? <p className="muted">Nenhum jogador com ficha vinculada nesta mesa ainda.</p> : <>
           <div className="tabs-row" role="tablist" aria-label="Personagens">
-            {roster.map(m => <button key={m.character_id} type="button" role="tab" aria-selected={selected === m.character_id} className={selected === m.character_id ? 'primary' : 'outline'} onClick={() => setSelected(m.character_id)}>
+            {roster.map(m => <button key={m.character_id} type="button" role="tab" aria-selected={selected === m.character_id} className={`tr-who ${selected === m.character_id ? 'primary on' : 'outline'}`} style={{ '--who': whoColor(m.character_id) }} onClick={() => setSelected(m.character_id)}>
               {characters[m.character_id].name || m.profiles?.display_name || 'Personagem'}{m.user_id === me ? ' (você)' : ''}
               {pendingOf(m.character_id) > 0 && <span className="tr-badge pending">{pendingOf(m.character_id)} pendente{pendingOf(m.character_id) > 1 ? 's' : ''}</span>}
             </button>)}
           </div>
           {!loaded ? <p className="muted">Carregando…</p> : <>
-            <p className="muted tr-owner">Jogador: {member?.profiles?.display_name || '—'}{!owner ? ' · só leitura' : ''}</p>
-            <div className="tabs-row tr-views" role="tablist" aria-label="Seção">
+            <p className="muted tr-owner" style={{ '--who': whoColor(selected) }}>Jogador: {member?.profiles?.display_name || '—'}{!owner ? ' · só leitura' : ''}</p>
+            {only !== 'history' && <div className="tabs-row tr-views" role="tablist" aria-label="Seção">
               <button type="button" role="tab" aria-selected={view === 'calendar'} className={view === 'calendar' ? 'primary' : 'outline'} onClick={() => setView('calendar')}>Calendário</button>
               <button type="button" role="tab" aria-selected={view === 'routines'} className={view === 'routines' ? 'primary' : 'outline'} onClick={() => setView('routines')}>Rotinas ({theirs.length})</button>
-              <button type="button" role="tab" aria-selected={view === 'history'} className={view === 'history' ? 'primary' : 'outline'} onClick={() => setView('history')}>{owner ? 'Ver Meus Treinamentos' : 'Treinamentos'}</button>
-              <button type="button" role="tab" aria-selected={view === 'aptitude'} className={view === 'aptitude' ? 'primary' : 'outline'} onClick={() => setView('aptitude')}>Aptidão{aptPoints > 0 ? ` (${aptPoints})` : ''}</button>
               <button type="button" role="tab" aria-selected={view === 'requests'} className={view === 'requests' ? 'primary' : 'outline'} onClick={() => setView('requests')}>Solicitações{pendingRequests ? ` (${pendingRequests})` : ''}</button>
               {isGm && <button type="button" role="tab" aria-selected={view === 'time'} className={view === 'time' ? 'primary' : 'outline'} onClick={() => setView('time')}>Tempo da campanha</button>}
-            </div>
+            </div>}
 
             {view === 'calendar'
               ? (clockReady && monthView
@@ -271,10 +272,7 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
                 : <p className="muted">{clock.available ? 'Carregando o relógio da campanha…' : 'O calendário depende da migration 0023.'}</p>)
               : view === 'history'
                 ? <TrainingHistory tableId={tableId} characterId={selected} owner={owner} closed={closed} stats={stats} character={character?.data ? validatedSheet(character.data) : null}
-                  tick={tick} progress={progress[selected] || []} training={training[selected]} spellProgress={spellProgress[selected]} requests={requests} allocation={aptitude?.allocation?.[selected]} onGo={setView} refresh={refreshAll} />
-              : view === 'aptitude'
-                ? <AptitudePanel tableId={tableId} characterId={selected} owner={owner} isGm={isGm} closed={closed} character={character?.data ? validatedSheet(character.data) : null}
-                  aptitude={aptitude} progress={progress[selected] || []} refresh={refreshAll} />
+                  tick={tick} progress={progress[selected] || []} training={training[selected]} spellProgress={spellProgress[selected]} requests={requests} allocation={aptitude?.allocation?.[selected]} onGo={v => onGo?.(v)} refresh={refreshAll} />
               : view === 'requests'
                 ? <RequestsPanel tableId={tableId} characterId={selected} owner={owner} isGm={isGm} closed={closed} requests={requests} stats={stats}
                   training={training[selected]} spellProgress={spellProgress[selected]} refresh={refreshAll} />

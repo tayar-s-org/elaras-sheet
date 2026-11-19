@@ -3,6 +3,7 @@ import { saveState, sendMessage } from '../../lib/room.js';
 import SheetViewModal from './SheetViewModal.jsx';
 import { AptitudeGrant } from '../routine/AptitudeSummary.jsx';
 import { grantXp } from '../../lib/xp.js';
+import { grantEach, grantSummary } from '../../lib/grantEach.js';
 import { RESOURCES, safeMaxima, level, LEVEL_TEXT, currentValue, baseMovement } from './vitals.js';
 import { incapacitation } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
@@ -85,8 +86,8 @@ function XpGrant({ tableId, targets, label }) {
     setBusy(true);
     setMsg('');
     try {
-      for (const t of targets) await grantXp(tableId, t.id, amount);
-      setMsg(`+${amount} XP enviado${targets.length > 1 ? ' a todos' : ''}.`);
+      const res = await grantEach(targets, t => grantXp(tableId, t.id, amount));
+      setMsg(grantSummary(res, `+${amount} XP enviado${targets.length > 1 ? ' a todos' : ''}.`));
     } catch (err) { setMsg(err.message); }
     finally { setBusy(false); }
   }

@@ -41,3 +41,14 @@
 .dice2-opts { display: grid; gap: 4px; font-size: .85rem; }
 .dice2 input:not([type="checkbox"]), .dice2 select { min-height: 38px; box-sizing: border-box; font-size: .95rem; }
 .dice2-item-bonus { color: var(--gold); font-size: .75rem; }
+
+.dice2-breakdown { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: .85rem; }
+.dice2-die-line, .dice2-bonus-line { display: flex; justify-content: space-between; gap: 8px; }
+.dice2-die-line b { color: var(--accent); font-family: var(--font-display); font-size: 1.05rem; }
+.dice2-bonus-line b { color: var(--gold); }
+.dice2-incap { color: var(--danger); }
+
+.gm-alert-box { display: grid; gap: 6px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.gm-alert-box h4 { margin: 0; }
+.gm-alert-box p { margin: 0; font-size: .85rem; }
+.gm-alert-box .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-start; }

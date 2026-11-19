@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MAX_HP, parseHp, newCreatureMeta, creatureOf, metaWithHp, metaWithMaxHp, hpTone, hpLabel, uniqueName } from './creature.js';
+import { MAX_HP, parseHp, newCreatureMeta, creatureOf, metaWithHp, metaWithMaxHp, hpTone, hpLabel, uniqueName, metaForCopy } from './creature.js';
 
 const token = (hp, maxHp, extra = {}) => ({ id: 't', meta: { creature: true, hp, maxHp, ...extra } });
 
@@ -94,4 +94,10 @@ test('criatura antiga sem vida continua sem barra e volta a ter vida ao receber 
   assert.equal(hpVisible(creatureOf(old), true), false, 'sem vida: nem o mestre vê barra');
   const back = metaWithMaxHp(old, 12);
   assert.deepEqual(back, { creature: true, maxHp: 12, hp: 12 });
+});
+
+test('a cópia de uma criatura volta com a vida cheia e mantém a vida oculta', () => {
+  assert.deepEqual(metaForCopy(token(5, 30)), { creature: true, hp: 30, maxHp: 30 });
+  assert.deepEqual(metaForCopy(token(0, 12, { hideHp: true })), { creature: true, hp: 12, maxHp: 12, hideHp: true });
+  assert.deepEqual(metaForCopy({ meta: { creature: true, noHp: true } }), { creature: true, noHp: true });
 });

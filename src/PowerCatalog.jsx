@@ -45,7 +45,7 @@ export default function PowerCatalog({ character, onAdd, onOpenPage }) {
           {power.stage === 'Especial' && <p>Confirme os requisitos na página do livro antes de adicionar.</p>}
           <div className="catalog-actions">
             <button className="text-button" onClick={() => onOpenPage(power.page)}>Ver página {power.page} do PDF ↗</button>
-            <button className="primary" disabled={added || locked} onClick={() => onAdd({name:power.name, cost:power.cost, description})}>{added ? 'Já adicionado' : locked ? 'Estágio insuficiente' : power.stage === 'Especial' ? 'Adicionar para revisão' : 'Adicionar à ficha'}</button>
+            <button className="primary" disabled={added || locked} onClick={() => onAdd({name:power.name, cost:power.cost, damage:power.damage, range:power.range, duration:power.duration, description})}>{added ? 'Já adicionado' : locked ? 'Estágio insuficiente' : power.stage === 'Especial' ? 'Adicionar para revisão' : 'Adicionar à ficha'}</button>
           </div>
         </details>;
       })}{!results.length && <p>Nenhum poder encontrado. <button className="text-button" onClick={() => {setQuery('');setRank('');}}>Limpar filtros</button></p>}</div>

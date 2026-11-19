@@ -10,7 +10,7 @@ export async function loadAptitude(tableId) {
     supabase.from('character_aptitude').select('character_id,allocation,revision,updated_at').eq('table_id', tableId),
     supabase.from('aptitude_log').select('id,character_id,user_id,before_alloc,after_alloc,points_received,created_at').eq('table_id', tableId).order('id', { ascending: false }).limit(300),
   ]);
-  if (g.error || a.error || l.error) return null;
+  if (g.error || a.error || l.error) return { error: (g.error || a.error || l.error).message || 'erro desconhecido', grants: {}, allocation: {}, log: {} };
   const out = { grants: {}, allocation: {}, log: {} };
   for (const r of g.data) (out.grants[r.character_id] ||= []).push(r);
   for (const r of a.data) out.allocation[r.character_id] = r.allocation || {};
@@ -40,7 +40,7 @@ export async function loadCharacterAptitude(characterId, tableId = null) {
   let a = supabase.from('character_aptitude').select('allocation,table_id,updated_at').eq('character_id', characterId).order('updated_at', { ascending: false });
   if (tableId) { g = g.eq('table_id', tableId); a = a.eq('table_id', tableId); }
   const [gr, al] = await Promise.all([g, a]);
-  if (gr.error || al.error) return null;
+  if (gr.error || al.error) return { error: (gr.error || al.error).message || 'erro desconhecido' };
   const allocation = al.data[0]?.allocation || {};
   const received = gr.data.reduce((s, r) => s + r.roll, 0);
   const distributed = Object.values(allocation).reduce((s, v) => s + v, 0);

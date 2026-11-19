@@ -30,3 +30,25 @@
 .mod-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
 .mod-editor-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; }
 .mod-editor-body { overflow: auto; padding: 22px 24px 28px; }
+
+/* Vantagens, complicacoes e itens: cada um abre para mostrar o efeito */
+.mod-details { display: grid; gap: 6px; }
+.mod-detail { border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.mod-detail.power { border-left-color: var(--accent); }
+.mod-detail.major { border-left-color: var(--danger); }
+.mod-detail.minor { border-left-color: var(--warning); }
+.mod-detail summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 6px 10px; cursor: pointer; }
+.mod-detail summary small { color: var(--muted); font-size: .72rem; text-transform: uppercase; }
+.mod-detail-body { padding: 2px 12px 8px; display: grid; gap: 4px; font-size: .86rem; }
+.mod-detail-body p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mod-detail-body ul { margin: 0; padding-left: 18px; }
+
+/* Magias em linhas: nome e, abaixo, custo de mana, dano, distancia e duracao */
+.mod-spells { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.mod-spell { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; background: var(--surface-soft); }
+.mod-spell-name small { color: var(--muted); font-weight: 400; }
+.mod-spell-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px 12px; font-size: .84rem; }
+.mod-spell-facts span { display: grid; }
+.mod-spell-facts i { font-style: normal; font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.mod-spell-desc summary { cursor: pointer; font-size: .8rem; color: var(--accent); }
+.mod-spell-desc p { margin: 4px 0 0; font-size: .84rem; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -67,6 +67,13 @@ test('o d4 é o menor dado possível: nem atributos nem perícias descem dele', 
   assert.deepEqual(steppedDie(6, 2, 'skill'), { die: 4, bonus: 0 });   // d6 → d4 e para aí
   assert.deepEqual(steppedDie(8, 2, 'skill'), { die: 4, bonus: 0 });
   assert.deepEqual(steppedDie(0, 0, 'skill'), { die: 4, bonus: -2 });   // sem treino: d4−2
+  assert.deepEqual(steppedDie(12, 1, 'skill', 2), { die: 12, bonus: 1 });   // d12+2 → d12+1
+  assert.deepEqual(steppedDie(12, 2, 'skill', 2), { die: 12, bonus: 0 });   // d12+2 → d12
+  assert.deepEqual(steppedDie(12, 2, 'skill', 3), { die: 12, bonus: 1 });
+  assert.deepEqual(steppedDie(12, 2, 'attribute', 1), { die: 10, bonus: 0 }); // d12+1 → d12 → d10
+  assert.deepEqual(steppedDie(12, 1, 'attribute', 0), { die: 10, bonus: 0 });
+  assert.deepEqual(steppedDie(12, 0, 'attribute', 4), { die: 12, bonus: 4 });
+  assert.deepEqual(steppedDie(8, 1, 'attribute', 5), { die: 6, bonus: 0 }, 'bônus só existe com dado-base d12');
   assert.deepEqual(steppedDie(0, 1, 'skill'), { die: 4, bonus: -2 });   // sem treino não piora com a incapacitação
 });
 

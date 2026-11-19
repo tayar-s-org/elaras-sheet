@@ -18,6 +18,9 @@ export const ENABLED_ACTIVITIES = [ACT.SKILL, ACT.SPELL, ACT.STUDY, ACT.WORK, AC
 export const ACTIVITIES = [{ id: '', label: '—' }, ...ENABLED_ACTIVITIES.map(id => ({ id, label: ACTIVITY_LABEL[id] }))];
 
 export const SKILL_TRAIN_MAX_HOURS = 12;
+// Treinar a perícia Conjurar gasta também mana: 1 por hora, fixo (não acompanha o custo de estamina nem o treino focado).
+export const CAST_SKILL = 'Conjurar';
+export const CAST_MANA_COST = 1;
 export const WORK_MAX_HOURS = 12;
 export const REST_MAX_HOURS = 12;
 export const REST_MIN_STREAK = 4;
@@ -25,6 +28,8 @@ export const REST_PER_HOUR = 1.5;
 export const QUICK_PER_HOUR = 2;
 export const QUICK_MAX_HOURS = 4;
 export const LOW_RESOURCE = 1; // estamina/mana em 1 ou menos: não começa atividade que a consome
+// Nenhuma atividade da rotina deixa a estamina abaixo de 1: só se gasta o que passa de 1 (a hora ainda conta, o custo é limitado).
+export const spendableStamina = stamina => Math.max(0, stamina - LOW_RESOURCE);
 export const STUDY_HOURS_PER_DIE = 25;
 export const MAX_ASTUCIA_DICE = 24;
 
@@ -50,11 +55,14 @@ export function meditationRate(roll) {
 // Dados de Astúcia ganhos no Estudo Mágico: 1 a cada 25 horas, no máximo 24.
 export const astuciaDiceFor = hours => Math.min(MAX_ASTUCIA_DICE, Math.floor((Number(hours) || 0) / STUDY_HOURS_PER_DIE));
 
-export const linkedAttribute = skill => SKILLS.find(([name]) => name === skill)?.[1] || null;
+// Atributo ligado à perícia: o do livro ou, nas personalizadas, o escolhido na ficha (stats.customAttrs).
+export const linkedAttribute = (skill, stats) => SKILLS.find(([name]) => name === skill)?.[1] || stats?.customAttrs?.[skill] || null;
 
 // Motivo pelo qual a atividade não pode começar com estes recursos (vazio = pode).
-export function blockedReason(activity, stamina, mana) {
+// skill: nome da perícia treinada (treinar Conjurar também gasta mana, então com mana em 1 ou menos ela bloqueia).
+export function blockedReason(activity, stamina, mana, skill = '') {
   if (activity === ACT.SKILL && stamina <= LOW_RESOURCE) return 'Bloqueado: estamina em 1 ou menos, sem forças para este treino';
+  if (activity === ACT.SKILL && skill === CAST_SKILL && mana <= LOW_RESOURCE) return 'Bloqueado: mana em 1 ou menos, treinar Conjurar também gasta mana';
   if (activity === ACT.SPELL && mana <= LOW_RESOURCE) return 'Bloqueado: mana em 1 ou menos, sem mana para esta atividade';
   return '';
 }
@@ -75,7 +83,8 @@ export function rowIssue(row, stats) {
   switch (row?.a) {
     case ACT.SKILL:
       if (!row.skill) return 'escolha a perícia';
-      return stats.skills.includes(row.skill) ? '' : 'esta perícia não está na ficha';
+      if (!stats.skills.includes(row.skill)) return 'esta perícia não está na ficha';
+      return linkedAttribute(row.skill, stats) ? '' : 'defina o atributo desta perícia personalizada na ficha (aba Perícias)';
     case ACT.SPELL:
       if (!row.spell) return 'escolha o feitiço';
       return stats.spells.some(s => s.id === row.spell) ? '' : 'este feitiço não está na ficha';
@@ -120,14 +129,15 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
     case ACT.SKILL: {
       if (rowIssue(row, stats)) fail(`Perícia ${rowIssue(row, stats)}.`);
       else if (d.trainHours >= SKILL_TRAIN_MAX_HOURS) fail(`Limite de ${SKILL_TRAIN_MAX_HOURS} horas de treino por dia.`);
-      else if (blockedReason(act, state.stamina, state.mana)) fail(blockedReason(act, state.stamina, state.mana));
+      else if (blockedReason(act, state.stamina, state.mana, row.skill)) fail(blockedReason(act, state.stamina, state.mana, row.skill));
       else {
         d.trainHours += 1;
         const cost = trainingStaminaCost(d.trainHours) * modalityFactor(row);
-        dS = -Math.min(cost, state.stamina);
+        dS = -Math.min(cost, spendableStamina(state.stamina));
+        if (row.skill === CAST_SKILL) { dM = -Math.min(CAST_MANA_COST, state.mana); ev.manaCost = CAST_MANA_COST; }
         const mod = modalityOf(row);
         ev.xp.push({ kind: 'skill', name: row.skill, modality: mod, amount: 1 });
-        const attr = linkedAttribute(row.skill);
+        const attr = linkedAttribute(row.skill, stats);
         if (attr) ev.xp.push({ kind: 'attribute', name: attr, modality: mod, amount: 0.5 });
         ev.cost = cost;
         ev.trainHour = d.trainHours;
@@ -181,6 +191,9 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
       }
       d.medHours += 1;
       dM = d.medRate;
+      // Cada hora meditada dá +1 XP em Meditar e +0,5 em Espírito (a Aptidão é aplicada pelo servidor ao gravar).
+      ev.xp.push({ kind: 'skill', name: 'Meditar', modality: 'normal', amount: 1 });
+      ev.xp.push({ kind: 'attribute', name: 'Espírito', modality: 'normal', amount: 0.5 });
       break;
     }
     case ACT.WORK: {
@@ -197,7 +210,7 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
         else if (mCost > 0 && state.mana <= LOW_RESOURCE) fail('Bloqueado: mana em 1 ou menos, sem mana para trabalhar.');
         else {
           d.workHours = n;
-          dS = -Math.min(sCost, state.stamina);
+          dS = -Math.min(sCost, spendableStamina(state.stamina));
           dM = -Math.min(mCost, state.mana);
           if (job.xp > 0 && job.xpSkill) ev.xp.push({ kind: 'skill', name: job.xpSkill, modality: 'normal', amount: job.xp });
           ev.pay = job.pay;

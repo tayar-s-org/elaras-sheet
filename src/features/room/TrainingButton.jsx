@@ -7,7 +7,7 @@ const POLL_MS = 15000;
 // Botão "Rotina de Treino" com aviso: o mestre vê quantas rotinas aguardam aprovação; o jogador vê o estado das dele.
 export default function TrainingButton({ tableId, me, isGm, members, characters, closed }) {
   const [open, setOpen] = useState(false);
-  const [startView, setStartView] = useState(null);
+  const [startView, setStartView] = useState(null); // 'history' = só a janela "Ver Meus Treinamentos"; outro valor abre a Rotina de Treino nessa aba
   const [list, setList] = useState(null);
   const refresh = useCallback(() => loadRoutineList(tableId).then(setList).catch(() => {}), [tableId]);
   useEffect(() => {
@@ -29,6 +29,7 @@ export default function TrainingButton({ tableId, me, isGm, members, characters,
   return <>
     <button type="button" className="outline side-training" onClick={() => { setStartView(null); setOpen(true); }}>Rotina de Treino {badge}</button>
     <button type="button" className="outline side-training" onClick={() => { setStartView('history'); setOpen(true); }}>{isGm ? 'Treinamentos dos jogadores' : 'Ver Meus Treinamentos'}</button>
-    {open && <TrainingModal tableId={tableId} me={me} isGm={isGm} initialView={startView} members={members} characters={characters} closed={closed} onClose={() => setOpen(false)} />}
+    {open && <TrainingModal tableId={tableId} me={me} isGm={isGm} key={startView || 'routine'} initialView={startView === 'history' ? null : startView} only={startView === 'history' ? 'history' : undefined}
+      onGo={view => setStartView(view)} members={members} characters={characters} closed={closed} onClose={() => setOpen(false)} />}
   </>;
 }

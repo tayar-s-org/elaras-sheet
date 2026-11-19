@@ -11,6 +11,7 @@ import { useHashRoute, navigate, loginThen } from "./lib/router.js";
 import { cloudConfigured, supabase } from "./lib/supabase.js";
 import { useAutosave } from "./features/library/useAutosave.js";
 import { useMoneyClaims } from "./features/library/useMoneyClaims.js";
+import { useRewardSync } from "./features/library/useRewardSync.js";
 import { useCustomItemClaims } from "./features/library/useCustomItemClaims.js";
 import { useCustomSkillClaims } from "./features/library/useCustomSkillClaims.js";
 import { useEvolutionClaims } from "./features/library/useEvolutionClaims.js";
@@ -77,6 +78,7 @@ export default function App() {
   const setTab = i => { if (i === 6) setEditing(6); else { setEditing(null); goTo(i); } };
   const [toast, setToast] = useState("");
   useMoneyClaims(session, setSession, auth.user, setToast);
+  useRewardSync(session, setSession, auth.user, setToast);
   useCustomItemClaims(session, setSession, auth.user, setToast);
   useCustomSkillClaims(session, setSession, auth.user, setToast);
   useEvolutionClaims(session, setSession, auth.user, setToast);

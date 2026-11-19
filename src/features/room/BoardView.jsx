@@ -1,6 +1,8 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { updateToken, removeToken, addToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
 import { uploadTokenImage, tokenUrl } from '../../lib/tokens.js';
+import { setCharacterTokenImage } from '../../lib/cloud.js';
+import { loadPresets, savePreset } from '../../lib/presets.js';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
 import MusicPlayer from './MusicPlayer.jsx';
@@ -8,7 +10,8 @@ import SoundBar from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
-import { creatureOf, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
+import { creatureOf, uniqueName, metaForCopy, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
+import { displayName, imageVisible, isNameHidden, effectsOf, addEffect, removeEffect, effectBadges } from '../../tokenState.js';
 import SheetPeek from './SheetPeek.jsx';
 import { useAptitudeFor } from '../routine/AptitudeSummary.jsx';
 import { safeMaxima, currentValue } from './vitals.js';
@@ -48,6 +51,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const [tool, setTool] = useState('move');
   const [selected, setSelected] = useState(null);
   const [maker, setMaker] = useState(null); // { token } para um token existente, { token: null } para o meu token ainda sem lugar
+  const [tokenOverride, setTokenOverride] = useState({}); // ficha -> imagem recém-salva, até a leitura periódica das fichas trazer a nova
   const [busy, setBusy] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(null);
@@ -61,7 +65,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const gsize = clamp(Number(grid.size) || 70, 20, 400);
   const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
   // O token inteiro (nao so o centro) fica dentro do tabuleiro.
-  // Tokens de criatura aparecem com o dobro do tamanho dos demais.
+  // Tokens de criatura têm o mesmo tamanho dos de jogador (o mestre pode ajustar o `size` de cada um no módulo do mestre).
   // Barra de vida dos tokens de jogador (vida atual da ficha, visivel a todos na mesa).
   const pcLife = t => {
     if (!t.character_id) return null;
@@ -74,7 +78,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       return { hp, maxHp: max.life, ratio: hp / max.life };
     } catch { return null; }
   };
-  const unit = t => gsize * t.size * tokenScale * (creatureOf(t) ? 2 : 1);
+  const unit = t => gsize * t.size * tokenScale;
   const tokenHalf = t => unit(t) / 2;
   const keepIn = (v, half, max) => (max <= half * 2 ? max / 2 : clamp(v, half, max - half));
 
@@ -171,13 +175,15 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     svgRef.current.setPointerCapture?.(e.pointerId);
     if (tokenEl) {
       const t = tokens.find(x => x.id === tokenEl.dataset.token);
-      setSelected(t.id);
       if (tool === 'move' && t && canMove(t)) {
+        // Só um clique (sem arrastar) abre as informações do token; arrastar apenas move.
         const pt = toMap(e.clientX, e.clientY);
         local.beginDrag(t.id);
-        gesture.current = { type: 'token', id: t.id, dx: t.x - pt.x, dy: t.y - pt.y, half: tokenHalf(t), moved: false };
+        gesture.current = { type: 'token', id: t.id, dx: t.x - pt.x, dy: t.y - pt.y, half: tokenHalf(t), moved: false, sx: e.clientX, sy: e.clientY };
         return;
       }
+      if (tool === 'move' && t) { gesture.current = { type: 'tap', id: t.id }; return; }
+      if (t) setSelected(t.id);
     }
     if (markEl && tool === 'marker') {
       const m = marks.find(x => x.id === markEl.dataset.mark);
@@ -196,11 +202,14 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   function onPointerMove(e) {
     const g = gesture.current;
     if (!g) return;
+    if (g.type === 'tap') return;
     if (g.type === 'pan') {
       const scale = view.w / svgRef.current.getBoundingClientRect().width;
       setView(v => ({ ...v, x: g.vx - (e.clientX - g.sx) * scale, y: g.vy - (e.clientY - g.sy) * scale }));
       return;
     }
+    // Pequenos tremores do mouse ou do dedo não contam como arrasto (continua sendo um clique).
+    if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 5) return;
     const pt = toMap(e.clientX, e.clientY);
     const x = keepIn(pt.x + g.dx, g.half, W), y = keepIn(pt.y + g.dy, g.half, H);
     g.moved = true;
@@ -212,12 +221,14 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       room.sendBroadcast('drag', { id: g.id, x, y });
     }
   }
-  async function onPointerUp() {
+  async function onPointerUp(e) {
     const g = gesture.current;
     gesture.current = null;
+    const cancelled = e?.type === 'pointercancel';
+    if (g?.type === 'tap') { if (!cancelled) setSelected(g.id); return; }
     if (!g || g.type !== 'token') return;
     local.endDrag(g.id);
-    if (!g.moved) return;
+    if (!g.moved) { if (!cancelled) setSelected(g.id); return; }
     const final = grid.visible ? { x: keepIn(snapToGrid(g.x, gsize), g.half, W), y: keepIn(snapToGrid(g.y, gsize), g.half, H) } : { x: g.x, y: g.y };
     local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, ...final } : t)));
     room.sendBroadcast('drag', { id: g.id, ...final, done: true });
@@ -226,7 +237,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
 
   const pad = useSoundpad(room, tableId, isGm);
   const myToken = myCharacter ? tokens.find(t => t.character_id === myCharacter) : null;
-  const imageOf = t => tokenUrl(t.image_path || characters[t.character_id]?.data?.tokenImage);
+  // Token de personagem: a imagem é a da ficha (sempre sincronizada); a gravada no token só vale para tokens antigos, de ficha sem imagem.
+  const sheetImage = characterId => (characterId ? tokenOverride[characterId] ?? characters[characterId]?.data?.tokenImage : '') || '';
+  const imageOf = t => tokenUrl(sheetImage(t.character_id) || t.image_path);
   const place = () => ({ x: (board?.width || 2000) / 2 + (tokens.length % 5) * 20, y: (board?.height || 1400) / 2 + (tokens.length % 5) * 20 });
   const addMine = async imagePath => {
     const c = characters[myCharacter];
@@ -239,18 +252,31 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     setError('');
     try { await addMine(null); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
+  // Coloca o token na lista local; se o Realtime ja o trouxe (em branco, quando o nome esta oculto), completa com os valores reais.
+  const putToken = t => local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev.map(x => (x.id === t.id ? { ...x, ...t } : x)) : [...prev, t]));
+  // Mestre: nome oculto e efeitos de uma criatura ja criada. O estado local muda na hora; se o servidor recusar, recarrega.
+  const patchCreature = async (token, patch) => {
+    local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, ...patch } : t)));
+    try { await updateToken(token.id, patch); } catch (err) { setError(err.message); local.reloadItems(); }
+  };
+  const toggleName = (token, hide) => patchCreature(token, { name_hidden: hide });
+  const addTokenEffect = (token, input) => {
+    const effects = addEffect(token.effects, input);
+    if (effects.length !== effectsOf(token).length) patchCreature(token, { effects });
+  };
+  const removeTokenEffect = (token, id) => patchCreature(token, { effects: removeEffect(token.effects, id) });
   // Mestre: cria uma criatura (nome, foto e vida; moldura e cor unicas) ou troca imagem/nome/vida de uma existente.
   const saveCreature = async (blob, extra) => {
     const target = maker?.token;
     // Sem apagar a imagem anterior: ela pode estar em uso por uma predefinição ou outro token.
     const path = await uploadTokenImage(me, blob, '');
     if (target) {
-      const patch = { name: extra.name, image_path: path, meta: metaWithHideHp({ meta: metaWithMaxHp(target, extra.hp) }, extra.hideHp) };
+      const patch = { name: extra.name, image_path: path, meta: metaWithHideHp({ meta: metaWithMaxHp(target, extra.hp) }, extra.hideHp), name_hidden: Boolean(extra.hideName) };
       await updateToken(target.id, patch);
       local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, ...patch } : t)));
     } else {
-      const t = await addToken(board, { kind: 'npc', name: extra.name, color: CREATURE_COLOR, size: 1, image_path: path, meta: newCreatureMeta(extra.hp, extra.hideHp), ...place() });
-      local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev : [...prev, t]));
+      const t = await addToken(board, { kind: 'npc', name: extra.name, color: CREATURE_COLOR, size: 1, image_path: path, meta: newCreatureMeta(extra.hp, extra.hideHp), name_hidden: Boolean(extra.hideName), ...place() });
+      putToken(t);
       setSelected(t.id);
     }
   };
@@ -260,6 +286,22 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     const meta = metaWithHp(token, c.hp + delta);
     local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, meta } : t)));
     try { await updateToken(token.id, { meta }); } catch (err) { setError(err.message); local.reloadItems(); }
+  };
+  // Mestre: guarda a criatura so como predefinicao da mesa (nao poe no mapa). Devolve o nome salvo.
+  const saveCreaturePreset = async (blob, extra) => {
+    const path = await uploadTokenImage(me, blob, '');
+    const taken = (await loadPresets(board.table_id)).map(p => p.name);
+    const p = await savePreset(board.table_id, { name: uniqueName(extra.name, taken), image_path: path, max_hp: extra.hp, size: 1 });
+    return p.name;
+  };
+  // Duplica a criatura (so o mestre): mesmo nome (com numero), foto, vida cheia e nome oculto; efeitos nao vao junto. Fica na celula ao lado.
+  const duplicateCreature = async token => {
+    const spot = { x: keepIn(token.x + gsize, tokenHalf(token), W), y: keepIn(token.y, tokenHalf(token), H) };
+    try {
+      const t = await addToken(board, { kind: 'npc', name: uniqueName(token.name, tokens.map(x => x.name)), color: token.color, size: token.size, image_path: token.image_path || null, meta: metaForCopy(token), name_hidden: isNameHidden(token), effects: [], ...spot });
+      putToken(t);
+      setSelected(t.id);
+    } catch (err) { setError(err.message); }
   };
   // Apaga o token da criatura (so o mestre); pede confirmacao porque nao tem volta.
   const removeCreature = async token => {
@@ -274,6 +316,17 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const saveTokenImage = async (blob, extra) => {
     if (maker?.creature) return saveCreature(blob, extra);
     const target = maker?.token;
+    // Token do próprio jogador: a imagem vai para a ficha (e o token a acompanha); o token não guarda imagem própria.
+    if (myCharacter && (!target || target.character_id === myCharacter)) {
+      const previous = characters[myCharacter]?.data?.tokenImage || '';
+      const path = await uploadTokenImage(me, blob, previous.startsWith(`${me}/`) ? previous : '');
+      await setCharacterTokenImage(myCharacter, path);
+      setTokenOverride(prev => ({ ...prev, [myCharacter]: path }));
+      if (target) {
+        if (target.image_path) { await updateToken(target.id, { image_path: null }); local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, image_path: null } : t))); }
+      } else await addMine(null);
+      return;
+    }
     const path = await uploadTokenImage(me, blob, target?.image_path && target.image_path.startsWith(`${me}/`) ? target.image_path : '');
     if (target) {
       await updateToken(target.id, { image_path: path });
@@ -339,10 +392,11 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         const p = { x: keepIn(raw.x, tokenHalf(t), W), y: keepIn(raw.y, tokenHalf(t), H) };
         const r = unit(t) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
-        const src = imageOf(t);
+        const src = imageVisible(t, isGm) ? imageOf(t) : null; // nome oculto: sem foto para os jogadores
+        const badges = effectBadges(t.effects);
         const cr = creatureOf(t) || pcLife(t);
         // Token de personagem mostra o nome atual da ficha (o nome gravado no token é só o de quando foi colocado).
-        const label = (t.character_id && characters[t.character_id]?.name) || t.name;
+        const label = (t.character_id && characters[t.character_id]?.name) || displayName(t, isGm);
         return <g key={t.id} data-token={t.id} transform={`translate(${p.x} ${p.y})`}
           className={`board-token${canMove(t) ? ' movable' : ''}${selected === t.id ? ' selected' : ''}${t.hidden ? ' hidden-token' : ''}${cr && cr.hp === 0 ? ' defeated' : ''}`}>
           {src ? <>
@@ -357,11 +411,27 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
             <rect className={`hp-fill ${hpTone(cr.ratio)}`} x={-r} y={r + gsize * 0.05} width={Math.max(0, r * 2 * cr.ratio)} height={gsize * 0.11} rx={gsize * 0.05} />
           </g>}
           <text y={r + gsize * (hpVisible(cr, isGm) ? 0.46 : 0.28)} textAnchor="middle" fontSize={gsize * 0.26} className="token-label" pointerEvents="none">{label}</text>
+          {badges.shown.length > 0 && <g className="token-effects" pointerEvents="none">
+            <title>{badges.all}</title>
+            {[...badges.shown, ...(badges.extra ? [{ id: '+', icon: `+${badges.extra}` }] : [])].map((e, i, all) => {
+              const fs = gsize * 0.3;
+              return <g key={e.id} transform={`translate(${(i - (all.length - 1) / 2) * fs * 1.7} ${-r - fs * 0.45})`}>
+                <circle r={fs * 0.85} fill="rgba(0,0,0,0.78)" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" />
+                <text textAnchor="middle" dominantBaseline="central" fontSize={e.id === '+' ? fs * 0.8 : fs} fill="#fff">{e.icon}</text>
+              </g>;
+            })}
+          </g>}
+          {isGm && isNameHidden(t) && <g transform={`translate(${r * 0.78} ${-r * 0.78})`} pointerEvents="none">
+            <title>Nome e foto ocultos dos jogadores</title>
+            <circle r={gsize * 0.17} fill="#d9a21b" stroke="#000" strokeWidth="2" />
+            <text textAnchor="middle" dominantBaseline="central" fontSize={gsize * 0.22} fontWeight="700" fill="#000">?</text>
+          </g>}
         </g>;
       })}</g>
     </svg>
     {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek aptitude={selectedAptitude} data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
-    {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)} />}
+    {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)}
+      onDuplicate={isGm ? () => duplicateCreature(sel) : undefined} onToggleName={isGm ? hide => toggleName(sel, hide) : undefined} onAddEffect={input => addTokenEffect(sel, input)} onRemoveEffect={id => removeTokenEffect(sel, id)} />}
     <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>
     {logSlot}
@@ -372,7 +442,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
       onEditImage={t => { setMasterOpen(false); setMaker({ token: t, creature: Boolean(creatureOf(t)) }); }} />}
     {maker && <TokenMaker name={maker.token?.name || characters[myCharacter]?.name || ''} saveLabel={maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
-      creature={maker.creature ? { name: maker.token?.name || '', hp: creatureOf(maker.token)?.noHp ? undefined : creatureOf(maker.token)?.maxHp, hideHp: Boolean(creatureOf(maker.token)?.hideHp), editing: Boolean(maker.token) } : undefined}
-      onSave={saveTokenImage} onClose={() => setMaker(null)} />}
+      creature={maker.creature ? { name: maker.token?.name || '', hp: creatureOf(maker.token)?.noHp ? undefined : creatureOf(maker.token)?.maxHp, hideHp: Boolean(creatureOf(maker.token)?.hideHp), hideName: isNameHidden(maker.token), editing: Boolean(maker.token) } : undefined}
+      onSave={saveTokenImage} onSavePreset={maker.creature && !maker.token ? saveCreaturePreset : undefined} onClose={() => setMaker(null)} />}
   </div>;
 }

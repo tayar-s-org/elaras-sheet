@@ -41,13 +41,17 @@ export function incapacitation(state, max) {
   };
 }
 
-// Dado depois de perder `steps` estágios. O d4 é o menor dado possível: atributos e perícias treinadas nunca descem dele
-// (sem −2). Perícia sem treino (die 0) segue como já era, d4−2, e a incapacitação não a piora.
-export function steppedDie(die, steps, kind = 'attribute') {
+// Dado depois de perder `steps` estágios. A escada continua depois do d12: d4, d6, d8, d10, d12, d12+1, d12+2...
+// Cada estágio desce um degrau (d12+2 → d12+1 → d12 → d10). `bonus` é o +N de um d12+N (só existe com dado-base 12).
+// O d4 é o menor dado possível: atributos e perícias treinadas nunca descem dele (sem −2). Perícia sem treino
+// (die 0) segue como já era, d4−2, e a incapacitação não a piora.
+export function steppedDie(die, steps, kind = 'attribute', bonus = 0) {
   if (!die) return kind === 'attribute' ? { die: 4, bonus: 0 } : { die: 4, bonus: -2 };
   const index = DIE_LADDER.indexOf(die) + 1;
   if (index === 0) return { die, bonus: 0 };
-  const next = index - steps;
+  const extra = die === 12 ? Math.max(0, Math.trunc(Number(bonus) || 0)) : 0;
+  const next = index + extra - steps;
+  if (next > DIE_LADDER.length) return { die: 12, bonus: next - DIE_LADDER.length };
   return { die: DIE_LADDER[Math.max(1, next) - 1], bonus: 0 };
 }
 

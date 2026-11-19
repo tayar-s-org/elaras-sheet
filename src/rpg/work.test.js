@@ -49,6 +49,16 @@ test('trabalho que gasta estamina bloqueia com estamina em 1; sem custo de mana 
   assert.equal(run([work()], stats([onlyMana]), { stamina: 50, mana: 1 })[0].ok, false);
 });
 
+test('trabalho nunca deixa a estamina abaixo de 1: o custo é limitado ao que passa de 1', () => {
+  const heavy = { ...JOB, staminaTiers: [5, 5, 5], manaTiers: [0, 0, 0] };
+  const ev = run([work(), work()], stats([heavy]), { stamina: 3, mana: 50 });
+  assert.equal(ev[0].ok, true);
+  assert.equal(ev[0].staminaDelta, -2);
+  assert.equal(ev[0].staminaAfter, 1);
+  assert.equal(ev[1].ok, false, 'com 1 de estamina o trabalho bloqueia');
+  assert.equal(ev[1].staminaAfter, 1);
+});
+
 test('trabalho sem XP configurado não gera XP', () => {
   const noXp = { ...JOB, xp: 0, xpSkill: '' };
   assert.deepEqual(run([work()], stats([noXp]))[0].xp, []);

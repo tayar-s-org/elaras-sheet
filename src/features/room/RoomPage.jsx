@@ -9,6 +9,7 @@ import BoardView from './BoardView.jsx';
 import TableControls from '../tables/TableControls.jsx';
 import TableLog from './TableLog.jsx';
 import TrainingButton from './TrainingButton.jsx';
+import { useGmAlert, GmAlertToggle } from './GmAlert.jsx';
 import ItemApprovals from './ItemApprovals.jsx';
 import SkillApprovals from './SkillApprovals.jsx';
 import { useCustomSkillRequests } from './useCustomSkillRequests.js';
@@ -59,6 +60,8 @@ export default function RoomPage({ auth, id }) {
   const clock = useClock(id, Boolean(room.ready));
   const requests = useRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const trainingRequests = useTrainingApprovals(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
+  const pendingTotal = itemRequests.pending + skillRequests.pending + requests.pending.length + trainingRequests.pending.length + members.filter(m => m.status === 'pending').length;
+  const gmAlert = useGmAlert(pendingTotal, Boolean(auth.user) && table?.owner_id === auth.user?.id);
   // Guarda esta sala como a sessao atual (o menu do topo oferece "Voltar a mesa"); esquece se a pessoa perdeu o acesso.
   const userId = auth.user?.id;
   const approved = members.find(m => m.user_id === userId)?.status === 'approved';
@@ -123,11 +126,12 @@ export default function RoomPage({ auth, id }) {
         </>
         : tab === 'table' ? <>
         {ctrlError && <p role="alert" className="muted">{ctrlError}</p>}
+        {isGm && <GmAlertToggle alert={gmAlert} total={pendingTotal} />}
         <TableControls table={table} me={me} members={members} reload={room.reload} isGm={isGm}
           run={async fn => { setCtrlError(''); try { await fn(); } catch (e) { setCtrlError(e.message); } }} />
       </>
         : tab === 'dice' ? <>
-        <DicePanel tableId={id} me={auth.user.id} members={members} characters={characters} onRolled={room.addRoll} disabled={closed} settings={diceSettings} onSettings={setDiceSettings} />
+        <DicePanel tableId={id} me={auth.user.id} members={members} characters={characters} states={states} onRolled={room.addRoll} disabled={closed} settings={diceSettings} onSettings={setDiceSettings} />
         <h3>Histórico</h3>
         <RollHistory rolls={rolls} hidden={hidden} members={members} me={auth.user.id} />
       </>

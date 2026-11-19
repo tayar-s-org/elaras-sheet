@@ -1,3 +1,4 @@
+import { powerDamage } from './powerDamage.js';
 import { ATTRIBUTES, SKILLS, calculate } from './rules.js';
 
 export const stages = ['Novato', 'Experiente', 'Veterano', 'Heroico', 'Lendário'];
@@ -63,6 +64,6 @@ export function powersFromBook(pages) {
     const start = index + (blocks[index + 4]?.startsWith('• Manifestações:') ? 5 : 4);
     const summary = blocks[start]?.match(/^.*?[.!?](?=\s|$)/)?.[0] || blocks[start] || '';
     const title = name.charAt(0) + name.slice(1).toLocaleLowerCase('pt-BR');
-    return [{name:title, page, stage, cost, range, duration, summary}];
+    return [{name:title, page, stage, cost, range, duration, damage: powerDamage(title), summary}];
   }));
 }

@@ -1,8 +1,10 @@
 import { supabase } from './supabase.js';
+import { mergeSecrets } from '../tokenState.js';
 
 const fail = error => { if (error) throw new Error(error.message || 'Erro ao acessar a nuvem.'); };
 const BOARD_COLS = 'id,table_id,name,map_path,width,height,grid,settings';
-const TOKEN_COLS = 'id,board_id,table_id,kind,name,character_id,x,y,size,color,hidden,image_path,meta';
+const TOKEN_COLS = 'id,board_id,table_id,kind,name,character_id,x,y,size,color,hidden,image_path,meta,name_hidden,effects';
+const SECRET_COLS = 'token_id,name,image_path';
 const MARK_COLS = 'id,board_id,kind,x,y,text,color,created_by';
 
 export const MAP_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -14,14 +16,17 @@ export async function loadBoard(tableId) {
   fail(error);
   return data;
 }
+// Tokens com nome oculto chegam em branco; o mestre (e só ele, pela RLS) recebe os valores reais em board_token_secrets.
+// Se a leitura dos segredos falhar, o tabuleiro continua carregando (o nome oculto fica em branco).
 export async function loadBoardItems(boardId) {
-  const [tokens, marks] = await Promise.all([
+  const [tokens, marks, secrets] = await Promise.all([
     supabase.from('board_tokens').select(TOKEN_COLS).eq('board_id', boardId),
     supabase.from('board_marks').select(MARK_COLS).eq('board_id', boardId),
+    supabase.from('board_token_secrets').select(SECRET_COLS).eq('board_id', boardId),
   ]);
   fail(tokens.error);
   fail(marks.error);
-  return { tokens: tokens.data, marks: marks.data };
+  return { tokens: mergeSecrets(tokens.data, secrets.error ? [] : secrets.data), marks: marks.data };
 }
 export async function updateBoard(id, patch) {
   const { error } = await supabase.from('boards').update(patch).eq('id', id);
@@ -31,7 +36,8 @@ export async function addToken(board, token) {
   const { data, error } = await supabase.from('board_tokens')
     .insert({ board_id: board.id, table_id: board.table_id, ...token }).select(TOKEN_COLS).single();
   fail(error);
-  return data;
+  // Criado com nome oculto, o servidor devolve a linha em branco; quem criou (o mestre) continua com o nome e a imagem reais.
+  return data.name_hidden && !data.name ? { ...data, name: token.name || '', image_path: token.image_path || null } : data;
 }
 export async function updateToken(id, patch) {
   const { error } = await supabase.from('board_tokens').update(patch).eq('id', id);

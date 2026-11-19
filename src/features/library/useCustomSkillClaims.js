@@ -31,7 +31,7 @@ export function useCustomSkillClaims(session, setSession, user, notify) {
             const rows = await claimCustomSkills(id);
             if (rows.length) {
               setSession(prev => editSheet(prev, sheet.id, ch => rows.reduce((acc, row) => addCustomSkill(acc, row, FIXED), ch)));
-              const names = rows.map(r => `${r.name} (d${r.die})`).join(', ');
+              const names = rows.map(r => `${r.name} (${r.attribute ? `${r.attribute}, ` : ''}d${r.die})`).join(', ');
               notifyRef.current?.(`🎓 O mestre aprovou ${rows.length > 1 ? 'as perícias' : 'a perícia'} ${names}. Já ${rows.length > 1 ? 'estão' : 'está'} na ficha de ${sheet.character.name || 'sua ficha'}.`);
             }
           } catch (error) {

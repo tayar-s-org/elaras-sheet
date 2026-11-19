@@ -13,6 +13,7 @@ import BookTab from "./BookTab.jsx";
 import GuideTab from "./GuideTab.jsx";
 import MarketTab from "./MarketTab.jsx";
 import { resolveItem } from "../../market/items.js";
+import { itemEffects } from "../../market/effects.js";
 import "./modules.css";
 import AptitudeSummary, { useAptitudeFor } from "../routine/AptitudeSummary.jsx";
 import SheetAptitude from "../routine/SheetAptitude.jsx";
@@ -35,16 +36,19 @@ const excerpt = (text, max = 220) => {
   const t = (text || "").trim().replace(/\n{2,}/g, "\n");
   return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
 };
-// Vantagens repetidas aparecem uma vez com o multiplicador (Nome ×2).
+// Vantagens repetidas aparecem uma vez com o multiplicador (Nome ×2); a descrição é a da primeira que tiver texto.
 const groupedAdvantages = list => {
   const map = new Map();
   for (const a of list) {
     const name = a.name || "Sem nome";
     const key = name.trim().toLowerCase();
-    map.set(key, map.has(key) ? [map.get(key)[0], map.get(key)[1] + 1, map.get(key)[2]] : [name, 1, a.power]);
+    const prev = map.get(key);
+    map.set(key, prev ? [prev[0], prev[1] + 1, prev[2], prev[3] || a.description] : [name, 1, a.power, a.description]);
   }
   return [...map.values()];
 };
+// Cartão que abre para mostrar o efeito (descrição da vantagem ou da complicação, efeitos do equipamento).
+const Detail = ({ title, tag, tone, children }) => <details className={`mod-detail${tone ? ` ${tone}` : ""}`}><summary><b>{title}</b>{tag ? <small>{tag}</small> : null}</summary><div className="mod-detail-body">{children}</div></details>;
 // Itens da mochila (equipados primeiro).
 const bagItems = c => c.inventory.map(e => ({ ...e, name: resolveItem(e)?.name })).filter(e => e.name).sort((a, b) => Number(b.equipped) - Number(a.equipped));
 // Bônus de rolagem vindo de itens equipados, ex.: " (+2)".
@@ -88,14 +92,23 @@ function Summary({ index, c, d }) {
     case 3:
       return <>
         <h4 className="mod-sub">Vantagens ({c.advantages.length})</h4>
-        {c.advantages.length ? <div className="mod-chips">{groupedAdvantages(c.advantages).map(([label, n, power]) => <Chip key={label} label={n > 1 ? `${label} ×${n}` : label} tone={power ? "power" : ""} />)}</div> : <Empty>Nenhuma vantagem.</Empty>}
+        {c.advantages.length ? <div className="mod-details">{groupedAdvantages(c.advantages).map(([label, n, power, description]) => <Detail key={label} title={n > 1 ? `${label} ×${n}` : label} tag={power ? "poder" : ""} tone={power ? "power" : ""}>{description ? <p>{description}</p> : <p className="muted">Sem descrição. Escreva o efeito em Editar.</p>}</Detail>)}</div> : <Empty>Nenhuma vantagem.</Empty>}
         <h4 className="mod-sub">Complicações ({c.hindrances.length})</h4>
-        {c.hindrances.length ? <div className="mod-chips">{c.hindrances.map((h, i) => <Chip key={i} label={h.name || "Sem nome"} value={h.severity} tone={h.severity === "Maior" ? "major" : "minor"} />)}</div> : <Empty>Nenhuma complicação.</Empty>}
+        {c.hindrances.length ? <div className="mod-details">{c.hindrances.map((h, i) => <Detail key={i} title={h.name || "Sem nome"} tag={h.severity} tone={h.severity === "Maior" ? "major" : "minor"}>{h.description ? <p>{h.description}</p> : <p className="muted">Sem descrição.</p>}</Detail>)}</div> : <Empty>Nenhuma complicação.</Empty>}
       </>;
     case 4:
       return <>
         <h4 className="mod-sub">Poderes ({c.powers.length})</h4>
-        {c.powers.length ? <div className="mod-chips">{c.powers.map((p, i) => <Chip key={i} label={p.name || "Sem nome"} value={p.cost || null} tone="power" />)}</div> : <Empty>Nenhum poder.</Empty>}
+        {c.powers.length ? <ul className="mod-spells">{c.powers.map((p, i) => <li key={i} className="mod-spell">
+          <b className="mod-spell-name">{p.name || "Sem nome"}{p.upgrades?.length ? <small> · {p.upgrades.length} melhoria(s)</small> : null}</b>
+          <span className="mod-spell-facts">
+            <span><i>Custo de mana</i>{p.cost || "—"}</span>
+            <span><i>Dano</i>{p.damage || "—"}</span>
+            <span><i>Distância</i>{p.range || "—"}</span>
+            <span><i>Duração</i>{p.duration || "—"}</span>
+          </span>
+          {p.description ? <details className="mod-spell-desc"><summary>Descrição</summary><p>{p.description}</p></details> : null}
+        </li>)}</ul> : <Empty>Nenhum poder.</Empty>}
         {c.powers.some(p => p.upgrades?.length) && <ul className="mod-upgrades">{c.powers.flatMap((p, i) => (p.upgrades || []).map(u => <li key={`${i}-${u.n}`}><b>{p.name || "Feitiço"} · melhoria {u.n}:</b> {u.description}</li>))}</ul>}
       </>;
     case 7: {
@@ -104,7 +117,13 @@ function Summary({ index, c, d }) {
       const load = d.inventory;
       return <>
         <h4 className="mod-sub">Itens ({c.inventory.reduce((n, e) => n + e.qty, 0)})</h4>
-        {bag.length ? <div className="mod-chips">{bag.map(e => <Chip key={e.id} label={e.name} value={e.qty > 1 ? `×${e.qty}` : null} tone={e.equipped ? "power" : ""} />)}</div> : <Empty>Nada na mochila. Compre equipamento no Mercado.</Empty>}
+        {bag.length ? <div className="mod-details">{bag.map(e => {
+          const fx = itemEffects(resolveItem(e));
+          return <Detail key={e.id} title={e.qty > 1 ? `${e.name} ×${e.qty}` : e.name} tag={e.equipped ? "equipado" : ""} tone={e.equipped ? "power" : ""}>
+            {fx.lines.length ? <ul>{fx.lines.map(l => <li key={l}>{l}</li>)}</ul> : <p className="muted">Sem efeito em regras.</p>}
+            {fx.notes && <p>{fx.notes}</p>}
+          </Detail>;
+        })}</div> : <Empty>Nada na mochila. Compre equipamento no Mercado.</Empty>}
         {bag.length > 0 && <p className="mod-facts">Carga {kg(load.weight)} / {kg(load.capacity)}{load.overload ? ` · sobrecarga −${load.overload} de Movimento` : ""} · itens em roxo estão equipados</p>}
         {bonus.length > 0 && <div className="mod-chips">{bonus.map(([k, v]) => <Chip key={k} label={`Bônus de ${k}`} value={v > 0 ? `+${v}` : v} />)}</div>}
       </>;
@@ -154,7 +173,7 @@ export function SheetOverview({ c, d, apt }) {
 // Ficha em modulos: cada cartao resume a secao e o botao "Editar" abre o editor completo dela.
 export default function SheetModules({ ctx, editing, setEditing }) {
   const { c, d } = ctx;
-  const apt = useAptitudeFor({ characterId: ctx.cloudId });
+  const apt = useAptitudeFor({ characterId: ctx.cloudId, tableId: ctx.tableId || null });
   useEffect(() => {
     if (editing == null) return undefined;
     const onKey = e => { if (e.key === "Escape") setEditing(null); };

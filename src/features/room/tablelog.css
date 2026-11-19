@@ -25,3 +25,6 @@
 .log-reward.up .log-delta { color: var(--success); }
 .log-reward.xp.up .log-delta { color: var(--gold); }
 .log-reward.down .log-delta { color: var(--danger); }
+
+.log-steps { display: grid; gap: 1px; margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--border); color: var(--muted); font-size: .82rem; }
+.log-step:last-child { font-weight: 600; }

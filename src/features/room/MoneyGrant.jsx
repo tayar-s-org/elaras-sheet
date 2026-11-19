@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { grantMoney } from '../../lib/money.js';
+import { grantEach, grantSummary } from '../../lib/grantEach.js';
 import { formatMoney } from '../../money.js';
 import '../../ui/money.css';
 
@@ -18,8 +19,8 @@ export default function MoneyGrant({ tableId, targets, label = 'Dinheiro ($)', b
     setBusy(true);
     setMsg('');
     try {
-      for (const t of targets) await grantMoney(tableId, t.id, sign * amount);
-      setMsg(`$${formatMoney(amount)} ${sign > 0 ? 'enviado' : 'removido'}${targets.length > 1 ? (sign > 0 ? ' a todos' : ' de todos') : ''}.`);
+      const res = await grantEach(targets, t => grantMoney(tableId, t.id, sign * amount));
+      setMsg(grantSummary(res, `$${formatMoney(amount)} ${sign > 0 ? 'enviado' : 'removido'}${targets.length > 1 ? (sign > 0 ? ' a todos' : ' de todos') : ''}.`));
     } catch (err) { setMsg(err.message); }
     finally { setBusy(false); }
   }

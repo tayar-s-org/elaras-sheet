@@ -127,11 +127,11 @@ export default function MasterModule({ board, tokens, marks, members, characters
         <h3 id="m-selected">Token selecionado</h3>
         {!selected && <p className="muted">Clique num token no tabuleiro para editá-lo, ocultá-lo ou removê-lo.</p>}
         {selected && <div className="item-card">
-          <strong>{selected.name || 'Sem nome'}</strong> <span className="muted">{creature ? 'Criatura' : selected.kind === 'pc' ? 'Personagem' : 'Objeto'}</span>
+          <strong>{(selected.character_id && characters[selected.character_id]?.name) || selected.name || 'Sem nome'}</strong> <span className="muted">{creature ? 'Criatura' : selected.kind === 'pc' ? 'Personagem' : 'Objeto'}</span>
           <div className="form-grid compact">
-            <label className="field"><span>Nome</span>
+            {!selected.character_id && <label className="field"><span>Nome</span>
               <input maxLength={60} defaultValue={selected.name} key={`${selected.id}-${selected.name}`}
-                onBlur={e => { const v = e.target.value.trim(); if (v && v !== selected.name) patchToken(selected, { name: v }); }} /></label>
+                onBlur={e => { const v = e.target.value.trim(); if (v && v !== selected.name) patchToken(selected, { name: v }); }} /></label>}
             <label className="field"><span>Tamanho</span>
               <select value={selected.size} onChange={e => patchToken(selected, { size: Number(e.target.value) })}>
                 <option value="0.5">Pequeno</option><option value="1">Médio</option><option value="2">Grande</option><option value="3">Enorme</option></select></label>
@@ -147,13 +147,15 @@ export default function MasterModule({ board, tokens, marks, members, characters
             </>}
           </div>
           <div className="row master-actions">
-            <button type="button" className="outline" disabled={busy} onClick={() => onEditImage(selected)}>
-              {creature ? 'Trocar imagem da criatura' : selected.image_path ? 'Trocar imagem' : 'Criar imagem do token'}</button>
+            {selected.character_id
+              ? <p className="muted">A imagem e o nome do token de jogador vêm da ficha dele.</p>
+              : <button type="button" className="outline" disabled={busy} onClick={() => onEditImage(selected)}>
+                {creature ? 'Trocar imagem da criatura' : selected.image_path ? 'Trocar imagem' : 'Criar imagem do token'}</button>}
             {creature && !creature.noHp && <button type="button" className="outline" disabled={busy || !presets} onClick={() => run(async () => {
               const p = await savePreset(board.table_id, { name: uniqueName(selected.name, (presets || []).map(x => x.name)), image_path: selected.image_path, max_hp: creature.maxHp, size: selected.size });
               setPresets(prev => [...(prev || []), p]);
             })}>Salvar como predefinição</button>}
-            {!creature && selected.image_path && <button type="button" className="text-button" disabled={busy} onClick={() => patchToken(selected, { image_path: null })}>Tirar imagem</button>}
+            {!creature && !selected.character_id && selected.image_path && <button type="button" className="text-button" disabled={busy} onClick={() => patchToken(selected, { image_path: null })}>Tirar imagem</button>}
             <button type="button" className="outline" disabled={busy}
               onClick={() => run(async () => { const hidden = !selected.hidden; await updateToken(selected.id, { hidden }); local.setTokens(prev => prev.map(t => (t.id === selected.id ? { ...t, hidden } : t))); room.sendBroadcast('board_refresh', {}); })}>
               {selected.hidden ? 'Revelar aos jogadores' : 'Ocultar dos jogadores'}</button>

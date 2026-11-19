@@ -14,8 +14,9 @@ const initialsOf = name => (name || '').trim().split(/\s+/).slice(0, 2).map(w =>
 
 // Criador de tokens: envie um retrato, enquadre, escolha forma/moldura e salve (ou baixe o PNG).
 // onSave(blob) devolve uma promessa; o modal fecha quando ela resolve.
-// Modo criatura (mestre): moldura, forma e cor são únicas; escolhe-se só nome, foto e vida. onSave(blob, { name, hp }).
-export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Salvar token', creature }) {
+// Modo criatura (mestre): moldura, forma e cor são únicas; escolhe-se nome, foto, vida e se o nome fica oculto (os efeitos ficam só no cartão do token).
+// onSave(blob, { name, hp, hideHp, hideName }).
+export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, saveLabel = 'Salvar token', creature }) {
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const drag = useRef(null);
@@ -28,6 +29,8 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
   const [cName, setCName] = useState(creature?.name || '');
   const [cHp, setCHp] = useState(creature?.hp ? String(creature.hp) : '');
   const [hideHp, setHideHp] = useState(Boolean(creature?.hideHp)); // vida oculta dos jogadores (o mestre sempre vê)
+  const [note, setNote] = useState('');
+  const [hideName, setHideName] = useState(Boolean(creature?.hideName)); // nome e foto ocultos dos jogadores (aparece ?)
   const [frameImg, setFrameImg] = useState(null);
   const [frameFailed, setFrameFailed] = useState(false);
   // Moldura das criaturas: imagem única. Se não carregar, cai na moldura vermelha desenhada.
@@ -107,10 +110,18 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setError(e.message); }
   }
+  // Criatura nova: guarda só a predefinição (sem pôr no mapa), para deixar os monstros preparados. O modal continua aberto.
+  async function savePresetOnly() {
+    setBusy(true);
+    setError('');
+    setNote('');
+    try { setNote(`Predefinição “${await onSavePreset(await render(), { name: cName.trim(), hp: parseHp(cHp) })}” salva.`); } catch (e) { setError(e.message); }
+    setBusy(false);
+  }
   async function save() {
     setBusy(true);
     setError('');
-    try { await onSave(await render(), creature ? { name: cName.trim(), hp: parseHp(cHp), hideHp } : undefined); onClose(); } catch (e) { setError(e.message); setBusy(false); }
+    try { await onSave(await render(), creature ? { name: cName.trim(), hp: parseHp(cHp), hideHp, hideName } : undefined); onClose(); } catch (e) { setError(e.message); setBusy(false); }
   }
 
   const frame = FRAMES.find(f => f.id === design.frame);
@@ -138,6 +149,7 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
             <label className="field"><span>Vida</span>
               <input type="number" min="1" max={MAX_HP} inputMode="numeric" value={cHp} placeholder="Ex.: 30" onChange={e => setCHp(e.target.value)} /></label>
             <label className="check token-nohp"><input type="checkbox" checked={hideHp} onChange={e => setHideHp(e.target.checked)} /> Não mostrar vida (só o mestre vê a barra e os números)</label>
+            <label className="check token-nohp"><input type="checkbox" checked={hideName} onChange={e => setHideName(e.target.checked)} /> Ocultar nome e foto (os jogadores veem “?” até você desmarcar)</label>
           </div>}
           <label className="field"><span>Zoom</span>
             <input type="range" min="0.3" max="4" step="0.01" value={design.zoom} disabled={!image} onChange={e => patch({ zoom: Number(e.target.value) })} /></label>
@@ -176,10 +188,12 @@ export default function TokenMaker({ name = '', onSave, onClose, saveLabel = 'Sa
         </div>
       </div>
       {error && <p role="alert" className="token-error">{error}</p>}
+      {note && <p role="status" className="muted">{note}</p>}
       <div className="row token-actions">
         <button type="button" className="quiet" disabled={busy} onClick={onClose}>Cancelar</button>
         <span className="token-actions-right">
           <button type="button" className="outline" disabled={busy} onClick={download}>Baixar PNG</button>
+          {creature && !creature.editing && onSavePreset && <button type="button" className="outline" disabled={busy || !creatureReady} title="Guarda a criatura nas predefinições sem colocá-la no mapa" onClick={savePresetOnly}>Salvar predefinição</button>}
           {onSave && <button type="button" className="primary" disabled={busy || !creatureReady || (!creature && !image && !design.initials)} onClick={save}>{busy ? 'Salvando…' : saveLabel}</button>}
         </span>
       </div>

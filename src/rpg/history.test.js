@@ -115,3 +115,41 @@ test('acumuladores agrupados por alvo, com Normal e Focado lado a lado', () => {
   assert.equal(g[0].focused.available, 5);
   assert.equal(g[1].focused, null);
 });
+
+import { lastTrainedTicks, xpSheetRows, sortXpRows, xpSheetTotals } from './history.js';
+
+const pool = (kind, name, modality, available, earned, spent) => ({ kind, name, modality, available, earned_total: earned, spent_total: spent });
+
+test('planilha de XP: soma Normal e Focado por característica e calcula os totais', () => {
+  const progress = [
+    pool('skill', 'Atirar', 'normal', 100, 300, 200), pool('skill', 'Atirar', 'focused', 50, 80, 30),
+    pool('attribute', 'Agilidade', 'normal', 10, 40, 30), pool('spell', 's1', 'normal', 5, 5, 0),
+  ];
+  const rows = xpSheetRows(progress, { dieOf: (k, n) => (n === 'Atirar' ? 8 : 0), nameOf: (k, n) => (k === 'spell' ? 'Fogo' : n), lastTicks: { 'skill:Atirar': 40 } });
+  const atirar = rows.find(r => r.name === 'Atirar');
+  assert.deepEqual([atirar.earned, atirar.spent, atirar.available, atirar.die, atirar.lastTick], [380, 230, 150, 8, 40]);
+  assert.equal(rows.find(r => r.kind === 'spell').label, 'Fogo');
+  assert.equal(rows.find(r => r.name === 'Agilidade').lastTick, null);
+  assert.deepEqual(xpSheetTotals(rows), { earned: 425, spent: 260, available: 165 });
+});
+
+test('planilha de XP: ordena por coluna, com vazios no fim, e é estável pelo nome', () => {
+  const rows = [
+    { label: 'Atirar', kind: 'skill', earned: 5, lastTick: 9 }, { label: 'Agilidade', kind: 'attribute', earned: 5, lastTick: null },
+    { label: 'Fogo', kind: 'spell', earned: 9, lastTick: 20 },
+  ];
+  assert.deepEqual(sortXpRows(rows, 'earned', 'desc').map(r => r.label), ['Fogo', 'Agilidade', 'Atirar']);
+  assert.deepEqual(sortXpRows(rows, 'lastTick', 'desc').map(r => r.label), ['Fogo', 'Atirar', 'Agilidade']);
+  assert.deepEqual(sortXpRows(rows, 'lastTick', 'asc').map(r => r.label), ['Atirar', 'Fogo', 'Agilidade'], 'sem treino sempre por último');
+  assert.deepEqual(sortXpRows(rows, 'kind').map(r => r.kind), ['attribute', 'skill', 'spell']);
+});
+
+test('último treino: maior tick com XP do alvo, ignorando horas sem efeito', () => {
+  const runs = [
+    { tick: 5, ok: true, xp: [{ kind: 'skill', name: 'Atirar' }, { kind: 'attribute', name: 'Agilidade' }] },
+    { tick: 9, ok: true, xp: [{ kind: 'skill', name: 'Atirar' }] },
+    { tick: 12, ok: false, xp: [{ kind: 'skill', name: 'Atirar' }] },
+    { tick: 14, ok: true, xp: [] },
+  ];
+  assert.deepEqual(lastTrainedTicks(runs), { 'skill:Atirar': 9, 'attribute:Agilidade': 5 });
+});

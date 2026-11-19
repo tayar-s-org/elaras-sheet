@@ -108,6 +108,18 @@ test('estamina em 1 ou menos bloqueia o treino sem custo nem XP', () => {
   assert.equal(blockedReason(ACT.SKILL, 2, 0), '');
 });
 
+test('nenhuma hora de treino deixa a estamina abaixo de 1: o custo é limitado e a hora seguinte bloqueia', () => {
+  const one = run([skill({ mode: 'focused' })], { start: { stamina: 2 } });
+  assert.equal(one.events[0].ok, true, 'com 2 de estamina a hora acontece');
+  assert.equal(one.events[0].staminaDelta, -1, 'o custo (2) é limitado ao que passa de 1');
+  assert.equal(one.state.stamina, 1);
+  const long = run(rows(12, skill({ mode: 'focused' })), { start: { stamina: 5 } });
+  assert.ok(long.events.every(e => e.staminaAfter >= 1), 'nunca abaixo de 1');
+  assert.equal(long.state.stamina, 1);
+  assert.equal(long.events.filter(e => e.ok).length, 2, '5 → 3 → 1; com 1 de estamina as horas seguintes bloqueiam');
+  assert.equal(run([skill()], { start: { stamina: 1.5 } }).state.stamina, 1);
+});
+
 test('treinar feitiço: 1 de mana por hora (2 se focado), limite = metade do dado-base de Conjurar', () => {
   const six = run(rows(8, spell()));
   assert.equal(six.events.filter(e => e.ok).length, 6, 'Conjurar d12 = 6 horas');
@@ -350,4 +362,16 @@ test('statsFromCharacter lê Espírito, Conjurar, Meditar (com bônus), máximos
 
 test('newDay começa zerado', () => {
   assert.deepEqual(newDay(3), { dayNo: 3, trainHours: 0, spellHours: 0, workHours: 0, restHours: 0, restStreak: 0, quickHours: 0, medClosed: 0, medActive: false, medHours: 0, medRoll: 0, medRate: 0, prev: '' });
+});
+
+test('meditar: cada hora dá +1 XP em Meditar e +0,5 em Espírito (só nas horas com efeito)', () => {
+  const med = { a: ACT.MEDITATE };
+  const r = run([med, med, med], { start: { mana: 0 } });
+  for (const e of r.events) assert.deepEqual(e.xp, [
+    { kind: 'skill', name: 'Meditar', modality: 'normal', amount: 1 },
+    { kind: 'attribute', name: 'Espírito', modality: 'normal', amount: 0.5 },
+  ]);
+  const d6 = run([med, { a: '' }, med], { st: stats({ spirit: { die: 6, bonus: 0 } }), start: { mana: 0 } });
+  assert.equal(d6.events[2].ok, false, 'sem sessão disponível a hora não tem efeito');
+  assert.deepEqual(d6.events[2].xp, [], 'e não dá XP');
 });

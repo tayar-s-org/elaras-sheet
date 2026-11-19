@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-const COLS = 'id,table_id,user_id,character_id,name,die,status,gm_note,created_at,decided_at';
+const COLS = 'id,table_id,user_id,character_id,name,die,attribute,status,gm_note,created_at,decided_at';
 export const SKILL_STATUS = { pending: 'Aguardando aprovação', approved: 'Aprovada', rejected: 'Recusada' };
 
 // Devolvem null quando a tabela ainda nao existe (migration 0027 pendente).
@@ -16,8 +16,8 @@ export async function listTableCustomSkills(tableId) {
   const { data, error } = await supabase.from('table_custom_skills').select(COLS).eq('table_id', tableId).order('created_at', { ascending: false }).limit(100);
   return error ? null : data;
 }
-export async function submitCustomSkill(tableId, characterId, name, die) {
-  const { error } = await supabase.from('table_custom_skills').insert({ table_id: tableId, character_id: characterId, name, die });
+export async function submitCustomSkill(tableId, characterId, name, die, attribute) {
+  const { error } = await supabase.from('table_custom_skills').insert({ table_id: tableId, character_id: characterId, name, die, attribute });
   if (error) throw new Error(error.message || 'Não foi possível enviar a perícia.');
 }
 export async function decideCustomSkill(id, status, note = '') {

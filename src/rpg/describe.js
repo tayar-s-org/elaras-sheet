@@ -13,7 +13,7 @@ export function describeEvent(e, stats) {
   switch (e.activity) {
     case ACT.SKILL: {
       const row = e.row || {};
-      return `${e.trainHour}ª hora de treino${mod(row.mode)}: −${fmt(e.cost)} de estamina · +1 XP em ${row.skill}`;
+      return `${e.trainHour}ª hora de treino${mod(row.mode)}: −${fmt(e.cost)} de estamina${e.manaCost ? ` e −${fmt(e.manaCost)} de mana` : ''} · +1 XP em ${row.skill}`;
     }
     case ACT.SPELL: {
       const row = e.row || {};
@@ -29,7 +29,7 @@ export function describeEvent(e, stats) {
     case ACT.QUICK: return 'Descanso rápido: +2 de estamina';
     case ACT.MEDITATE: {
       const m = e.meditation || {};
-      return m.started ? `Sessão de meditação iniciada: +${fmt(m.rate)} de mana por hora` : `Meditação: +${fmt(e.manaDelta)} de mana`;
+      return `${m.started ? `Sessão de meditação iniciada: +${fmt(m.rate)} de mana por hora` : `Meditação: +${fmt(e.manaDelta)} de mana`} · +1 XP em Meditar, +0,5 em Espírito`;
     }
     default: return ACTIVITY_LABEL[e.activity] || '';
   }

@@ -2,6 +2,7 @@ import { racialEffects } from "./templates.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
 import { inventoryEffects, itemById } from "./market/items.js";
 import { sanitizeCustom, isCustomId } from "./market/custom.js";
+import { bookFacts } from "./data/matchBookPower.js";
 import { sanitizeCustomSkills } from "./skills/custom.js";
 export const ATTRIBUTES = [
   "Agilidade",
@@ -250,6 +251,7 @@ function integer(value, min, max, fallback = 0) {
     ? value
     : fallback;
 }
+const fromBook = (power, key) => bookFacts(power.name, power.cost)?.[key] || "";
 function powerId(index, name) {
   let h = 0;
   for (const ch of String(name || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -318,7 +320,7 @@ export function validateCharacter(raw) {
     }
     return out;
   };
-  const skillNames = SKILLS.map(([n]) => n);
+  const skillNames = Object.keys(c.skills).concat(SKILLS.map(([n]) => n).filter(n => !(n in c.skills)));
   c.bonuses = { skills: counts(raw.bonuses, "skills", skillNames, 50, true), attributes: counts(raw.bonuses, "attributes", ATTRIBUTES, 50, true) };
   c.evolved = { skills: counts(raw.evolved, "skills", skillNames, 20, false), attributes: counts(raw.evolved, "attributes", ATTRIBUTES, 20, false) };
   c.advantages = (Array.isArray(raw.advantages) ? raw.advantages : [])
@@ -344,6 +346,11 @@ export function validateCharacter(raw) {
       name: string(x.name, 200),
       description: string(x.description),
       cost: string(x.cost, 100),
+      // Dados de regra do feitiço mostrados na ficha.
+      // Campos vazios de poderes que vieram do livro são preenchidos com os dados do livro (o que o jogador escreveu prevalece).
+      damage: string(x.damage, 100) || fromBook(x, "damage"),
+      range: string(x.range, 100) || fromBook(x, "range"),
+      duration: string(x.duration, 100) || fromBook(x, "duration"),
       // Melhorias conquistadas no Estudo Mágico: { n, description, at }.
       upgrades: (Array.isArray(x.upgrades) ? x.upgrades : []).slice(0, 20).map((u, i) => ({
         n: integer(u?.n, 1, 20, i + 1), description: string(u?.description, 2000), at: string(u?.at, 40),

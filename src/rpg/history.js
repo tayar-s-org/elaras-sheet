@@ -133,3 +133,52 @@ export function groupPools(progress) {
   const order = { skill: 0, attribute: 1, spell: 2 };
   return [...map.values()].sort((a, b) => order[a.kind] - order[b.kind] || a.name.localeCompare(b.name));
 }
+
+// Último treino de cada alvo (perícia, atributo ou feitiço): o maior tick de uma hora com efeito que rendeu XP a esse alvo.
+export function lastTrainedTicks(runs) {
+  const map = {};
+  for (const r of runs) {
+    if (!r.ok) continue;
+    for (const x of r.xp || []) {
+      const k = `${x.kind}:${x.name}`;
+      if (!(k in map) || r.tick > map[k]) map[k] = r.tick;
+    }
+  }
+  return map;
+}
+
+// Planilha de XP: uma linha por característica treinada, somando os acumuladores Normal e Focado.
+//   adquiridos = total conquistado (nunca diminui) · aplicados = XP já gasta em evoluções · disponíveis = o que ainda pode gastar.
+// dieOf(kind, name) devolve o dado atual (número) ou 0/undefined; nameOf(kind, name) o nome a mostrar.
+export function xpSheetRows(progress, { lastTicks = {}, dieOf = () => 0, nameOf = (_k, n) => n } = {}) {
+  return groupPools(progress).map(g => {
+    const sum = field => round([g.normal, g.focused].reduce((s, p) => s + Number(p?.[field] || 0), 0));
+    return {
+      key: `${g.kind}:${g.name}`, kind: g.kind, name: g.name, label: nameOf(g.kind, g.name), normal: g.normal, focused: g.focused,
+      die: dieOf(g.kind, g.name) || 0, earned: sum('earned_total'), spent: sum('spent_total'), available: sum('available'),
+      lastTick: lastTicks[`${g.kind}:${g.name}`] ?? null,
+    };
+  });
+}
+
+const KIND_ORDER = { skill: 1, attribute: 0, spell: 2 };
+// Ordena as linhas da planilha por coluna (label, kind, die, earned, spent, available, lastTick). Vazio (sem último treino) vai para o fim.
+export function sortXpRows(rows, key = 'label', dir = 'asc') {
+  const sign = dir === 'desc' ? -1 : 1;
+  const value = r => (key === 'kind' ? KIND_ORDER[r.kind] : r[key]);
+  return [...rows].sort((a, b) => {
+    const x = value(a), y = value(b);
+    if (x == null && y == null) return a.label.localeCompare(b.label, 'pt-BR');
+    if (x == null) return 1;
+    if (y == null) return -1;
+    const cmp = typeof x === 'string' ? x.localeCompare(y, 'pt-BR') : x - y;
+    return cmp * sign || a.label.localeCompare(b.label, 'pt-BR');
+  });
+}
+
+// Totais do rodapé da planilha.
+export const xpSheetTotals = rows => ({
+  earned: round(rows.reduce((s, r) => s + r.earned, 0)),
+  spent: round(rows.reduce((s, r) => s + r.spent, 0)),
+  available: round(rows.reduce((s, r) => s + r.available, 0)),
+});

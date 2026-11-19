@@ -44,6 +44,14 @@ export async function updateCharacter(id, revision, character) {
   if (!data.length) throw new ConflictError();
   return { id: data[0].id, revision: data[0].revision, character: c };
 }
+// A imagem do token mora na ficha (a ficha manda no token): grava o caminho nela. Tenta de novo uma vez se a ficha mudou no meio.
+export async function setCharacterTokenImage(id, path) {
+  for (let attempt = 0; ; attempt += 1) {
+    const { revision, character } = await getCharacter(id);
+    try { return await updateCharacter(id, revision, { ...character, tokenImage: path }); }
+    catch (e) { if (!(e instanceof ConflictError) || attempt >= 1) throw e; }
+  }
+}
 export async function deleteCharacter(id) {
   const { error } = await supabase.from('characters').delete().eq('id', id);
   fail(error);

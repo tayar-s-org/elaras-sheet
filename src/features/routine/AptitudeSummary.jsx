@@ -7,11 +7,12 @@ import './routine.css';
 // Aptidão de um personagem para mostrar na ficha, no resumo do token e nas telas do mestre.
 // Devolve { allocation, received, distributed, available } ou null (sem migration 0026 ou sem permissão para ver).
 export function useAptitudeFor({ characterId, tableId = null, enabled = true, refreshKey = 0 }) {
-  const [apt, setApt] = useState(null);
+  const [apt, setApt] = useState(() => (enabled && characterId ? { loading: true } : null));
   useEffect(() => {
     let alive = true;
     if (!enabled || !characterId) { setApt(null); return undefined; }
-    const pull = () => loadCharacterAptitude(characterId, tableId).then(a => { if (alive) setApt(a); }).catch(() => {});
+    setApt(prev => prev || { loading: true });
+    const pull = () => loadCharacterAptitude(characterId, tableId).then(a => { if (alive) setApt(a); }).catch(e => { if (alive) setApt({ error: e.message }); });
     pull();
     const timer = setInterval(pull, 20000);
     return () => { alive = false; clearInterval(timer); };
@@ -23,6 +24,8 @@ const pct = b => `+${Math.round(b * 100)}%`;
 
 // Lista só o que tem pontos: atributo ou perícia, pontos, bônus de XP/limite e o limite de acúmulo.
 export default function AptitudeSummary({ apt, compact = false, always = false }) {
+  if (apt?.loading) return always ? <p className="muted">Carregando a Aptidão…</p> : null;
+  if (apt?.error) return always ? <p className="callout" role="alert">Não foi possível carregar a Aptidão desta ficha: {apt.error}</p> : null;
   if (!apt || (!apt.received && !Object.keys(apt.allocation || {}).length)) {
     return always ? <section className="apt-sum" aria-label="Aptidão">
       <p className="muted">Nenhum ponto de Aptidão recebido ainda. O mestre concede uma rolagem de 1d100 (o resultado são os pontos) e você os distribui entre seus atributos e perícias: +10% de XP e de limite de acúmulo por ponto em atributo, +5% por ponto em perícia, até +100%.</p>
