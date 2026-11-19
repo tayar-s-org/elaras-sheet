@@ -505,7 +505,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </g>;
       })}</g>
     </svg>
-    {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek aptitude={selectedAptitude} data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} onClose={() => setSelected(null)} />}
+    {sel?.character_id && characters[sel.character_id]?.data && <SheetPeek aptitude={selectedAptitude} data={characters[sel.character_id].data} state={room.states[sel.character_id]} limited={!isGm && sel.character_id !== myCharacter} mine={sel.character_id === myCharacter} editable={!closed && (isGm || sel.character_id === myCharacter)} characterId={sel.character_id} tableId={tableId} onClose={() => setSelected(null)} />}
     {sel && !sel.character_id && creatureOf(sel) && <CreaturePeek token={sel} isGm={isGm} onAdjust={delta => adjustHp(sel, delta)} onRemove={isGm ? () => removeCreature(sel) : undefined} onClose={() => setSelected(null)}
       onDuplicate={isGm ? () => duplicateCreature(sel) : undefined} onToggleName={isGm ? hide => toggleName(sel, hide) : undefined} onAddEffect={input => addTokenEffect(sel, input)} onRemoveEffect={id => removeTokenEffect(sel, id)}>
       {isGm && <CreatureSheetPeek key={sel.id} token={sel} tableId={tableId} room={room} closed={closed}

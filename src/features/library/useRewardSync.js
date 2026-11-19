@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase.js';
 import { listMine, getCharacter } from '../../lib/cloud.js';
 import { applyRewardSync } from '../../sheetRebase.js';
 import { formatMoney, addMoney } from '../../money.js';
+import { resolveItem } from '../../market/items.js';
+import { INVENTORY_EVENT } from '../../lib/items.js';
 
 // XP e dinheiro que o mestre concede são aplicados direto na ficha, na nuvem (migração 0035), mesmo com o app do jogador
 // fechado. Este gancho traz essa mudança para as fichas abertas: logo que chega a concessão (tempo real), ao voltar o foco
@@ -43,6 +45,9 @@ export function useRewardSync(session, setSession, user, notify) {
           if (g.xp < 0) notifyRef.current?.(`${g.name || 'Sua ficha'} perdeu ${-g.xp} XP (removido pelo mestre).`);
           if (g.money > 0) notifyRef.current?.(`💰 Você recebeu $${formatMoney(g.money)} do mestre${who}.`);
           if (g.money < 0) notifyRef.current?.(`💸 O mestre removeu $${formatMoney(-g.money)}${who}. Saldo: $${formatMoney(addMoney(g.before?.money, g.money))}.`);
+          // Itens que chegaram na mochila (mestre entregou ou outro jogador enviou).
+          const received = (g.items || []).filter(i => i.delta > 0).map(i => `${i.delta > 1 ? `${i.delta}× ` : ''}${resolveItem(i.entry)?.name || 'item'}`);
+          if (received.length) notifyRef.current?.(`🎒 Você recebeu ${received.join(', ')}${who}.`);
         }
       } catch { /* sem rede ou migração pendente: tenta de novo no próximo ciclo */ }
       finally {
@@ -56,7 +61,10 @@ export function useRewardSync(session, setSession, user, notify) {
     const channel = supabase.channel(`rewardsync:${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'xp_awards' }, () => soon())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'money_awards' }, () => soon())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_log' }, () => soon(300)) // item entregue ou transferido
       .subscribe();
+    const onInventory = () => soon(150); // mexeu na mochila pelo token (nesta mesma janela)
+    window.addEventListener(INVENTORY_EVENT, onInventory);
     const onVisible = () => { if (document.visibilityState === 'visible') soon(0); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -65,6 +73,7 @@ export function useRewardSync(session, setSession, user, notify) {
       clearTimeout(debounce);
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(INVENTORY_EVENT, onInventory);
       supabase.removeChannel(channel);
     };
   }, [user?.id, setSession]);

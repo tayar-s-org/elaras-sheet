@@ -265,6 +265,41 @@ export const MARKET_ITEMS = items;
 export const itemById = new Map(items.map(item => [item.id, item]));
 export const equippable = item => Boolean(item.slot);
 
+// Líquidos: o recipiente guarda só o volume (litros) de cada unidade (`fills`); o peso do líquido é calculado na hora
+// (litros × densidade) e nunca entra no peso-base do item. Por ora só existe água, mas outro líquido cabe em LIQUIDS.
+export const LIQUIDS = { agua: { name: 'Água', density: 1 } }; // densidade em kg por litro
+export const FILL_STEP = 0.05;
+export const LIQUID_CONTAINERS = { 'aventura-equipamento-de-aventura-cantil-odre': { capacity: 1, liquid: 'agua' } }; // litros por unidade
+for (const [id, liquid] of Object.entries(LIQUID_CONTAINERS)) {
+  const found = itemById.get(id);
+  if (found) found.liquid = liquid;
+}
+export const liquidOf = item => item?.liquid || null;
+// Volume válido: de 0 até a capacidade, em passos de 0,05 L.
+export const roundFill = (value, capacity = 1) => {
+  const steps = Math.round((Number(value) || 0) / FILL_STEP);
+  return Math.min(capacity, Math.max(0, Math.round(steps * FILL_STEP * 100) / 100));
+};
+
+// Níveis das unidades de um recipiente: sempre um por unidade (completa com vazio ou corta o que sobra).
+export function unitFills(entry, item = resolveItem(entry)) {
+  const liquid = liquidOf(item);
+  if (!liquid) return [];
+  const qty = Math.max(0, Math.trunc(Number(entry?.qty)) || 0);
+  const raw = Array.isArray(entry?.fills) ? entry.fills : [];
+  return Array.from({ length: qty }, (_, i) => roundFill(raw[i], liquid.capacity));
+}
+
+// Peso da entrada da mochila: peso-base × unidades + líquido guardado (nunca altera o peso-base).
+export function entryWeight(entry, item = resolveItem(entry)) {
+  if (!item) return 0;
+  const base = (item.weight || 0) * entry.qty;
+  const liquid = liquidOf(item);
+  if (!liquid) return base;
+  const kg = unitFills(entry, item).reduce((sum, litres) => sum + litres, 0) * (LIQUIDS[liquid.liquid]?.density || 0);
+  return Math.round((base + kg) * 1000) / 1000;
+}
+
 // Item de uma entrada da mochila: do catálogo do livro ou customizado (aprovado pelo mestre e guardado na ficha).
 export function resolveItem(entry) {
   if (!entry) return null;
@@ -284,7 +319,7 @@ export function inventoryEffects(inventory = [], strengthDie = 4) {
   for (const entry of inventory) {
     const item = resolveItem(entry);
     if (!item) continue;
-    weight += (item.weight || 0) * entry.qty;
+    weight += entryWeight(entry, item);
     if (!entry.equipped) continue;
     if (item.effects) {
       armor += item.effects.armor || 0;

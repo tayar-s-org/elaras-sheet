@@ -10,6 +10,7 @@ import { incapacitation } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
 import MoneyGrant from './MoneyGrant.jsx';
+import GmItemsModal from './GmItemsModal.jsx';
 import './party.css';
 
 function Counter({ id, label, value, max, amount, canEdit, onChange }) {
@@ -27,8 +28,9 @@ function Counter({ id, label, value, max, amount, canEdit, onChange }) {
   </div>;
 }
 
-function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState, closed }) {
+function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState, closed, itemTargets = [] }) {
   const [error, setError] = useState('');
+  const [giving, setGiving] = useState(false);
   const [viewing, setViewing] = useState(false);
   const [amountText, setAmountText] = useState('1');
   const amount = Math.max(1, Math.min(999, Math.trunc(Number(amountText)) || 1));
@@ -70,6 +72,8 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     {isGm && !closed && <MoneyGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} />}
     {isGm && !closed && <XpGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} label="Experiência (XP)" />}
     {isGm && !closed && <AptitudeGrant tableId={tableId} characterId={row.id} name={row.name} />}
+    {isGm && !closed && <button type="button" className="outline give-item-btn" onClick={() => setGiving(true)}>Entregar item</button>}
+    {giving && <GmItemsModal tableId={tableId} targets={itemTargets} initialTarget={row.id} onClose={() => setGiving(false)} />}
     {error && <p role="alert" className="muted">{error}</p>}
   </article>;
 }
@@ -130,7 +134,7 @@ export default function PartyPanel({ tableId, me, isGm, members, characters, sta
             onClick={() => setPicked(m.user_id)}>{firstName(m)}{m.user_id === me ? ' (você)' : ''}</button>)}
         </div>
         <CharacterCard key={current.user_id} member={current} row={characters[current.character_id]}
-          state={states[current.character_id]} canEdit={isGm || current.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} />
+          state={states[current.character_id]} canEdit={isGm || current.user_id === me} isGm={isGm} tableId={tableId} patchState={patchState} closed={closed} itemTargets={playerTargets} />
       </>;
     })()}
   </div>;

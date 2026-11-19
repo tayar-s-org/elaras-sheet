@@ -4,7 +4,10 @@ import { CATEGORIES, MARKET_ITEMS, SLOTS, resolveItem } from "../../market/items
 import { describeEffect } from "../../market/custom.js";
 import { markCustomDiscarded } from "../../lib/customItems.js";
 import CustomItemForm from "./CustomItemForm.jsx";
-import { buyItem, sellItem, toggleEquip, sellPrice, discardItem } from "../../market/inventory.js";
+import { buyItem, sellItem, toggleEquip, sellPrice, discardItem, consumeItem, setFill } from "../../market/inventory.js";
+import { entryWeight } from "../../market/items.js";
+import { QtyMinus, LiquidUnits, SendMenu } from "./ItemControls.jsx";
+import TransferModal from "./TransferModal.jsx";
 import { formatMoney, normalizeMoney } from "../../money.js";
 import "../../ui/money.css";
 import "./market.css";
@@ -31,11 +34,12 @@ function Stats({ item }) {
 }
 
 // Mercado: compra de equipamento do livro com o dinheiro da ficha; itens equipados somam à Resistência, ao Aparar e à carga.
-export default function MarketTab({ c, d, setC, setToast, cloudId, tableId, initialView = "shop" }) {
+export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, tableId, initialView = "shop" }) {
   const askConfirm = useConfirm();
   const [view, setView] = useState(initialView);
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
+  const [sending, setSending] = useState(null); // { id, name, max, index } do item que está sendo enviado
   const money = normalizeMoney(c.money);
   const owned = useMemo(() => Object.fromEntries(c.inventory.map(e => [e.id, e.qty])), [c.inventory]);
   const fx = d.inventory;
@@ -56,6 +60,13 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, tableId, init
     setToast(`${item.name} vendido por $ ${formatMoney(sellPrice(item, 1))}.`);
   };
   const equip = id => setC(prev => toggleEquip(prev, id) || prev);
+  // Gastar unidade / ajustar cantil: edição local da ficha (salva sozinha); se o servidor mexeu ao mesmo tempo, o merge soma os dois.
+  const consume = (id, index = null) => setC(prev => consumeItem(prev, id, 1, index) || prev);
+  const fill = (id, index, litres) => setC(prev => setFill(prev, id, index, litres) || prev);
+  // Enviar só com a ficha já salva na nuvem: o servidor confere o saldo do que está salvo.
+  const saved = Boolean(cloudId) && JSON.stringify(c) === cloudBase;
+  const canSend = Boolean(tableId && cloudId);
+  const sendHint = !canSend ? "Só dá para enviar itens numa ficha ligada a uma mesa." : !saved ? "Aguarde a ficha salvar na nuvem (1 s)." : "";
 
   return <div className="market">
     <div className="mk-status">
@@ -105,21 +116,26 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, tableId, init
       <p className="muted mk-foot">Preços do livro (capítulo 2), relativos aos recursos iniciais de $500. Veículos e itens "Militar" não ficam à venda.</p>
     </> : <>
       {!bag.length ? <p className="muted">Sua mochila está vazia. Compre itens na loja.</p> : <div className="mk-list">
-        {bag.map(({ id, qty, equipped, item }) => <article className={`mk-item${equipped ? " on" : ""}`} key={id}>
+        {bag.map(entry => { const { id, qty, equipped, item } = entry; return <article className={`mk-item${equipped ? " on" : ""}`} key={id}>
           <div className="mk-main">
-            <h4>{item.name}{qty > 1 && <span className="mk-owned">×{qty}</span>}{equipped && <span className="mk-equipped">Equipado</span>}</h4>
-            <p className="mk-meta">{item.weight ? fmtKg(item.weight * qty) : "sem peso"}{item.isCustom ? " · Item customizado" : item.slot ? ` · ${SLOTS[item.slot]}` : ""}</p>
+            <h4>{item.name}{qty > 1 && <span className="mk-owned">×{qty}</span>}<QtyMinus entry={entry} item={item} onConsume={() => consume(id)} />{equipped && <span className="mk-equipped">Equipado</span>}</h4>
+            <p className="mk-meta">{entryWeight(entry, item) ? fmtKg(entryWeight(entry, item)) : "sem peso"}{item.liquid ? " · com o líquido" : ""}{item.isCustom ? " · Item customizado" : item.slot ? ` · ${SLOTS[item.slot]}` : ""}</p>
             <Stats item={item} />
+            <LiquidUnits entry={entry} item={item} live onFill={(i, litres) => fill(id, i, litres)} onConsume={i => consume(id, i)}
+              onSend={canSend ? i => setSending({ id, name: item.name, max: 1, index: i }) : null} sendDisabled={!saved} sendTitle={sendHint} />
           </div>
           <div className="mk-buy">
             {item.slot && <button type="button" className={equipped ? "outline" : "primary"} onClick={() => equip(id)}>{equipped ? "Desequipar" : "Equipar"}</button>}
             {item.isCustom
               ? <button type="button" className="text-button danger" onClick={async () => await askConfirm({ title: 'Descartar item?', text: `Descartar "${item.name}"? O item sai da mochila e não volta sem nova aprovação.`, actionLabel: 'Descartar item', danger: true }) && (setC(prev => discardItem(prev, id) || prev), markCustomDiscarded(id))}>Descartar</button>
               : <button type="button" className="text-button" onClick={() => sell(item)} title="Vender uma unidade por metade do preço">Vender (+$ {formatMoney(sellPrice(item, 1))})</button>}
+            {canSend && !item.liquid && <SendMenu onSend={() => setSending({ id, name: item.name, max: qty, index: null })} disabled={!saved} title={sendHint} />}
           </div>
-        </article>)}
+        </article>; })}
       </div>}
       <p className="muted mk-foot">Equipar um item troca o que já estava no mesmo espaço. Armaduras (torso, cabeça, braços, pernas) somam na Resistência; armas e escudos somam no Aparar. Vender devolve metade do preço.</p>
     </>}
+    {sending && <TransferModal tableId={tableId} fromCharacter={cloudId} itemId={sending.id} itemName={sending.name} max={sending.max} index={sending.index}
+      onClose={() => setSending(null)} onDone={setToast} />}
   </div>;
 }

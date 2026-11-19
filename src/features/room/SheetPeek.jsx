@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ATTRIBUTES, calculate, validateCharacter } from '../../rules.js';
 import { safeMaxima } from './vitals.js';
 import VitalBars from './VitalBars.jsx';
 import { incapacitation, steppedDie, effectiveMovement } from '../../incapacitation.js';
 import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
-import { resolveItem } from '../../market/items.js';
+import { resolveItem, unitFills } from '../../market/items.js';
+import { QtyMinus, LiquidUnits, SendMenu } from '../sheet/ItemControls.jsx';
+import TransferModal from '../sheet/TransferModal.jsx';
+import { consumeRemote, setFillRemote } from '../../lib/items.js';
 import { itemEffects } from '../../market/effects.js';
 
 // "d8" ou, com a penalidade de incapacitação, "d6 (d8)"; o d4 é o menor dado (nunca vira d4−2).
@@ -41,13 +44,28 @@ const grouped = list => {
 // Resumo da ficha mostrado no canto do tabuleiro quando se clica no token de um personagem.
 // limited: visão dos outros jogadores (só nome, descrição e barras de Vida, Stamina e Mana; sem dinheiro nem o resto da ficha).
 // mine: o token é do próprio jogador (só ele vê a própria mana; os outros jogadores não).
-export default function SheetPeek({ data, state, onClose, limited = false, mine = false, aptitude = null }) {
+export default function SheetPeek({ data, state, onClose, limited = false, mine = false, aptitude = null, editable = false, characterId = null, tableId = null }) {
+  const [sending, setSending] = useState(null); // { id, name, max, index }
+  const [itemError, setItemError] = useState('');
+  // Gastar item, ajustar cantil e enviar valem no servidor (mesma mochila da ficha); o token relê a ficha logo em seguida.
+  const run = async fn => { setItemError(''); try { await fn(); } catch (e) { setItemError(e.message); } };
   let c, d;
   try { c = validateCharacter(data); d = calculate(c); } catch { return null; }
   const max = safeMaxima(data);
   const inc = incapacitation(state, max);
   const skills = Object.entries(c.skills).filter(([, die]) => die > 0);
-  const gear = c.inventory.map(e => ({ ...e, name: resolveItem(e)?.name })).filter(e => e.name);
+  const gear = c.inventory.map(e => ({ ...e, item: resolveItem(e), name: resolveItem(e)?.name })).filter(e => e.name);
+  const liters = g => (g.item.liquid ? ` · ${unitFills(g, g.item).reduce((a, b) => a + b, 0).toFixed(2).replace(/\.?0+$/, '').replace('.', ',') || '0'} L` : '');
+  // Linha de item: o resumo abre com a descrição; com permissão, também gasta unidade, ajusta o cantil e envia.
+  const row = g => <div className="peek-gear" key={g.id}>
+    <div className="peek-gear-head">
+      <Detail label={g.name} value={`${g.qty > 1 ? `×${g.qty}` : ''}${liters(g)}`.replace(/^ · /, '')} tone={g.equipped ? 'power' : ''}><Lines {...itemEffects(g.item)} empty="Sem efeito em regras." /></Detail>
+      {editable && <QtyMinus entry={g} item={g.item} onConsume={() => run(() => consumeRemote(characterId, g.id))} />}
+      {editable && tableId && !g.item.liquid && <SendMenu onSend={() => setSending({ id: g.id, name: g.name, max: g.qty, index: null })} />}
+    </div>
+    {editable && <LiquidUnits entry={g} item={g.item} onFill={(i, litres) => run(() => setFillRemote(characterId, g.id, i, litres))} onConsume={i => run(() => consumeRemote(characterId, g.id, 1, i))}
+      onSend={tableId ? i => setSending({ id: g.id, name: g.name, max: 1, index: i }) : null} />}
+  </div>;
   return <aside className="sheet-peek" aria-label={`Ficha de ${c.name || 'personagem'}`}>
     <button type="button" className="peek-close" aria-label="Fechar resumo da ficha" onClick={onClose}>×</button>
     <h4>{c.name || 'Sem nome'}</h4>
@@ -75,11 +93,12 @@ export default function SheetPeek({ data, state, onClose, limited = false, mine 
     </>}
     {gear.length > 0 && <>
       <h5>Equipamento</h5>
-      <div className="peek-details">{gear.filter(g => g.equipped).map(g => <Detail key={g.id} label={g.name} value={g.qty > 1 ? `×${g.qty}` : ''} tone="power"><Lines {...itemEffects(resolveItem(g))} empty="Sem efeito em regras." /></Detail>)}</div>
+      <div className="peek-details">{gear.filter(g => g.equipped).map(row)}</div>
       {gear.some(g => !g.equipped) && <>
         <h5>Mochila</h5>
-        <div className="peek-details">{gear.filter(g => !g.equipped).map(g => <Detail key={g.id} label={g.name} value={g.qty > 1 ? `×${g.qty}` : ''}><Lines {...itemEffects(resolveItem(g))} empty="Sem efeito em regras." /></Detail>)}</div>
+        <div className="peek-details">{gear.filter(g => !g.equipped).map(row)}</div>
       </>}
+      {itemError && <p role="alert" className="muted">{itemError}</p>}
       <p className="muted peek-load">Carga {fmtKg(d.inventory.weight)} / {fmtKg(d.inventory.capacity)}{d.inventory.overload ? ` · sobrecarga −${d.inventory.overload} de Movimento` : ''}</p>
     </>}
     {c.powers.length > 0 && <>
@@ -93,5 +112,6 @@ export default function SheetPeek({ data, state, onClose, limited = false, mine 
     </>}
     {!limited && <AptitudeSummary apt={aptitude} compact />}
     </>}
+    {sending && <TransferModal tableId={tableId} fromCharacter={characterId} itemId={sending.id} itemName={sending.name} max={sending.max} index={sending.index} onClose={() => setSending(null)} />}
   </aside>;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { loadCharacters } from '../../lib/room.js';
+import { INVENTORY_EVENT } from '../../lib/items.js';
 
 const POLL_MS = 5000;
 
@@ -35,13 +36,17 @@ export function useLiveCharacters(tableId, members, base, enabled) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'money_awards', filter: `table_id=eq.${tableId}` }, () => { later(2500); later(6000); })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'money_awards', filter: `table_id=eq.${tableId}` }, () => later(400))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'xp_awards', filter: `table_id=eq.${tableId}` }, () => later(400))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_log', filter: `table_id=eq.${tableId}` }, () => later(400)) // item entregue ou transferido
       .subscribe();
+    const onInventory = () => later(150); // alguém mexeu na mochila pelo token nesta janela
+    window.addEventListener(INVENTORY_EVENT, onInventory);
     return () => {
       alive = false;
       clearTimeout(first);
       clearInterval(poll);
       timers.forEach(clearTimeout);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(INVENTORY_EVENT, onInventory);
       supabase.removeChannel(channel);
     };
   }, [tableId, ids, enabled]);

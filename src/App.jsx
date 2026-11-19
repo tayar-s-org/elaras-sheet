@@ -222,7 +222,7 @@ export default function App() {
     if (activeSheet.cloud) await bindCharacterTable(activeSheet.cloud.id, table.id);
     setSession(prev => setSheetTable(prev, activeSheet.id, { tableId: table.id, tableName: table.name }));
   };
-  const ctx = { cloudId: activeSheet?.cloud?.id, tableId: activeSheet?.tableId, auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
+  const ctx = { cloudId: activeSheet?.cloud?.id, cloudBase: activeSheet?.cloud?.base, tableId: activeSheet?.tableId, auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
   const sheetsLocked = cloudConfigured && route === "/fichas" && !auth.user;
   const topbar = <TopBar theme={theme} setTheme={setTheme} route={route} auth={auth} onSignOut={signOut} />;
   const page = route === "/fichas" ? (sheetsLocked ? <main className="page">

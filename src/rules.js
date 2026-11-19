@@ -1,7 +1,7 @@
 import { tokenArtwork } from './tokenArtwork.js';
 import { racialEffects } from "./templates.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
-import { inventoryEffects, itemById } from "./market/items.js";
+import { inventoryEffects, itemById, unitFills } from "./market/items.js";
 import { sanitizeCustom, isCustomId } from "./market/custom.js";
 import { bookFacts } from "./data/matchBookPower.js";
 import { sanitizeCustomSkills } from "./skills/custom.js";
@@ -293,7 +293,9 @@ export function validateCharacter(raw) {
     if (!item) return [];
     let equipped = entry.equipped === true && Boolean(item.slot) && !takenSlots.has(item.slot);
     if (equipped) takenSlots.add(item.slot);
-    return [{ id: item.id, qty: integer(entry.qty, 1, 99, 1), equipped }];
+    const qty = integer(entry.qty, 1, 99, 1);
+    // Recipientes de líquido guardam o nível de cada unidade (litros).
+    return [{ id: item.id, qty, equipped, ...(item.liquid ? { fills: unitFills({ qty, fills: entry.fills }, item) } : {}) }];
   });
   c.tokenImage = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(raw.tokenImage) ? raw.tokenImage : "";
   if (c.tokenImage && raw.tokenArtwork) c.tokenArtwork = tokenArtwork(raw.tokenArtwork);

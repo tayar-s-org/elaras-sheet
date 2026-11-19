@@ -5,7 +5,7 @@ Rode os arquivos em ordem no SQL Editor do Supabase.
 **Realtime:** so assine `postgres_changes` de tabelas que estao em `supabase_realtime`
 (`table_messages`, `table_rolls`, `table_character_state`, `table_members`, `boards`,
 `board_tokens`, `board_marks`, `table_state_log`, `xp_awards`, `money_awards`, `table_clock`,
-`table_clock_log`, `table_routine_days`). Assinar uma tabela fora da publicacao faz o servidor
+`table_clock_log`, `table_routine_days`, `inventory_log`). Assinar uma tabela fora da publicacao faz o servidor
 descartar, sem erro, todos os eventos daquele canal.
 
 ## Sistema de rotinas e tempo da campanha (0023 a 0025)
@@ -32,3 +32,7 @@ Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replac
 
 - `0037_creature_editor.sql`: adiciona fichas rápidas e aparência editável a criaturas e predefinições. O formato privado dos tokens depende da 0034. Aplique antes de publicar o frontend que usa o novo editor. Tokens antigos continuam usando o PNG existente até serem editados.
 - `0038_map_library.sql`: biblioteca privada por mesa, bucket `map-library` e troca transacional do cenário ativo. Aplique antes de publicar o frontend.
+- `0039_inventory_items.sql`: inventário. `inventory_consume` (só diminui quantidade), `inventory_set_fill` (nível do cantil), `inventory_transfer`
+  (transferência atômica entre personagens aprovados da mesma mesa) e `gm_give_item` (mestre entrega item do catálogo ou criado por ele); todas
+  escrevem em `characters.data.inventory` com lock da linha. Tabela `inventory_log` (só leitura para membros; dispara a sincronização da ficha e do token).
+  Aditiva; pode ser repetida. Teste de banco: `node scripts/itemsDbTest.mjs` (cria e apaga contas descartáveis).

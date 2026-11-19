@@ -1,0 +1,44 @@
+@reference "../../tailwind.css";
+/* Controles de item compartilhados entre a mochila da ficha e o token */
+.qty-minus { @apply inline-flex items-center justify-center w-[26px] h-[26px] p-0 rounded-[999px] cursor-pointer; border: 1px solid var(--control-border); background: var(--surface); color: var(--text); font-size: 1.05rem; line-height: 1; }
+.qty-minus:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.qty-minus:disabled { @apply opacity-50 cursor-not-allowed; }
+
+.liquid-units { @apply grid gap-[6px] mt-[4px]; }
+.liquid-unit { @apply flex items-center gap-[8px] min-w-0; }
+.liquid-name { @apply text-app-muted; font-size: .75rem; min-width: 1ch; }
+.liquid { @apply flex items-center gap-[10px] flex-1 min-w-0; }
+.liquid-label { font-size: .78rem; @apply whitespace-nowrap text-app-muted; font-variant-numeric: tabular-nums; }
+.liquid-range { @apply flex-1 min-w-[48px] h-[10px] rounded-[999px] cursor-pointer; appearance: none; -webkit-appearance: none; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border) var(--fill, 0%)); }
+.liquid-range:disabled { @apply opacity-50 cursor-not-allowed; }
+.liquid-range::-webkit-slider-thumb { -webkit-appearance: none; @apply w-[18px] h-[18px] rounded-full; background: var(--gold); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--control-border); }
+.liquid-range::-moz-range-thumb { @apply w-[16px] h-[16px] rounded-full; background: var(--gold); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--control-border); }
+.liquid-range::-moz-range-track { background: transparent; }
+
+.item-more { @apply relative; }
+.item-more summary { @apply list-none inline-flex items-center justify-center w-[26px] h-[26px] rounded-[999px] cursor-pointer text-app-muted; font-size: 1.1rem; line-height: 1; }
+.item-more summary::-webkit-details-marker { display: none; }
+.item-more summary:hover { background: var(--surface-soft); }
+.item-menu { @apply absolute right-0 top-[30px] z-[5] grid gap-[4px] p-[8px] rounded-[8px] min-w-[190px]; border: 1px solid var(--border); background: var(--surface); box-shadow: 0 8px 24px var(--shadow); }
+.item-menu small { font-size: .72rem; }
+
+/* Modais de enviar item e de itens do mestre */
+.item-modal { @apply grid gap-[14px] w-full max-w-[560px] p-[22px] rounded-[10px]; background: var(--surface); box-shadow: 0 20px 80px var(--shadow); }
+.item-modal h2 { font-family: var(--font-display); @apply font-normal m-0; font-size: 1.6rem; }
+.item-modal-actions { @apply flex flex-wrap justify-end gap-[8px]; }
+.recipients { @apply grid gap-[6px]; }
+.recipient { @apply flex items-center gap-[10px] p-[8px_12px] rounded-[8px] cursor-pointer; border: 1px solid var(--border); background: var(--surface-soft); }
+.recipient:has(input:checked) { @apply border-app-accent; background: var(--selection); }
+.recipient small { @apply text-app-muted; }
+.qty-field { @apply flex items-center gap-[10px]; }
+.qty-field input { @apply w-[8ch]; }
+.gm-pick { @apply grid gap-[6px] overflow-y-auto; max-height: 260px; }
+.gm-pick .recipient { @apply justify-between; }
+.gm-footer { @apply grid gap-[10px] p-[12px] rounded-[8px]; border: 1px solid var(--border); background: var(--surface-soft); }
+.gm-footer .row { @apply flex flex-wrap items-end gap-[10px]; }
+
+@media (max-width: 560px) {
+  .liquid-unit { @apply flex-wrap; }
+  .liquid-label { @apply order-last; }
+  .item-modal { @apply p-[16px]; }
+}

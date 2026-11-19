@@ -38,3 +38,9 @@
 .peek-detail-body ul { @apply m-0 pl-[16px] grid gap-[2px]; }
 .peek-detail-body .peek-facts { list-style: none; @apply p-0; grid-template-columns: 1fr 1fr; @apply gap-[2px_10px]; }
 .peek-facts i { @apply block; font-style: normal; font-size: .62rem; letter-spacing: .05em; @apply uppercase text-app-muted; }
+.peek-details { grid-template-columns: minmax(0, 1fr); }
+.peek-gear { @apply grid gap-[2px] min-w-0; }
+.peek-gear-head { @apply flex items-start gap-[6px]; }
+.peek-gear-head .peek-detail { @apply flex-1 min-w-0; }
+.peek-gear-head .qty-minus, .peek-gear-head .item-more { @apply flex-none mt-[1px]; }
+.peek-gear .liquid-units { @apply m-[2px_0_4px_6px]; }
