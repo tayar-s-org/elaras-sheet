@@ -1,66 +1,35 @@
 import React, { useState } from 'react';
 import { adjustXp, adjustExperience, upsertExperienceType, deleteExperienceType } from '../../../../lib/masterHub.js';
-import { previewAdjust } from '../core.js';
 import ExperienceIcon from '../ExperienceIcon.jsx';
 import IconPicker from '../IconPicker.jsx';
+import ModuleTabs from '../ModuleTabs.jsx';
+import AdjustForm from '../AdjustForm.jsx';
 import { IMAGE_ICONS, iconText } from '../experienceIcons.js';
-import { PlayerPicker, BatchResults, useMasterRun, targetsFor, defaultTarget, previewText } from '../ui.jsx';
+import { BatchResults, useMasterRun, previewText } from '../ui.jsx';
 
-const MODES = [['add', 'Somar'], ['subtract', 'Remover'], ['set', 'Definir valor']];
-const apiOf = (mode, n) => (mode === 'set' ? { mode: 'set', amount: n } : { mode: 'add', amount: mode === 'subtract' ? -Math.abs(n) : Math.abs(n) });
-const useTarget = players => {
-  const [target, setTarget] = useState(null);
-  return [target === 'all' || players.some(p => p.id === target) ? target : defaultTarget(players), setTarget];
-};
-
+const amountLabel = (mode, unit) => `${mode === 'set' ? `Novo ${unit}` : mode === 'subtract' ? `${unit === 'XP' ? 'XP' : 'Pontos'} a remover` : `${unit === 'XP' ? 'XP' : 'Pontos'} a somar`}`;
 // Experiências: o XP de evolução (o do nível, o mesmo do Grupo) e os tipos de experiência criados pelo mestre
 // (contadores nomeados por personagem, ex.: Reputação; não mexem em XP nem em nível).
 export default function ExperienceModule({ ctx }) {
   const { tableId, players, extras, closed } = ctx;
+  const [tab, setTab] = useState('xp');
   return <div className="mh-sections">
-    <Xp tableId={tableId} players={players} closed={closed} />
-    <Types tableId={tableId} extras={extras} closed={closed} />
-    <Counters tableId={tableId} players={players} extras={extras} closed={closed} />
+    <ModuleTabs label="Seções de experiências" value={tab} onChange={setTab} tabs={[['xp', 'XP de evolução'], ['counters', 'Distribuir'], ['types', 'Tipos']]} />
+    {tab === 'xp' && <Xp tableId={tableId} players={players} closed={closed} />}
+    {tab === 'counters' && <Counters tableId={tableId} players={players} extras={extras} closed={closed} onCreate={() => setTab('types')} />}
+    {tab === 'types' && <Types tableId={tableId} extras={extras} closed={closed} />}
   </div>;
 }
 
 function Xp({ tableId, players, closed }) {
-  const [target, setTarget] = useTarget(players);
-  const [mode, setMode] = useState('add');
-  const [text, setText] = useState('5');
-  const [note, setNote] = useState('');
-  const run = useMasterRun();
-  const targets = targetsFor(players, target);
-  const api = apiOf(mode, Math.trunc(Number(text)));
-  const previews = targets.map(p => ({ p, v: previewAdjust('xp', p.xp, api.mode, api.amount) }));
-  const bad = previews.find(x => !x.v.ok);
-  async function submit(e) {
-    e.preventDefault();
-    if (bad || closed || !targets.length) return;
-    await run.start({
-      title: `${MODES.find(m => m[0] === mode)[1]} XP`, actionLabel: 'Aplicar', danger: mode !== 'add',
-      text: previewText([`${targets.length === 1 ? targets[0].name : `${targets.length} jogadores`}:`, ...previews.map(({ p, v }) => `${p.name}: ${v.current} XP (nível ${Math.floor(v.current / 5)}) → ${v.next} XP (nível ${Math.floor(v.next / 5)})`)]),
-      opKey: `xp:${mode}:${text}:${note}`, targets,
-      fn: (t, requestId) => adjustXp({ tableId, characterId: t.id, ...api, note, requestId }),
-    });
-  }
-  return <section className="mh-section" aria-labelledby="mh-xp-h">
-    <h3 id="mh-xp-h">XP de evolução</h3>
+  return <section className="mh-section" aria-label="XP de evolução">
     <p className="muted mh-hint">É o XP do nível (nível = XP ÷ 5). Treino, aptidão e estudo de magia continuam nos sistemas deles.</p>
-    <form className="mh-form" onSubmit={submit}>
-      <PlayerPicker players={players} value={target} onChange={setTarget} />
-      <div className="tabs-row" role="group" aria-label="Operação">
-        {MODES.map(([k, l]) => <button key={k} type="button" className={mode === k ? 'primary' : 'outline'} aria-pressed={mode === k} onClick={() => setMode(k)}>{l}</button>)}
-      </div>
-      <label className="field"><span>{mode === 'set' ? 'Novo XP' : 'Quantidade'}</span>
-        <input type="number" inputMode="numeric" value={text} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()} /></label>
-      <label className="field"><span>Observação (opcional)</span><input maxLength={200} value={note} onChange={e => setNote(e.target.value)} /></label>
-      <button className="primary" disabled={Boolean(bad) || closed || run.busy || !targets.length}>Aplicar</button>
-    </form>
-    <ul className="mh-preview" aria-label="Prévia">
-      {previews.map(({ p, v }) => <li key={p.id}><b>{p.name}</b> {p.xp} XP · nível {p.level}{v.ok ? <> → <b>{v.next} XP</b> · nível {Math.floor(v.next / 5)}</> : <small className="muted"> · {v.error}</small>}</li>)}
-    </ul>
-    <BatchResults run={run} />
+    <AdjustForm kind="xp" storageKey="xp" players={players} closed={closed} quick={[1, 5, 10, 50]} labels={{ subtract: 'Remover' }}
+      amountLabel={mode => amountLabel(mode, 'XP')} currentOf={p => p.xp}
+      format={n => `${n} XP · nível ${Math.floor(n / 5)}`} confirmTitle={name => `${name} XP`}
+      call={(t, { mode, amount, note }, requestId) => adjustXp({ tableId, characterId: t.id, mode, amount, note, requestId })}
+      undoCall={(t, delta, requestId) => adjustXp({ tableId, characterId: t.id, mode: 'add', amount: delta, note: 'Desfeito', requestId })}
+      deltaOf={r => (r?.after?.xp ?? 0) - (r?.before?.xp ?? 0)} />
   </section>;
 }
 
@@ -88,16 +57,15 @@ function Types({ tableId, extras, closed }) {
       fn: (x, requestId) => deleteExperienceType({ tableId, id: t.id, force: true, requestId }),
     });
   }
-  return <section className="mh-section" aria-labelledby="mh-types-h">
-    <h3 id="mh-types-h">Tipos de experiência</h3>
+  return <section className="mh-section" aria-label="Tipos de experiência">
     <p className="muted mh-hint">Crie novas formas de progressão (Reputação, Maestria, Fama…). Cada uma é um contador por personagem, visível para todos da mesa (ficha, Grupo e resumo do token), como o XP.</p>
-    {extras.status === 'unavailable' && <p className="callout">Falta aplicar a migração 0040 no Supabase.</p>}
+    {extras.status === 'unavailable' && <p className="callout">Atualização do banco pendente (0040): aplique-a no Supabase e recarregue a página.</p>}
     <ul className="mh-list">
       {extras.types.map(t => <li key={t.id}>
         <span><b><ExperienceIcon icon={t.icon} /> {t.name}</b>{t.category ? <small> · {t.category}</small> : null}{t.description ? <small className="muted"> — {t.description}</small> : null}</span>
         <span className="tabs-row">
-          <button type="button" className="outline" disabled={closed} onClick={() => setForm({ id: t.id, name: t.name, icon: t.icon, category: t.category || '', description: t.description || '' })}>Editar</button>
-          <button type="button" className="outline danger" disabled={closed || run.busy} onClick={() => remove(t)}>Apagar</button>
+          <button type="button" className="outline" aria-label={`Editar ${t.name}`} disabled={closed} onClick={() => setForm({ id: t.id, name: t.name, icon: t.icon, category: t.category || '', description: t.description || '' })}>Editar</button>
+          <button type="button" className="outline danger mh-danger" aria-label={`Apagar ${t.name}`} disabled={closed || run.busy} onClick={() => remove(t)}>Apagar</button>
         </span>
       </li>)}
       {!extras.types.length && <li className="muted">Nenhum tipo criado ainda.</li>}
@@ -118,48 +86,24 @@ function Types({ tableId, extras, closed }) {
   </section>;
 }
 
-function Counters({ tableId, players, extras, closed }) {
-  const [target, setTarget] = useTarget(players);
+function Counters({ tableId, players, extras, closed, onCreate }) {
   const [typeId, setTypeId] = useState('');
-  const [mode, setMode] = useState('add');
-  const [text, setText] = useState('1');
-  const [note, setNote] = useState('');
-  const run = useMasterRun({ onDone: () => extras.refresh() });
   const type = extras.types.find(t => t.id === typeId) || extras.types[0] || null;
-  const targets = targetsFor(players, target);
-  const api = apiOf(mode, Math.trunc(Number(text)));
-  const previews = type ? targets.map(p => ({ p, v: previewAdjust('experience', extras.experience[p.id]?.[type.id] || 0, api.mode, api.amount) })) : [];
-  const bad = previews.find(x => !x.v.ok);
-  async function submit(e) {
-    e.preventDefault();
-    if (!type || bad || closed || !targets.length) return;
-    await run.start({
-      title: `${MODES.find(m => m[0] === mode)[1]} ${type.name}`, actionLabel: 'Aplicar', danger: mode !== 'add',
-      text: previewText([`${iconText(type.icon)} ${type.name}:`, ...previews.map(({ p, v }) => `${p.name}: ${v.current} → ${v.next}`)]),
-      opKey: `xpcount:${type.id}:${mode}:${text}:${note}`, targets,
-      fn: (t, requestId) => adjustExperience({ tableId, characterId: t.id, typeId: type.id, ...api, note, requestId }),
-    });
-  }
-  return <section className="mh-section" aria-labelledby="mh-cnt-h">
-    <h3 id="mh-cnt-h">Distribuir experiências</h3>
-    {!extras.types.length ? <p className="muted">Crie um tipo de experiência acima para distribuir aos jogadores.</p> : <>
-      <form className="mh-form" onSubmit={submit}>
-        <PlayerPicker players={players} value={target} onChange={setTarget} />
-        <label className="field"><span>Experiência</span>
-          <select value={type?.id || ''} onChange={e => setTypeId(e.target.value)}>{extras.types.map(t => <option key={t.id} value={t.id}>{iconText(t.icon)} {t.name}</option>)}</select></label>
-        <div className="tabs-row" role="group" aria-label="Operação">
-          {MODES.map(([k, l]) => <button key={k} type="button" className={mode === k ? 'primary' : 'outline'} aria-pressed={mode === k} onClick={() => setMode(k)}>{l}</button>)}
-        </div>
-        <label className="field"><span>{mode === 'set' ? 'Novo valor' : 'Quantidade'}</span>
-          <input type="number" inputMode="numeric" value={text} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()} /></label>
-        <label className="field"><span>Observação (opcional)</span><input maxLength={200} value={note} onChange={e => setNote(e.target.value)} /></label>
-        <button className="primary" disabled={Boolean(bad) || closed || run.busy || !targets.length}>Aplicar</button>
-      </form>
+  return <section className="mh-section" aria-label="Distribuir experiências">
+    <p className="muted mh-hint">Dê, retire ou defina os pontos de um tipo de experiência (Reputação…) para um jogador ou para todos.</p>
+    {!extras.types.length ? <div className="mh-empty"><p className="muted">Ainda não há tipos de experiência, então não há o que distribuir.</p><button type="button" className="outline" onClick={onCreate}>Criar o primeiro tipo</button></div> : <>
+      <AdjustForm kind="experience" storageKey="counter" extraKey={type?.id || ''} players={players} closed={closed} blocked={!type} quick={[1, 5, 10]} labels={{ subtract: 'Remover' }}
+        extra={<label className="field mh-picker"><span>Experiência</span>
+          <select value={type?.id || ''} onChange={e => setTypeId(e.target.value)}>{extras.types.map(t => <option key={t.id} value={t.id}>{iconText(t.icon)} {t.name}</option>)}</select></label>}
+        amountLabel={mode => amountLabel(mode, 'valor')} currentOf={p => extras.experience[p.id]?.[type?.id] || 0}
+        confirmTitle={name => `${name} ${type?.name || 'experiência'}`}
+        call={(t, { mode, amount, note }, requestId) => adjustExperience({ tableId, characterId: t.id, typeId: type.id, mode, amount, note, requestId })}
+        undoCall={(t, delta, requestId) => adjustExperience({ tableId, characterId: t.id, typeId: type.id, mode: 'add', amount: delta, note: 'Desfeito', requestId })}
+        deltaOf={r => (r?.after?.amount ?? 0) - (r?.before?.amount ?? 0)} onDone={() => extras.refresh()} />
       <div className="mh-table-wrap"><table className="mh-table">
         <thead><tr><th>Jogador</th>{extras.types.map(t => <th key={t.id}><ExperienceIcon icon={t.icon} /> {t.name}</th>)}</tr></thead>
         <tbody>{players.map(p => <tr key={p.id}><td>{p.name}</td>{extras.types.map(t => <td key={t.id}>{extras.experience[p.id]?.[t.id] || 0}</td>)}</tr>)}</tbody>
       </table></div>
     </>}
-    <BatchResults run={run} />
   </section>;
 }

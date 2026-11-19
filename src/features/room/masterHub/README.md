@@ -140,3 +140,11 @@ O seletor oferece só as imagens embutidas; o tipo guarda a **chave** da imagem 
 
 ## Ícones das moedas
 O seletor de moeda oferece só as imagens embutidas (`CURRENCY_ICONS` em `experienceIcons.js`, arquivos em `public/assets/currency/`): `@cedula`, `@euro`, `@lingote`, `@chines`, `@maco`. A chave vai no campo `symbol` da moeda (limite de 8 caracteres do banco). Imagem onde há espaço (chips, cabeçalhos, preços); em textos puros vira `¤` (`iconText(symbol, '¤')`), e `cleanIconKeys` limpa chaves cruas que o servidor coloca nos resumos do histórico. Moedas antigas com emoji continuam como estão. Sem migração.
+
+## Glossário (use estes termos na interface)
+- **Dinheiro ($)**: o `$` da ficha (`characters.data.money`); é o que o jogador gasta no Mercado do livro. Sempre escrito com o `$` e rotulado "Dinheiro".
+- **Moedas** (módulo Moedas › "Moedas da mesa"): moedas criadas pelo mestre, cada uma com a sua **carteira** por jogador. Não viram `$` e só pagam itens da **Loja do Mestre**.
+- **XP de evolução**: o XP do nível (nível = XP ÷ 5). **Experiências / tipos de experiência**: contadores criados pelo mestre (Reputação…), que não mexem em XP nem em nível.
+- **Pontos livres**: pontos de personagem ainda não gastos ("0 de 41 pontos livres").
+- Campo de quantidade: "Quantidade a somar / a retirar" e "Novo saldo / Novo XP", sempre com a unidade entre parênteses.
+- Aviso de atualização do banco: "Atualização do banco pendente (0040/0041): aplique-a no Supabase e recarregue a página."

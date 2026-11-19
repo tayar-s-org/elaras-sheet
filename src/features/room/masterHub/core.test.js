@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import {
-  MASTER_MODULES, LIMITS, previewAdjust, makePendingStore, runBatch, retryFailed, summarizeBatch,
+  MASTER_MODULES, MODULE_GROUPS, LIMITS, previewAdjust, makePendingStore, runBatch, retryFailed, summarizeBatch,
   AUDIT_CATEGORIES, categoryLabel, auditDetails, auditTitle, experienceChips, walletChips,
 } from './core.js';
 import { IMAGE_ICONS, CURRENCY_ICONS, ALL_ICONS, isImageIcon, imageIconUrl, iconText, cleanIconKeys, DEFAULT_ICON } from './experienceIcons.js';
@@ -11,7 +11,13 @@ const memory = () => { const m = new Map(); return { getItem: k => m.get(k) ?? n
 const seq = () => { let n = 0; return () => `id-${++n}`; };
 
 test('os módulos pedidos existem, na ordem, sem chaves repetidas', () => {
-  assert.deepEqual(MASTER_MODULES.map(m => m.label).slice(0, 9), ['Jogadores', 'Moedas', 'Itens', 'Experiências', 'Status e Condições', 'Criaturas e Tokens', 'Mapas', 'Música', 'Soundpad']);
+  assert.deepEqual(MASTER_MODULES.map(m => m.label).sort(), ['Criaturas e Tokens', 'Experiências', 'Histórico', 'Itens', 'Jogadores', 'Mapas', 'Moedas', 'Música', 'Soundpad', 'Status e Condições']);
+  // os 3 mais usados em destaque; o resto agrupado
+  const by = g => MASTER_MODULES.filter(m => m.group === g).map(m => m.label);
+  assert.deepEqual(by('rewards'), ['Moedas', 'Itens', 'Experiências']);
+  assert.deepEqual(by('campaign'), ['Jogadores', 'Status e Condições']);
+  assert.deepEqual(by('tools'), ['Criaturas e Tokens', 'Mapas', 'Música', 'Soundpad', 'Histórico']);
+  assert.ok(MASTER_MODULES.every(m => MODULE_GROUPS.some(([g]) => g === m.group)));
   assert.equal(new Set(MASTER_MODULES.map(m => m.key)).size, MASTER_MODULES.length);
   assert.ok(MASTER_MODULES.some(m => m.key === 'history'));
 });
@@ -185,4 +191,9 @@ test('ícones de moeda: imagens existem, chaves únicas e dentro do limite do s�
   assert.equal(w.label, '12');
   assert.deepEqual(auditDetails({ category: 'wallet', before: { name: 'Euro', symbol: '@euro', amount: 0 }, after: { name: 'Euro', symbol: '@euro', amount: 5 } }), [['¤ Euro', '0 → 5']]);
   assert.equal(auditTitle({ kind: 'shop_create', summary: 'Colocou à venda: Anel (10 @euro)' }, ''), 'Pôs à venda · Colocou à venda: Anel (10 ¤)');
+});
+
+test('histórico no modo raw devolve a chave da imagem (a tela troca pela imagem da moeda)', () => {
+  assert.deepEqual(auditDetails({ category: 'wallet', before: { name: 'Euro', symbol: '@euro', amount: 0 }, after: { name: 'Euro', symbol: '@euro', amount: 5 } }, id => id, { raw: true }), [['@euro Euro', '0 → 5']]);
+  assert.equal(auditTitle({ kind: 'shop_create', summary: 'Colocou à venda: Anel (10 @euro)' }, '', id => id, { raw: true }), 'Pôs à venda · Colocou à venda: Anel (10 @euro)');
 });

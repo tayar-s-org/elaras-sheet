@@ -6,7 +6,7 @@
 
 .liquid-units { @apply grid gap-[6px] mt-[4px]; }
 .liquid-unit { @apply flex items-center gap-[8px] min-w-0; }
-.liquid-name { @apply text-app-muted; font-size: .75rem; min-width: 1ch; }
+.liquid-name { @apply text-app-muted flex-none whitespace-nowrap; font-size: .75rem; }
 .liquid { @apply flex items-center gap-[10px] flex-1 min-w-0; }
 .liquid-label { font-size: .78rem; @apply whitespace-nowrap text-app-muted; font-variant-numeric: tabular-nums; }
 .liquid-range { @apply flex-1 min-w-[48px] h-[10px] rounded-[999px] cursor-pointer; appearance: none; -webkit-appearance: none; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border) var(--fill, 0%)); }

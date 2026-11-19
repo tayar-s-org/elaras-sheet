@@ -15,7 +15,7 @@ const walletOf = (extras, id, full) => (full ? walletChips(extras, id) : []);
 
 // Painel da ficha no topo do tabuleiro: identidade sempre visível + módulos que abrem um de cada vez.
 // Segue o token selecionado (sem seleção: a ficha de quem está jogando). Não guarda dados da ficha: lê/edita as mesmas fontes da ficha.
-export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, tableId, sheets, auth, closed = false, embedded = false, states = null }) {
+export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, tableId, sheets, auth, closed = false, embedded = false, states = null, onOpenShop = null }) {
   const extras = useExtras();
   const subject = resolveSubject({ sel, myCharacter, isGm, characters, sessionSheets: sheets?.session?.sheets || [] });
   const available = modulesAvailable(subject);
@@ -41,7 +41,7 @@ export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, ta
         <button type="button" className="outline" aria-expanded="false" onClick={toggleMin}>Maximizar</button></div>
     </section>;
   }
-  return <section className="board-sheet" aria-label="Ficha do personagem">
+  return <section className={`board-sheet${embedded && current ? ' bsp-compact' : ''}`} aria-label="Ficha do personagem" id={embedded ? undefined : 'room-char-panel'}>
     <div className="bsp-top">
       <div className="bsp-id-wrap">
         <SheetIdentityCard data={subject.data} full={subject.full} kind={subject.kind} conditions={conditionsOf(states?.[subject.characterId])} wallet={subject.data ? walletOf(extras, subject.characterId, subject.full) : []} experience={subject.data ? experienceChips(extras, subject.characterId) : []} />
@@ -58,7 +58,7 @@ export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, ta
     <div className={`bsp-region${current ? ' open' : ''}`} id={regionId} role="region" aria-label={module ? `Módulo ${module.label}` : 'Módulo da ficha'} inert={!current}>
       <div className="bsp-clip">
         <div className="bsp-body">
-          {module && available && <ModuleContent key={`${module.key}:${subject.characterId}`} module={module} subject={subject} sheets={sheets} auth={auth} tableId={tableId} closed={closed} />}
+          {module && available && <ModuleContent key={`${module.key}:${subject.characterId}`} module={module} subject={subject} sheets={sheets} auth={auth} tableId={tableId} closed={closed} onOpenShop={onOpenShop} />}
         </div>
       </div>
     </div>

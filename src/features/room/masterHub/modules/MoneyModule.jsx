@@ -1,67 +1,37 @@
 import React, { useState } from 'react';
 import { formatMoney } from '../../../../money.js';
 import { adjustMoney, adjustWallet, upsertCurrency, deleteCurrency } from '../../../../lib/masterHub.js';
-import { previewAdjust } from '../core.js';
 import ExperienceIcon from '../ExperienceIcon.jsx';
 import IconPicker from '../IconPicker.jsx';
+import ModuleTabs from '../ModuleTabs.jsx';
+import AdjustForm from '../AdjustForm.jsx';
 import { CURRENCY_ICONS, iconText, DEFAULT_CURRENCY_ICON } from '../experienceIcons.js';
-import { PlayerPicker, BatchResults, useMasterRun, targetsFor, defaultTarget, previewText } from '../ui.jsx';
+import { BatchResults, useMasterRun, previewText } from '../ui.jsx';
 import '../../../../ui/money.css';
 
-const MODES = [['add', 'Somar'], ['subtract', 'Retirar'], ['set', 'Definir valor']];
-const apiOf = (mode, n) => (mode === 'set' ? { mode: 'set', amount: n } : { mode: 'add', amount: mode === 'subtract' ? -Math.abs(n) : Math.abs(n) });
-const useTarget = players => {
-  const [target, setTarget] = useState(null);
-  const value = target === 'all' || players.some(p => p.id === target) ? target : defaultTarget(players);
-  return [value, setTarget];
-};
-
+// Rótulo do campo de quantidade conforme a operação (e a unidade, quando há): diz o que o número significa.
+const amountLabel = (mode, unit = '') => `${mode === 'set' ? 'Novo saldo' : mode === 'subtract' ? 'Quantidade a retirar' : 'Quantidade a somar'}${unit ? ` (${unit})` : ''}`;
 // Dinheiro ($ da ficha, com prévia antes → depois), moedas personalizadas da mesa e a carteira de cada personagem.
 export default function MoneyModule({ ctx }) {
   const { tableId, players, extras, closed } = ctx;
+  const [tab, setTab] = useState('money');
   return <div className="mh-sections">
-    <SheetMoney tableId={tableId} players={players} closed={closed} />
-    <Currencies tableId={tableId} extras={extras} closed={closed} />
-    <Wallets tableId={tableId} players={players} extras={extras} closed={closed} />
+    <ModuleTabs label="Seções de moedas" value={tab} onChange={setTab} tabs={[['money', 'Dinheiro ($)'], ['currencies', 'Moedas da mesa'], ['wallets', 'Carteiras']]} />
+    {tab === 'money' && <SheetMoney tableId={tableId} players={players} closed={closed} />}
+    {tab === 'currencies' && <Currencies tableId={tableId} extras={extras} closed={closed} />}
+    {tab === 'wallets' && <Wallets tableId={tableId} players={players} extras={extras} closed={closed} onCreate={() => setTab('currencies')} />}
   </div>;
 }
 
 function SheetMoney({ tableId, players, closed }) {
-  const [target, setTarget] = useTarget(players);
-  const [mode, setMode] = useState('add');
-  const [text, setText] = useState('100');
-  const [note, setNote] = useState('');
-  const run = useMasterRun();
-  const targets = targetsFor(players, target);
-  const api = apiOf(mode, Math.trunc(Number(text)));
-  const previews = targets.map(p => ({ p, v: previewAdjust('money', p.money, api.mode, api.amount) }));
-  const bad = previews.find(x => !x.v.ok);
-  async function submit(e) {
-    e.preventDefault();
-    if (bad || closed || !targets.length) return;
-    await run.start({
-      title: `${MODES.find(m => m[0] === mode)[1]} dinheiro`, actionLabel: 'Aplicar', danger: mode !== 'add',
-      text: previewText([`${targets.length === 1 ? targets[0].name : `${targets.length} jogadores`}:`, ...previews.map(({ p, v }) => `${p.name}: $${formatMoney(v.current)} → $${formatMoney(v.next)}`)]),
-      opKey: `money:${mode}:${text}:${note}`, targets,
-      fn: (t, requestId) => adjustMoney({ tableId, characterId: t.id, ...api, note, requestId }),
-    });
-  }
-  return <section className="mh-section" aria-labelledby="mh-money-h">
-    <h3 id="mh-money-h">Dinheiro dos jogadores ($)</h3>
-    <form className="mh-form" onSubmit={submit}>
-      <PlayerPicker players={players} value={target} onChange={setTarget} />
-      <div className="tabs-row" role="group" aria-label="Operação">
-        {MODES.map(([k, l]) => <button key={k} type="button" className={mode === k ? 'primary' : 'outline'} aria-pressed={mode === k} onClick={() => setMode(k)}>{l}</button>)}
-      </div>
-      <label className="field"><span>{mode === 'set' ? 'Novo saldo' : 'Valor'}</span>
-        <input type="number" inputMode="numeric" value={text} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()} /></label>
-      <label className="field"><span>Observação (opcional)</span><input maxLength={200} value={note} onChange={e => setNote(e.target.value)} /></label>
-      <button className="primary" disabled={Boolean(bad) || closed || run.busy || !targets.length}>Aplicar</button>
-    </form>
-    <ul className="mh-preview" aria-label="Prévia">
-      {previews.map(({ p, v }) => <li key={p.id}><b>{p.name}</b> <span className="money-coin" aria-hidden="true">$</span> {formatMoney(p.money)}{v.ok ? <> → <b>{formatMoney(v.next)}</b>{v.delta !== api.amount && api.mode === 'add' ? <small> (limitado)</small> : null}</> : <small className="muted"> · {v.error}</small>}</li>)}
-    </ul>
-    <BatchResults run={run} />
+  return <section className="mh-section" aria-label="Dinheiro ($)">
+    <p className="muted mh-hint">É o dinheiro ($) da ficha de cada jogador, o mesmo que ele gasta no Mercado do livro.</p>
+    <AdjustForm kind="money" storageKey="money" players={players} closed={closed} quick={[10, 50, 100, 500]}
+      amountLabel={mode => amountLabel(mode, '$')} currentOf={p => p.money} format={formatMoney}
+      confirmTitle={name => `${name} dinheiro`}
+      call={(t, { mode, amount, note }, requestId) => adjustMoney({ tableId, characterId: t.id, mode, amount, note, requestId })}
+      undoCall={(t, delta, requestId) => adjustMoney({ tableId, characterId: t.id, mode: 'add', amount: delta, note: 'Desfeito', requestId })}
+      deltaOf={r => (r?.after?.money ?? 0) - (r?.before?.money ?? 0)} />
   </section>;
 }
 
@@ -93,16 +63,15 @@ function Currencies({ tableId, extras, closed }) {
     });
     if (b?.results.every(r => r.ok)) extras.refresh();
   }
-  return <section className="mh-section" aria-labelledby="mh-cur-h">
-    <h3 id="mh-cur-h">Moedas da mesa</h3>
-    <p className="muted mh-hint">Cada moeda tem a própria carteira por personagem. O valor em $ é só uma referência: o dinheiro da ficha e o Mercado continuam em $.</p>
-    {extras.status === 'unavailable' && <p className="callout">Falta aplicar a migração 0040 no Supabase.</p>}
+  return <section className="mh-section" aria-label="Moedas da mesa">
+    <p className="muted mh-hint">Moedas criadas por você (Ouro, Cristal…). Cada jogador tem uma carteira separada para cada moeda. Elas não viram dinheiro ($) e só pagam itens da Loja do Mestre.</p>
+    {extras.status === 'unavailable' && <p className="callout">Atualização do banco pendente (0040): aplique-a no Supabase e recarregue a página.</p>}
     <ul className="mh-list">
       {extras.currencies.map(c => <li key={c.id}>
         <span><b><ExperienceIcon icon={c.symbol} /> {c.name}</b>{c.rate ? <small> · referência: {c.rate} $</small> : null}{c.description ? <small className="muted"> — {c.description}</small> : null}</span>
         <span className="tabs-row">
-          <button type="button" className="outline" disabled={closed} onClick={() => setForm({ id: c.id, name: c.name, symbol: c.symbol, description: c.description || '', rate: c.rate ?? '' })}>Editar</button>
-          <button type="button" className="outline danger" disabled={closed || run.busy} onClick={() => remove(c)}>Apagar</button>
+          <button type="button" className="outline" aria-label={`Editar ${c.name}`} disabled={closed} onClick={() => setForm({ id: c.id, name: c.name, symbol: c.symbol, description: c.description || '', rate: c.rate ?? '' })}>Editar</button>
+          <button type="button" className="outline danger mh-danger" aria-label={`Apagar ${c.name}`} disabled={closed || run.busy} onClick={() => remove(c)}>Apagar</button>
         </span>
       </li>)}
       {!extras.currencies.length && <li className="muted">Nenhuma moeda criada ainda.</li>}
@@ -111,7 +80,7 @@ function Currencies({ tableId, extras, closed }) {
       <h4>{form.id ? 'Editar moeda' : 'Nova moeda'}</h4>
       <label className="field"><span>Nome</span><input maxLength={40} value={form.name} onChange={e => set({ name: e.target.value })} placeholder="Ex.: Ouro, Cristal, Moeda Real" /></label>
       <IconPicker icons={CURRENCY_ICONS} value={form.symbol} onChange={symbol => set({ symbol })} label="Ícone da moeda" />
-      <label className="field"><span>Valor de referência em $ (opcional)</span><input inputMode="decimal" value={form.rate} onChange={e => set({ rate: e.target.value })} placeholder="Ex.: 10" /></label>
+      <label className="field"><span>Quanto vale em $ (só referência, não converte)</span><input inputMode="decimal" value={form.rate} onChange={e => set({ rate: e.target.value })} placeholder="Ex.: 10" /></label>
       <label className="field"><span>Descrição</span><input maxLength={300} value={form.description} onChange={e => set({ description: e.target.value })} /></label>
       {error && <p role="alert" className="muted">{error}</p>}
       <div className="tabs-row">
@@ -123,48 +92,24 @@ function Currencies({ tableId, extras, closed }) {
   </section>;
 }
 
-function Wallets({ tableId, players, extras, closed }) {
-  const [target, setTarget] = useTarget(players);
+function Wallets({ tableId, players, extras, closed, onCreate }) {
   const [currencyId, setCurrencyId] = useState('');
-  const [mode, setMode] = useState('add');
-  const [text, setText] = useState('10');
-  const [note, setNote] = useState('');
-  const run = useMasterRun({ onDone: () => extras.refresh() });
   const cur = extras.currencies.find(c => c.id === currencyId) || extras.currencies[0] || null;
-  const targets = targetsFor(players, target);
-  const api = apiOf(mode, Math.trunc(Number(text)));
-  const previews = cur ? targets.map(p => ({ p, v: previewAdjust('wallet', extras.wallets[p.id]?.[cur.id] || 0, api.mode, api.amount) })) : [];
-  const bad = previews.find(x => !x.v.ok);
-  async function submit(e) {
-    e.preventDefault();
-    if (!cur || bad || closed || !targets.length) return;
-    await run.start({
-      title: `${MODES.find(m => m[0] === mode)[1]} ${cur.name}`, actionLabel: 'Aplicar', danger: mode !== 'add',
-      text: previewText([`${iconText(cur.symbol, DEFAULT_CURRENCY_ICON)} ${cur.name}:`, ...previews.map(({ p, v }) => `${p.name}: ${formatMoney(v.current)} → ${formatMoney(v.next)}`)]),
-      opKey: `wallet:${cur.id}:${mode}:${text}:${note}`, targets,
-      fn: (t, requestId) => adjustWallet({ tableId, characterId: t.id, currencyId: cur.id, ...api, note, requestId }),
-    });
-  }
-  return <section className="mh-section" aria-labelledby="mh-wal-h">
-    <h3 id="mh-wal-h">Carteiras</h3>
-    {!extras.currencies.length ? <p className="muted">Crie uma moeda acima para dar saldo aos personagens.</p> : <>
-      <form className="mh-form" onSubmit={submit}>
-        <PlayerPicker players={players} value={target} onChange={setTarget} />
-        <label className="field"><span>Moeda</span>
-          <select value={cur?.id || ''} onChange={e => setCurrencyId(e.target.value)}>{extras.currencies.map(c => <option key={c.id} value={c.id}>{iconText(c.symbol, DEFAULT_CURRENCY_ICON)} {c.name}</option>)}</select></label>
-        <div className="tabs-row" role="group" aria-label="Operação">
-          {MODES.map(([k, l]) => <button key={k} type="button" className={mode === k ? 'primary' : 'outline'} aria-pressed={mode === k} onClick={() => setMode(k)}>{l}</button>)}
-        </div>
-        <label className="field"><span>{mode === 'set' ? 'Novo saldo' : 'Valor'}</span>
-          <input type="number" inputMode="numeric" value={text} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()} /></label>
-        <label className="field"><span>Observação (opcional)</span><input maxLength={200} value={note} onChange={e => setNote(e.target.value)} /></label>
-        <button className="primary" disabled={Boolean(bad) || closed || run.busy || !targets.length}>Aplicar</button>
-      </form>
+  return <section className="mh-section" aria-label="Carteiras">
+    <p className="muted mh-hint">Saldo de cada jogador em cada moeda. Só o dono da ficha e você veem a carteira.</p>
+    {!extras.currencies.length ? <div className="mh-empty"><p className="muted">Ainda não há moedas na mesa, então não há carteira para dar saldo.</p><button type="button" className="outline" onClick={onCreate}>Criar a primeira moeda</button></div> : <>
+      <AdjustForm kind="wallet" storageKey="wallet" extraKey={cur?.id || ''} players={players} closed={closed} blocked={!cur} quick={[1, 10, 100]}
+        extra={<label className="field mh-picker"><span>Moeda</span>
+          <select value={cur?.id || ''} onChange={e => setCurrencyId(e.target.value)}>{extras.currencies.map(c => <option key={c.id} value={c.id}>{iconText(c.symbol, DEFAULT_CURRENCY_ICON)} {c.name}</option>)}</select></label>}
+        amountLabel={mode => amountLabel(mode, cur?.name)} currentOf={p => extras.wallets[p.id]?.[cur?.id] || 0} format={formatMoney}
+        confirmTitle={name => `${name} ${cur?.name || 'moeda'}`}
+        call={(t, { mode, amount, note }, requestId) => adjustWallet({ tableId, characterId: t.id, currencyId: cur.id, mode, amount, note, requestId })}
+        undoCall={(t, delta, requestId) => adjustWallet({ tableId, characterId: t.id, currencyId: cur.id, mode: 'add', amount: delta, note: 'Desfeito', requestId })}
+        deltaOf={r => (r?.after?.amount ?? 0) - (r?.before?.amount ?? 0)} onDone={() => extras.refresh()} />
       <div className="mh-table-wrap"><table className="mh-table">
         <thead><tr><th>Jogador</th>{extras.currencies.map(c => <th key={c.id}><ExperienceIcon icon={c.symbol} /> {c.name}</th>)}</tr></thead>
         <tbody>{players.map(p => <tr key={p.id}><td>{p.name}</td>{extras.currencies.map(c => <td key={c.id}>{formatMoney(extras.wallets[p.id]?.[c.id] || 0)}</td>)}</tr>)}</tbody>
       </table></div>
     </>}
-    <BatchResults run={run} />
   </section>;
 }

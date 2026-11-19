@@ -5,6 +5,7 @@ import { giveItems, upsertShopItem } from '../../../../lib/masterHub.js';
 import { saleOptions, priceText } from '../../../../market/shop.js';
 import ShopSaleOptions, { emptySale } from '../ShopSaleOptions.jsx';
 import ShopManager from './ShopManager.jsx';
+import ModuleTabs from '../ModuleTabs.jsx';
 import { sendMessage } from '../../../../lib/room.js';
 import { PlayerPicker, BatchResults, useMasterRun, targetsFor, defaultTarget, previewText } from '../ui.jsx';
 import '../../../sheet/market.css';
@@ -19,6 +20,7 @@ const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace('.', ',')} 
 export default function ItemsModule({ ctx }) {
   const { tableId, players, closed, extras, shopReady } = ctx;
   const [sale, setSale] = useState(emptySale());
+  const [view, setView] = useState(ctx.entry?.view === 'shop' ? 'shop' : 'deliver'); // deliver | shop
   const [tab, setTab] = useState('catalog');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0].id);
@@ -67,45 +69,49 @@ export default function ItemsModule({ ctx }) {
     if (batch?.results.every(r => r.ok)) { setForm(emptyItemForm()); setSale(emptySale()); extras.refresh(); }
   }
 
+  const source = <div className="tabs-row" role="tablist" aria-label="Origem do item">
+    <button type="button" role="tab" aria-selected={tab === 'catalog'} className={tab === 'catalog' ? 'primary' : 'outline'} onClick={() => setTab('catalog')}>Itens existentes</button>
+    <button type="button" role="tab" aria-selected={tab === 'create'} className={tab === 'create' ? 'primary' : 'outline'} onClick={() => setTab('create')}>Criar item</button>
+  </div>;
+
   return <div className="mh-sections">
-    <section className="mh-section">
-      <div className="tabs-row" role="tablist" aria-label="Origem do item">
-        <button type="button" role="tab" aria-selected={tab === 'catalog'} className={tab === 'catalog' ? 'primary' : 'outline'} onClick={() => setTab('catalog')}>Itens existentes</button>
-        <button type="button" role="tab" aria-selected={tab === 'create'} className={tab === 'create' ? 'primary' : 'outline'} onClick={() => setTab('create')}>Criar item</button>
-      </div>
-      {tab === 'catalog' ? <>
-        <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar item em todo o catálogo…" aria-label="Buscar item" />
-        {!searching && <select value={category} onChange={e => setCategory(e.target.value)} aria-label="Categoria">{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select>}
-        <div className="gm-pick mh-pick" role="radiogroup" aria-label="Item do catálogo">
-          {list.map(i => <label key={i.id} className="recipient">
-            <span><input type="radio" name="mh-item" checked={picked?.id === i.id} onChange={() => setPicked(i)} /> {i.name}</span>
-            <small>{i.weight ? fmtKg(i.weight) : 'sem peso'}</small>
-          </label>)}
-          {!list.length && <p className="muted">Nenhum item encontrado.</p>}
+    {shopReady && <ModuleTabs label="Seções de itens" value={view} onChange={setView} tabs={[['deliver', 'Entregar'], ['shop', `Loja do Mestre (${extras.shop.length})`]]} />}
+    {view === 'shop' && shopReady
+      ? <ShopManager tableId={tableId} extras={extras} closed={closed} />
+      : <>
+        <section className="mh-section">
+          {source}
+          {tab === 'catalog' ? <>
+            <div className="mh-form">
+              <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar item em todo o catálogo…" aria-label="Buscar item" />
+              {!searching && <select value={category} onChange={e => setCategory(e.target.value)} aria-label="Categoria">{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select>}
+            </div>
+            <div className="gm-pick mh-pick" role="radiogroup" aria-label="Item do catálogo">
+              {list.map(i => <label key={i.id} className="recipient">
+                <span><input type="radio" name="mh-item" checked={picked?.id === i.id} onChange={() => setPicked(i)} /> {i.name}</span>
+                <small>{i.weight ? fmtKg(i.weight) : 'sem peso'}</small>
+              </label>)}
+              {!list.length && <p className="muted">Nenhum item encontrado.</p>}
+            </div>
+          </> : <form className="ci-form" onSubmit={e => e.preventDefault()}>
+            <CustomItemFields form={form} set={set} />
+            {shopReady
+              ? <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} disabled={closed} />
+              : <p className="muted mh-hint">Atualização do banco pendente (0041): aplique-a no Supabase para vender itens na Loja do Mestre.</p>}
+          </form>}
+          <BatchResults run={run} />
+        </section>
+        <div className="mh-dock" role="group" aria-label="Entrega">
+          <PlayerPicker players={players} value={value} onChange={setTarget} />
+          <label className="field"><span>Quantidade</span>
+            <input type="number" inputMode="numeric" min="1" max="99" value={qtyText} onChange={e => setQtyText(e.target.value)} onFocus={e => e.target.select()} style={{ width: '8ch' }} /></label>
+          <details className="mh-note"><summary>Observação{note ? ' ✓' : ''}</summary>
+            <input maxLength={200} value={note} onChange={e => setNote(e.target.value)} placeholder="Aparece no chat da mesa" aria-label="Observação da recompensa" /></details>
+          <span className="mh-dock-actions">
+            <button type="button" className="primary" disabled={!valid || run.busy} onClick={give}>{run.busy ? 'Aplicando…' : !subject ? (tab === 'catalog' ? 'Escolha um item' : 'Dê um nome ao item') : 'Entregar'}</button>
+            {tab === 'create' && sale.sell && <button type="button" className="primary" disabled={!canSell || run.busy} onClick={putOnSale}>Colocar à venda</button>}
+          </span>
         </div>
-      </> : <form className="ci-form" onSubmit={e => e.preventDefault()}>
-        <CustomItemFields form={form} set={set} />
-        {shopReady
-          ? <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} disabled={closed} />
-          : <p className="muted mh-hint">Falta aplicar a migração 0041 (Loja do Mestre) no Supabase para vender itens na loja.</p>}
-      </form>}
-    </section>
-    <section className="mh-section">
-      <h3>Entrega</h3>
-      <div className="mh-form">
-        <PlayerPicker players={players} value={value} onChange={setTarget} />
-        <label className="field"><span>Quantidade</span>
-          <input type="number" inputMode="numeric" min="1" max="99" value={qtyText} onChange={e => setQtyText(e.target.value)} onFocus={e => e.target.select()} style={{ width: '8ch' }} /></label>
-        <label className="field"><span>Observação da recompensa (opcional)</span><input maxLength={200} value={note} onChange={e => setNote(e.target.value)} placeholder="Aparece no chat da mesa" /></label>
-        {tab === 'create' && !custom && <small className="muted">Dê um nome ao item.</small>}
-        {tab === 'catalog' && !picked && <small className="muted">Escolha um item da lista.</small>}
-        <div className="tabs-row">
-          <button type="button" className="primary" disabled={!valid || run.busy} onClick={give}>{run.busy ? 'Aplicando…' : 'Entregar'}</button>
-          {tab === 'create' && sale.sell && <button type="button" className="primary" disabled={!canSell || run.busy} onClick={putOnSale}>Colocar à venda</button>}
-        </div>
-      </div>
-      <BatchResults run={run} />
-    </section>
-    {shopReady && <ShopManager tableId={tableId} extras={extras} closed={closed} />}
+      </>}
   </div>;
 }

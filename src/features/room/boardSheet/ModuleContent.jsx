@@ -30,10 +30,13 @@ function OwnEditor({ module, subject, sheets, auth, tableId }) {
 }
 
 // Resumo só de leitura, igual ao da ficha.
-function ReadView({ module, c, d, apt, own, bag }) {
+function ReadView({ module, c, d, apt, own, bag, onOpenShop }) {
   if (module.key === 'aptitude') return <AptitudeSummary apt={apt} always />;
   if (module.key === 'market') {
-    if (!own) return <p className="muted">Compra e venda acontecem na ficha do próprio jogador. Aqui o mestre só consulta a mochila e a aptidão.</p>;
+    if (!own) return <div className="bsp-readonly">
+      <p className="muted">O Mercado é do jogador: compra e venda só acontecem na ficha dele. Para vender itens aos jogadores, use a Loja do Mestre.</p>
+      {onOpenShop && <div><button type="button" className="outline" onClick={onOpenShop}>Abrir Itens › Loja do Mestre</button></div>}
+    </div>;
     const load = d.inventory;
     return <div className="mod-chips">
       <span className="mod-chip"><span className="money-coin" aria-hidden="true">$</span> Dinheiro <b>{formatMoney(c.money)}</b></span>
@@ -42,11 +45,14 @@ function ReadView({ module, c, d, apt, own, bag }) {
     </div>;
   }
   if (module.key === 'bag') return <BagView c={c} d={d} {...bag} />;
-  return <div className="bsp-readonly"><Summary index={module.summary} c={c} d={d} /></div>;
+  return <div className="bsp-readonly">
+    {!own && <p className="muted bsp-ro-note">Somente leitura. Dinheiro, XP, itens e condições se alteram pelos módulos da Central.</p>}
+    <Summary index={module.summary} c={c} d={d} />
+  </div>;
 }
 
 // Conteúdo de um módulo: primeiro o resumo (como na ficha); o dono tem o botão "Editar", que abre os mesmos editores da ficha.
-export default function ModuleContent({ module, subject, sheets, auth, tableId, closed = false }) {
+export default function ModuleContent({ module, subject, sheets, auth, tableId, closed = false, onOpenShop = null }) {
   const [editing, setEditing] = useState(false);
   const own = subject.kind === 'own';
   const canEdit = own && subject.editable && Boolean(sheets);
@@ -67,6 +73,6 @@ export default function ModuleContent({ module, subject, sheets, auth, tableId, 
       <button type="button" className={module.key === 'aptitude' && apt?.available > 0 ? 'primary' : 'outline'} disabled={!canEdit}
         title={canEdit ? undefined : 'Aguarde a ficha carregar na sua conta (ou abra-a em Fichas).'} onClick={() => setEditing(true)}>{label}</button>
     </div>}
-    <ReadView module={module} c={c} d={d} apt={apt} own={own} bag={{ characterId: subject.characterId, tableId, editable: !closed && (own || subject.kind === 'gm') }} />
+    <ReadView module={module} c={c} d={d} apt={apt} own={own} bag={{ characterId: subject.characterId, tableId, editable: !closed && (own || subject.kind === 'gm') }} onOpenShop={onOpenShop} />
   </>;
 }

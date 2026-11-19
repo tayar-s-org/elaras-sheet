@@ -45,3 +45,13 @@
 .bsp-mini .outline { padding: 4px 12px; }
 .bsp-extras { @apply flex flex-wrap items-center gap-[4px] mt-[3px]; }
 .bsp-holding { padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .75rem; }
+
+/* Dentro da Central do Mestre, com um módulo aberto: o cabeçalho encolhe (só o nome) e sobra espaço para o conteúdo */
+.bsp-compact .bsp-top { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.bsp-compact .bsp-identity { padding: 4px 10px; gap: 8px; }
+.bsp-compact .bsp-portrait { width: 28px; height: 28px; font-size: .8rem; border-width: 1px; }
+.bsp-compact .bsp-id-text > p, .bsp-compact .holding-groups, .bsp-compact .bsp-extras { display: none; }
+.bsp-compact .bsp-modules { grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); grid-template-rows: none; }
+.bsp-compact .bsp-tab { padding: 5px 8px; }
+
+.bsp-ro-note { @apply m-0; font-size: .82rem; }

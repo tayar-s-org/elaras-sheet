@@ -1,22 +1,24 @@
 // Núcleo puro da Central do Mestre (sem React, sem rede): lista de módulos, execução em lote idempotente com resultado por
 // alvo, prévia de valores (espelha os limites do servidor) e texto do histórico administrativo. Testado em core.test.js.
 // Documentação: src/features/room/masterHub/README.md.
-import { iconText, cleanIconKeys, DEFAULT_CURRENCY_ICON } from './experienceIcons.js';
+import { iconText, iconText as iconTextPlain, cleanIconKeys, DEFAULT_CURRENCY_ICON } from './experienceIcons.js';
 
 // Ordem e rótulos dos módulos. O componente de cada um é ligado em modules.jsx (adicionar módulo = uma linha aqui e uma lá).
 // needsHub: depende da migração 0040 (a Central mostra o aviso em vez de chamar função inexistente).
+// group: rewards = o que o mestre mais usa (destaque); campaign = acompanhar jogadores; tools = ferramentas e registro (discretos).
 export const MASTER_MODULES = [
-  { key: 'players', label: 'Jogadores' },
-  { key: 'money', label: 'Moedas', needsHub: true },
-  { key: 'items', label: 'Itens', needsHub: true },
-  { key: 'experience', label: 'Experiências', needsHub: true },
-  { key: 'conditions', label: 'Status e Condições', needsHub: true },
-  { key: 'creatures', label: 'Criaturas e Tokens' },
-  { key: 'maps', label: 'Mapas' },
-  { key: 'music', label: 'Música' },
-  { key: 'soundpad', label: 'Soundpad' },
-  { key: 'history', label: 'Histórico', needsHub: true },
+  { key: 'players', label: 'Jogadores', group: 'campaign' },
+  { key: 'money', label: 'Moedas', group: 'rewards', needsHub: true },
+  { key: 'items', label: 'Itens', group: 'rewards', needsHub: true },
+  { key: 'experience', label: 'Experiências', group: 'rewards', needsHub: true },
+  { key: 'conditions', label: 'Status e Condições', group: 'campaign', needsHub: true },
+  { key: 'creatures', label: 'Criaturas e Tokens', group: 'tools' },
+  { key: 'maps', label: 'Mapas', group: 'tools' },
+  { key: 'music', label: 'Música', group: 'tools' },
+  { key: 'soundpad', label: 'Soundpad', group: 'tools' },
+  { key: 'history', label: 'Histórico', group: 'tools', needsHub: true },
 ];
+export const MODULE_GROUPS = [['rewards', 'Recompensas'], ['campaign', 'Campanha'], ['tools', 'Ferramentas e registro']];
 
 // ---------- limites e prévia (os mesmos dos RPCs gm_adjust_*; o servidor é quem decide, isto só mostra o que vai acontecer) ----------
 export const LIMITS = {
@@ -113,8 +115,10 @@ const labels = list => (Array.isArray(list) ? list.map(c => c?.label).filter(Boo
 const arrow = (a, b) => `${a ?? '—'} → ${b ?? '—'}`;
 
 // Linhas de detalhe "antes → depois" de uma entrada do histórico, por categoria. itemName(id) resolve o nome do catálogo.
-export function auditDetails(entry, itemName = id => id) {
+// opts.raw: devolve a chave da imagem ("@euro") no lugar do símbolo de texto, para a tela trocar pela imagem (RichIcons).
+export function auditDetails(entry, itemName = id => id, opts = {}) {
   const b = entry?.before, a = entry?.after;
+  const iconText = opts.raw ? (icon, fb) => icon || fb : iconTextPlain;
   switch (entry?.category) {
     case 'money': return [['Dinheiro', arrow(b?.money, a?.money)]];
     case 'xp': return [['XP', arrow(b?.xp, a?.xp)], ...(Number.isFinite(a?.xp) ? [['Nível', arrow(Math.floor((b?.xp ?? 0) / 5), Math.floor(a.xp / 5))]] : [])];
@@ -143,11 +147,11 @@ export function auditDetails(entry, itemName = id => id) {
 }
 
 // Resumo de uma linha: "Somou · Aria · Dinheiro: 500 → 600".
-export function auditTitle(entry, characterName, itemName = id => id) {
+export function auditTitle(entry, characterName, itemName = id => id, opts = {}) {
   // O servidor não conhece o catálogo de itens: o nome do item é resolvido aqui.
   const summary = entry?.category === 'item' && entry.kind === 'give' && entry.after
     ? `Entregou ${entry.after.given ?? ''}× ${entry.after.name || itemName(entry.after.item)}`.replace(' ×', '×')
-    : cleanIconKeys(entry?.summary);
+    : (opts.raw ? String(entry?.summary ?? '') : cleanIconKeys(entry?.summary));
   return [kindLabel(entry?.kind), characterName, summary].filter(Boolean).join(' · ');
 }
 

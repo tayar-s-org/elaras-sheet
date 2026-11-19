@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { loadAudit } from '../../../../lib/masterHub.js';
 import { resolveItem } from '../../../../market/items.js';
+import { RichIcons } from '../ExperienceIcon.jsx';
 import { AUDIT_CATEGORIES, categoryLabel, auditDetails, auditTitle } from '../core.js';
 
 const PAGE = 30;
@@ -21,14 +22,18 @@ export default function HistoryModule({ ctx }) {
   const query = f => ({ from: dayStart(f.from), to: dayEnd(f.to), characterId: f.characterId, category: f.category });
   const nameOf = id => players.find(p => p.id === id)?.name || (id ? 'Personagem removido' : '');
 
+  const ticket = useRef(0); // só a última consulta vale: trocar o filtro com uma resposta ainda a caminho não mistura resultados
   const load = useCallback(async (offset = 0) => {
+    const mine = ++ticket.current;
     setBusy(true);
     setError('');
     try {
       const page = await loadAudit(tableId, { ...query(filters), offset, limit: PAGE });
-      setRows(prev => (offset ? [...(prev || []), ...page] : page));
+      if (mine !== ticket.current) return;
+      // "Carregar mais" por deslocamento pode repetir uma linha se entrou registro novo no meio: descarta repetidas
+      setRows(prev => { if (!offset) return page; const seen = new Set((prev || []).map(r => r.id)); return [...(prev || []), ...page.filter(r => !seen.has(r.id))]; });
       setMore(page.length === PAGE);
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
+    } catch (e) { if (mine === ticket.current) setError(e.message); } finally { if (mine === ticket.current) setBusy(false); }
   }, [tableId, filters]);
   useEffect(() => { load(0); }, [load]);
 
@@ -50,22 +55,22 @@ export default function HistoryModule({ ctx }) {
         <button type="button" className="outline" onClick={() => setFilters({ from: '', to: '', characterId: '', category: '' })}>Limpar filtros</button>
         <button type="button" className="outline" disabled={busy} onClick={() => load(0)}>Atualizar</button>
       </form>
-      {error && <p role="alert" className="muted">{error}</p>}
+      {error && <p role="alert" className="muted">Não foi possível carregar o histórico: {error} <button type="button" className="outline" onClick={() => load(0)}>Tentar de novo</button></p>}
       {rows === null && !error && <p className="muted" role="status">Carregando…</p>}
-      {rows && !rows.length && <p className="muted">Nenhuma operação registrada com esses filtros.</p>}
-      <ul className="mh-audit">
+      {rows && !rows.length && !error && <p className="muted">Nenhuma operação registrada com esses filtros.</p>}
+      <ul className="mh-audit" aria-busy={busy}>
         {(rows || []).map(r => <li key={r.id}>
           <details>
             <summary>
               <span className={`mh-cat mh-cat-${r.category}`}>{categoryLabel(r.category)}</span>
-              <span className="mh-audit-title">{auditTitle(r, nameOf(r.character_id), itemName)}</span>
+              <span className="mh-audit-title"><RichIcons text={auditTitle(r, nameOf(r.character_id), itemName, { raw: true })} /></span>
               <time dateTime={r.created_at}>{dt(r.created_at)}</time>
             </summary>
             <dl className="mh-audit-detail">
               <div><dt>Responsável</dt><dd>{r.profiles?.display_name || 'Mestre'}</dd></div>
               <div><dt>Jogador afetado</dt><dd>{nameOf(r.character_id) || '—'}</dd></div>
               <div><dt>Operação</dt><dd>{categoryLabel(r.category)} · {r.kind}</dd></div>
-              {auditDetails(r, itemName).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+              {auditDetails(r, itemName, { raw: true }).map(([k, v]) => <div key={k}><dt><RichIcons text={k} /></dt><dd><RichIcons text={v} /></dd></div>)}
               {r.note ? <div><dt>Observação</dt><dd>{r.note}</dd></div> : null}
               <div><dt>Data e hora</dt><dd>{dt(r.created_at)}</dd></div>
               <div><dt>Identificador</dt><dd><small>{r.request_id || '—'}</small></dd></div>

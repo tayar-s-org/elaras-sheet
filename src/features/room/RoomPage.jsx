@@ -200,6 +200,15 @@ export default function RoomPage({ auth, id, sheets }) {
     document.getElementById(`room-tab-${key}`)?.focus();
     document.getElementById('room-tools')?.scrollIntoView({ block: 'start' });
   }
+  // Atalho para o painel do tabuleiro (a Central do mestre ou a ficha do jogador): rola até ele e põe o foco no primeiro botão.
+  function jumpToBoardPanel(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start' });
+    // O foco vai para o próprio painel (o leitor de tela lê o nome dele), não para um botão qualquer dentro dele.
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+    el.focus({ preventScroll: true });
+  }
   function handleTabKey(event, index) {
     const n = tabs.length;
     const next = {
@@ -231,6 +240,7 @@ export default function RoomPage({ auth, id, sheets }) {
       <button type="button" className="outline" onClick={() => jumpToPanel('chat')}>Chat</button>
       <button type="button" className="outline" onClick={() => jumpToPanel('dice')}>Dados</button>
       {isGm && <button type="button" className="outline" onClick={() => jumpToPanel('items')}>{tabs.find(([key]) => key === 'items')[1]}</button>}
+      <button type="button" className="outline" onClick={() => jumpToBoardPanel(isGm ? 'room-master-hub' : 'room-char-panel')}>{isGm ? 'Central do Mestre' : 'Minha ficha'}</button>
     </nav>
     <aside className="room-side">
       <p className="eyebrow">{STATUS_LABEL[table.status].toUpperCase()}</p>

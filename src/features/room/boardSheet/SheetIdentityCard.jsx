@@ -26,7 +26,7 @@ export default function SheetIdentityCard({ data, full, kind, conditions = [], w
       <h3>{c.name || 'Sem nome'}</h3>
       <p className="bsp-concept" title={c.concept || undefined}>{c.concept || 'Sem conceito definido'}</p>
       <p>{[c.race, c.age && `${c.age}`].filter(Boolean).join(' · ') || 'Raça não definida'} · Nível {d.level} · {c.xp} XP · {stageForXP(c.xp)}</p>
-      {full ? <p className="bsp-money"><span className="money-coin" aria-hidden="true">$</span> <b>{formatMoney(c.money)}</b> · Pontos: {d.remaining + d.spent} no total · {d.spent} gastos · {d.remaining} livres</p>
+      {full ? <p className="bsp-money" title={`${d.spent} de ${d.remaining + d.spent} pontos já gastos`}>Dinheiro <span className="money-coin" aria-hidden="true">$</span> <b>{formatMoney(c.money)}</b> · {d.remaining} de {d.remaining + d.spent} {d.remaining + d.spent === 1 ? 'ponto livre' : 'pontos livres'}</p>
         : <p>Dinheiro e demais módulos são privados.</p>}
       {conditions.length > 0 && <div className="bsp-extras"><ActiveConditions conditions={conditions} compact /></div>}
       <HoldingGroups wallet={wallet} experience={experience} compact />

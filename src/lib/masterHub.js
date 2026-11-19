@@ -11,7 +11,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 function friendly(error) {
   const msg = error?.message || 'Erro ao acessar a nuvem.';
-  if (SCHEMA.test(msg)) return new Error('Falta aplicar a migração 0040/0041 (Central do Mestre e Loja do Mestre) no Supabase.');
+  if (SCHEMA.test(msg)) return new Error('O banco ainda não tem a atualização 0040/0041 (Central e Loja do Mestre). Aplique-a no Supabase e recarregue a página.');
   if (/table_shop_items.*foreign key|foreign key.*table_shop_items/i.test(msg)) return new Error('Esta moeda é usada por itens da Loja do Mestre. Tire esses itens da loja antes de apagá-la.');
   return new Error(msg);
 }

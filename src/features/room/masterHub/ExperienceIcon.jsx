@@ -1,10 +1,15 @@
 import React from 'react';
-import { imageIconUrl, iconText } from './experienceIcons.js';
+import { imageIconUrl, iconText, isImageIcon } from './experienceIcons.js';
 
 // Ícone de um tipo de experiência (ou o símbolo de uma moeda): imagem embutida quando a chave é de imagem, senão o texto/emoji.
 export default function ExperienceIcon({ icon }) {
   const url = imageIconUrl(icon);
   return url ? <img className="xp-icon" src={url} alt="" width="20" height="20" /> : <span aria-hidden="true">{iconText(icon)}</span>;
+}
+
+// Texto com chaves de imagem ("Colocou à venda: Anel (10 @euro)"): cada chave vira a imagem da moeda/experiência.
+export function RichIcons({ text }) {
+  return String(text ?? '').split(/(@[a-z]{2,7})/).map((part, i) => (isImageIcon(part) ? <ExperienceIcon key={i} icon={part} /> : part));
 }
 
 // Selo de carteira/experiência de um personagem (ver experienceChips/walletChips em core.js).

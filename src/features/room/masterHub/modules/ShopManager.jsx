@@ -48,7 +48,7 @@ export default function ShopManager({ tableId, extras, closed }) {
           : <span className="tabs-row">
             <button type="button" className="outline" disabled={closed || run.busy} onClick={() => setEdit({ id: l.id, currencyId: l.currency_id, price: String(l.price) })}>Moeda e preço</button>
             <button type="button" className="outline" disabled={closed || run.busy} onClick={() => toggle(l)}>{l.active ? 'Pausar' : 'Reativar'}</button>
-            <button type="button" className="outline danger" disabled={closed || run.busy} onClick={() => remove(l)}>Tirar da loja</button>
+            <button type="button" className="outline danger mh-danger" aria-label={`Tirar ${l.name} da loja`} disabled={closed || run.busy} onClick={() => remove(l)}>Tirar da loja</button>
           </span>}
       </li>)}
       {!extras.shop.length && <li className="muted">Nenhum item à venda.</li>}

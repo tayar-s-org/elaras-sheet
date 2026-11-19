@@ -68,7 +68,7 @@ export function LiquidUnits({ entry, item, disabled = false, live = false, onFil
   };
   return <div className="liquid-units">
     {fills.map((litres, i) => <div className="liquid-unit" key={i}>
-      {!only && <span className="liquid-name">{i + 1}</span>}
+      {!only && <span className="liquid-name" aria-hidden="true">{`${(item.name || "").split(" ")[0]} ${i + 1}`}</span>}
       <LiquidSlider value={litres} capacity={item.liquid.capacity} label={`${item.name}${only ? "" : ` ${i + 1}`}`} disabled={disabled} live={live} onCommit={v => onFill(i, v)} />
       <button type="button" className="qty-minus" disabled={disabled} aria-label={`Tirar ${item.name}${only ? "" : ` ${i + 1}`} da mochila`} title="Tirar esta unidade" onClick={() => remove(i)}>−</button>
       {onSend && <SendMenu onSend={() => onSend(i)} disabled={sendDisabled} title={sendTitle} label="Enviar este cantil…" />}
