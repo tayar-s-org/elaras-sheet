@@ -22,9 +22,16 @@
 .die-picker button:disabled { opacity: .3; @apply cursor-default; }
 .skills2-cost { @apply text-right; font-size: .8rem; color: var(--gold); @apply font-bold; }
 .skills2-note { @apply mt-[18px]; font-size: .85rem; }
+/* Telefone: o nome e o custo ficam em cima; o seletor de dado ocupa a linha inteira embaixo, com alvos de 44px. */
 @media (max-width: 560px) {
-  .skills2-row { grid-template-columns: 1fr auto; }
-  .skills2-cost { @apply hidden; }
+  .skills2-row, .skills2-row:has(> .text-button) { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name cost" "pick pick"; row-gap: 8px; }
+  .skills2-row:has(> .text-button) { grid-template-columns: minmax(0, 1fr) auto 44px; grid-template-areas: "name cost rm" "pick pick pick"; }
+  .skills2-name { grid-area: name; }
+  .skills2-cost { grid-area: cost; }
+  .skills2-row > .text-button { grid-area: rm; @apply min-h-[44px]; }
+  .skills2-row > .die-picker { grid-area: pick; @apply grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .skills2-row > .die-bonus { justify-self: start; @apply ml-0; }
+  .die-picker button { @apply min-h-[44px] min-w-0 p-[5px_2px]; font-size: 1rem; }
 }
 .skills2-tabs { @apply m-[6px_0_4px]; }
 .skills2-count { font-size: .75rem; opacity: .75; @apply ml-[2px]; }

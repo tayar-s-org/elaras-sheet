@@ -18,6 +18,7 @@ import { itemEffects } from "../../market/effects.js";
 import "./modules.css";
 import AptitudeSummary, { useAptitudeFor } from "../routine/AptitudeSummary.jsx";
 import SheetAptitude from "../routine/SheetAptitude.jsx";
+import PointsStrip from "./PointsStrip.jsx";
 
 export const MODULES = [
   "Identidade",
@@ -31,6 +32,8 @@ export const MODULES = [
 ];
 // Ordem em que os módulos aparecem (a Mochila fica logo depois da Magia; os índices acima não mudam).
 const ORDER = [0, 1, 2, 3, 4, 7, 5, 6];
+// Editores que gastam pontos de criação e por isso mostram o saldo no topo (Perícias já traz o seu).
+const POINT_EDITORS = [0, 1, 3];
 
 const ATTRIBUTE_ORDER = ["Agilidade", "Astúcia", "Espírito", "Força", "Vigor"];
 const excerpt = (text, max = 220) => {
@@ -214,6 +217,7 @@ export default function SheetModules({ ctx, editing, setEditing }) {
           <h2 id="mod-editor-title">{editing === "guide" ? "Guia de criação" : editing === "market" ? "Mercado" : editing === "aptitude" ? "Aptidão" : MODULES[editing]}</h2>
           <button type="button" className="primary" onClick={() => setEditing(null)}>Concluir</button>
         </header>
+        {POINT_EDITORS.includes(editing) && <PointsStrip d={d} />}
         <div className="mod-editor-body">{renderEditor(editing, ctx)}</div>
       </div>
     </Modal>}

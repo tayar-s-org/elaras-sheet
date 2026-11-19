@@ -30,6 +30,14 @@
 .mod-editor { width: min(980px, 100%); @apply max-w-[980px]; background: var(--surface); @apply rounded-[10px]; box-shadow: 0 20px 80px var(--shadow); max-height: calc(100vh - 48px); @apply flex flex-col p-0 overflow-hidden; }
 .mod-editor-head { @apply flex items-center justify-between gap-[12px] p-[16px_24px]; border-bottom: 1px solid var(--border); }
 .mod-editor-head h2 { @apply m-0; font-family: var(--font-display); font-size: 1.7rem; @apply font-bold; }
+.mod-points { @apply flex flex-wrap items-baseline gap-[4px_10px] p-[8px_24px]; border-bottom: 1px solid var(--border); background: var(--surface-soft); color: var(--text); }
+.mod-points strong { font-family: var(--font-body); font-size: 1.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.mod-points-text { @apply font-bold; }
+.mod-points-sub { @apply text-app-muted ml-auto; font-size: .85rem; }
+.mod-points[data-state="ok"] { background: var(--success-bg); }
+.mod-points[data-state="ok"] strong { color: var(--success); }
+.mod-points[data-state="deficit"] { background: var(--danger-bg); }
+.mod-points[data-state="deficit"] strong { color: var(--danger); }
 .mod-editor-body { @apply overflow-auto p-[22px_24px_28px]; }
 
 /* Vantagens, complicacoes e itens: cada um abre para mostrar o efeito */
