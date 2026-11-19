@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dieDef, upNormal, alignQuaternion, UP, DIE_SIDES } from './geometry.js';
+import { faceAreaCenter } from './mesh.js';
 import { planDice, splitD100, seededRandom, faceLabel, MAX_ANIMATED } from './plan.js';
 
 const close = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -102,4 +103,13 @@ test('o sorteio da animação é determinístico por rolagem e varia entre rolag
   assert.deepEqual(seqA, seqB);
   assert.notDeepEqual(seqA, seqC);
   assert.ok(seqA.every(x => x >= 0 && x < 1));
+});
+
+test('centro da área de uma face em pipa independe da ordem dos vértices', () => {
+  const kite = [{ x: 5, y: 0 }, { x: 8, y: 6 }, { x: 5, y: 9 }, { x: 2, y: 6 }];
+  for (const points of [kite, [...kite].reverse()]) {
+    const center = faceAreaCenter(points);
+    assert.ok(close(center.x, 5));
+    assert.ok(close(center.y, 5));
+  }
 });

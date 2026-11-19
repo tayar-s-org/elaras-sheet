@@ -32,17 +32,45 @@ function distanceToEdges(points, cx, cy) {
   return min;
 }
 
+// Centro de área do polígono. A média dos vértices só coincide nas faces regulares.
+export function faceAreaCenter(points) {
+  let twiceArea = 0;
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const cross = a.x * b.y - b.x * a.y;
+    twiceArea += cross;
+    x += (a.x + b.x) * cross;
+    y += (a.y + b.y) * cross;
+  }
+  return { x: x / (3 * twiceArea), y: y / (3 * twiceArea) };
+}
+
 function drawNumber(ctx, text, x, y, size, color, rotation = 0) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
   ctx.font = `700 ${size}px "Alegreya Sans", "Segoe UI", Arial, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  const metrics = ctx.measureText(text);
+  const left = -metrics.actualBoundingBoxLeft;
+  const right = metrics.actualBoundingBoxRight;
+  const top = -metrics.actualBoundingBoxAscent;
+  const bottom = metrics.actualBoundingBoxDescent;
+  // Centraliza a tinta visível, incluindo algarismos estreitos e pares com larguras diferentes.
+  const xOffset = -(left + right) / 2;
+  const yOffset = -(top + bottom) / 2;
   ctx.fillStyle = color;
-  ctx.fillText(text, 0, size * 0.04);
-  // 6 e 9 (e 60/90) ganham um traco embaixo para nao serem confundidos.
-  if (['6', '9', '60', '90'].includes(text)) ctx.fillRect(-size * 0.28 * text.length * 0.7, size * 0.46, size * 0.56 * text.length * 0.7, Math.max(3, size * 0.06));
+  ctx.fillText(text, xOffset, yOffset);
+
+  // O traço diferencia 6/9 sem deslocar os algarismos do centro.
+  if (['6', '9', '60', '90'].includes(text)) {
+    const width = (right - left) * 0.75;
+    ctx.fillRect(-width / 2, yOffset + bottom + size * 0.09, width, Math.max(2, size * 0.045));
+  }
   ctx.restore();
 }
 
@@ -100,8 +128,7 @@ export function makeDieMesh(def, { kind, color, opacity = 1, value }) {
       });
     } else {
       const label = faceLabel(kind, face.value);
-      const centerX = px.reduce((a, p) => a + p.x, 0) / px.length;
-      const centerY = px.reduce((a, p) => a + p.y, 0) / px.length;
+      const { x: centerX, y: centerY } = faceAreaCenter(px);
       const room = distanceToEdges(px, centerX, centerY);
       const size = Math.min(CELL * 0.5, room * (label.length > 1 ? 1.15 : 1.5));
       drawNumber(ctx, label, centerX, centerY, size, textColor);
