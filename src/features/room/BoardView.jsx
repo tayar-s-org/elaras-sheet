@@ -9,13 +9,15 @@ import MasterModule from './MasterModule.jsx';
 import MapWorkspace from './MapWorkspace.jsx';
 import { boardGrid, gridLines, snapInsideGrid } from '../../boardGrid.js';
 import MusicPlayer from './MusicPlayer.jsx';
-import SoundBar, { SfxVolume } from './SoundBar.jsx';
+import { SfxVolume } from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
 import CreatureSheetPeek from './CreatureSheetPeek.jsx';
 import { creatureOf, uniqueName, metaForCopy, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
-import { displayName, imageVisible, isNameHidden, effectsOf, addEffect, removeEffect, effectBadges } from '../../tokenState.js';
+import { displayName, imageVisible, isNameHidden, effectsOf, addEffect, removeEffect, effectBadges, tokenEffects } from '../../tokenState.js';
+import MasterHub from './masterHub/MasterHub.jsx';
+import { useExtras } from './masterHub/extras.jsx';
 import SheetPeek from './SheetPeek.jsx';
 import BoardSheetPanel from './boardSheet/BoardSheetPanel.jsx';
 import { useAptitudeFor } from '../routine/AptitudeSummary.jsx';
@@ -48,7 +50,7 @@ function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initials = name => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false, sheets = null, auth = null, fullscreenAction = null }) {
+export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false, sheets = null, auth = null, fullscreenAction = null, campaign = null }) {
   const askConfirm = useConfirm();
   const { board, tokens, marks, mapSrc, drags, error, setError, local } = boardState;
   const svgRef = useRef(null);
@@ -56,6 +58,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const ratioRef = useRef(0.6); // altura/largura do SVG na tela
   const [tool, setTool] = useState('move');
   const [selected, setSelected] = useState(null);
+  const extras = useExtras();
   const [movingToken, setMovingToken] = useState(false);
   const [moveNotice, setMoveNotice] = useState('');
   const [creatureRevision, setCreatureRevision] = useState(0);
@@ -275,6 +278,11 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     if (effects.length !== effectsOf(token).length) patchCreature(token, { effects });
   };
   const removeTokenEffect = (token, id) => patchCreature(token, { effects: removeEffect(token.effects, id) });
+  // Central do Mestre: grava a lista inteira de efeitos do token e DEVOLVE a falha (patchCreature só mostra o erro), para o lote não dar sucesso falso.
+  const setTokenEffects = async (token, effects) => {
+    local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, effects } : t)));
+    try { await updateToken(token.id, { effects }); } catch (err) { local.reloadItems(); throw err; }
+  };
   const editCreature = async token => {
     const details = await loadCreatureDetails(token.id);
     setMasterOpen(false);
@@ -408,7 +416,10 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
 
   return <div className="board">
-    <BoardSheetPanel sel={sel} myCharacter={myCharacter} isGm={isGm} characters={characters} tableId={tableId} sheets={sheets} auth={auth} closed={closed} />
+    {isGm && <MasterHub tableId={tableId} closed={closed} members={members} characters={characters} states={room.states} board={board} tokens={tokens} pad={pad} sheets={sheets} auth={auth} extras={extras} campaign={campaign || { name: '', gmName: '', clock: '' }}
+      tools={{ openCreature: () => setMaker({ creature: true }), openPresets: () => { setPresetNotice(''); setMasterOpen('presets'); }, openTokens: () => setMasterOpen('map'), openMapTools: view => setMapTools(view), openMusic: () => setAudioOpen('music'), openSound: () => setAudioOpen('sound'), setTokenEffects }} />}
+    {/* O mestre consulta as fichas pelo módulo Jogadores da Central; o painel da ficha é dos jogadores. */}
+    {!isGm && <BoardSheetPanel sel={sel} myCharacter={myCharacter} isGm={isGm} characters={characters} tableId={tableId} sheets={sheets} auth={auth} closed={closed} states={room.states} />}
     <div className="board-toolbar">
       <div role="group" aria-label="Ferramentas" className="tabs-row">
         <button className={tool === 'move' ? 'primary' : 'outline'} aria-pressed={tool === 'move'} onClick={() => setTool('move')}>Mover</button>
@@ -421,17 +432,10 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         {fullscreenAction}
         {!isGm && <SfxVolume pad={pad} />}
       </div>
-      {!closed && (myCharacter || isGm) && <div className="toolbar-end">
+      {!closed && myCharacter && <div className="toolbar-end">
         {myCharacter && <div role="group" aria-label="Meu token" className="tabs-row">
           {!myToken && <button className="primary" disabled={busy} onClick={placeMine}>Colocar meu token</button>}
           <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken || sheetImage(myCharacter) ? 'Editar token' : 'Criar token'}</button>
-        </div>}
-        {isGm && <div role="group" aria-label="Mestre" className="tabs-row">
-          <button type="button" className="primary" onClick={() => setMaker({ creature: true })}>Nova criatura</button>
-          <button type="button" className="outline" onClick={() => { setPresetNotice(""); setMasterOpen("presets"); }}>Predefinições</button>
-          <button type="button" className="outline master-button" onClick={() => setMasterOpen('map')}>Mapa e tokens</button>
-          <button type="button" className="outline music-button" onClick={() => setAudioOpen('music')}>Música</button>
-          <button type="button" className="outline sound-button" onClick={() => setAudioOpen('sound')}>Soundpad</button>
         </div>}
       </div>}
     </div>
@@ -439,7 +443,6 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       aria-controls="board-audio-controls" onClick={()=>setImmersiveAudio(v=>!v)}>{immersiveAudio ? 'Recolher áudio' : 'Mostrar áudio'}</button>}
     <div id="board-audio-controls" hidden={immersive && !immersiveAudio}>
       {board.settings?.music && <MusicPlayer board={board} isGm={isGm} local={local} setError={setError} />}
-      <SoundBar pad={pad} isGm={isGm} />
     </div>
     <div className="board-wrap">
     {visibleTokens.length > 0 && <div className="board-token-controls">
@@ -473,7 +476,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         const r = unit(t) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
         const src = imageVisible(t, isGm) ? imageOf(t) : null; // nome oculto: sem foto para os jogadores
-        const badges = effectBadges(t.effects);
+        const badges = effectBadges(tokenEffects(t, room.states)); // criatura: efeitos do token · personagem: condições da mesa
         const cr = creatureOf(t) || pcLife(t);
         // Token de personagem mostra o nome atual da ficha (o nome gravado no token é só o de quando foi colocado).
         const label = tokenLabel(t);

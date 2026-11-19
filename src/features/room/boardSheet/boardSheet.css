@@ -43,3 +43,5 @@
 .bsp-mini { @apply flex items-center justify-between gap-[10px] p-[4px_8px_4px_12px]; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
 .bsp-mini-name { @apply min-w-0 overflow-hidden whitespace-nowrap text-ellipsis; font-size: .9rem; }
 .bsp-mini .outline { padding: 4px 12px; }
+.bsp-extras { @apply flex flex-wrap items-center gap-[4px] mt-[3px]; }
+.bsp-holding { padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .75rem; }

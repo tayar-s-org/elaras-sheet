@@ -20,6 +20,7 @@ import { useCustomItemRequests } from './useCustomItemRequests.js';
 import { setLastRoom, clearLastRoom } from '../../lib/lastRoom.js';
 import { useBoard } from './useBoard.js';
 import { useLiveCharacters } from './useLiveCharacters.js';
+import { TableExtrasContext, useTableExtras } from './masterHub/extras.jsx';
 import { useClock } from '../routine/useClock.js';
 import { formatClock } from '../../rpg/clock.js';
 import '../routine/routine.css';
@@ -155,6 +156,7 @@ export default function RoomPage({ auth, id, sheets }) {
   const itemRequests = useCustomItemRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const skillRequests = useCustomSkillRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const clock = useClock(id, Boolean(room.ready));
+  const extras = useTableExtras(id, Boolean(room.ready)); // moedas, carteiras e experiências da mesa (uma cópia só, por Realtime)
   const requests = useRequests(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const trainingRequests = useTrainingApprovals(id, Boolean(room.ready) && table?.owner_id === auth.user?.id);
   const pendingEntries = members.filter(m => m.status === 'pending').length;
@@ -213,7 +215,7 @@ export default function RoomPage({ auth, id, sheets }) {
     document.getElementById(`room-tab-${key}`)?.focus();
   }
 
-  return <main className={`room${immersive ? ' room-immersive' : ''}${docks.party ? ' dock-party-open' : ''}${docks.dice ? ' dock-dice-open' : ''}`}>
+  return <TableExtrasContext.Provider value={extras}><main className={`room${immersive ? ' room-immersive' : ''}${docks.party ? ' dock-party-open' : ''}${docks.dice ? ' dock-dice-open' : ''}`}>
     {immersive && <nav className="immersive-toolbar" inert={Boolean(overlayDock)} aria-label="Painéis do tabuleiro">
       <button type="button" className="outline" ref={node=>{dockButtons.current.party=node;}} aria-controls="immersive-party" aria-expanded={docks.party} onClick={()=>toggleDock('party')}>{isGm?'Grupo':'Fichas'}</button>
       <button type="button" className="outline" ref={node=>{dockButtons.current.dice=node;}} aria-controls="room-tools" aria-expanded={docks.dice} onClick={()=>toggleDock('dice')}>Dados e histórico</button>
@@ -249,7 +251,7 @@ export default function RoomPage({ auth, id, sheets }) {
       {error && <p role="alert" className="muted">{error}</p>}
     </aside>
     <section className="room-board" aria-label="Tabuleiro" inert={Boolean(overlayDock)}>
-      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} sheets={sheets} auth={auth} fullscreenAction={!immersive && <button ref={fullscreenButton} type="button" className="outline" onClick={enterImmersive}>Tela cheia</button>} diceSettings={diceSettings} markAnimating={markAnimating} immersive={immersive}
+      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} sheets={sheets} auth={auth} campaign={{ name: table.name, gmName: table.profiles?.display_name || '', clock: clock.available && clock.tick != null ? formatClock(clock.tick) : '' }} fullscreenAction={!immersive && <button ref={fullscreenButton} type="button" className="outline" onClick={enterImmersive}>Tela cheia</button>} diceSettings={diceSettings} markAnimating={markAnimating} immersive={immersive}
         logSlot={<div className="room-table-log"><TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} rewards={room.rewards} hidden={hidden} members={members} characters={characters} me={auth.user.id} isGm={isGm} /></div>} />
     </section>
     <aside className="room-panel" id="room-tools" hidden={immersive && !docks.dice}
@@ -286,5 +288,5 @@ export default function RoomPage({ auth, id, sheets }) {
         : <PartyPanel tableId={id} me={auth.user.id} isGm={isGm} members={members} characters={characters} states={states} patchState={room.patchState} closed={closed} />}
       </div>
     </aside>
-  </main>;
+  </main></TableExtrasContext.Provider>;
 }

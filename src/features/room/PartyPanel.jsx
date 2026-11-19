@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { saveState, sendMessage } from '../../lib/room.js';
+import ActiveConditions from '../sheet/ActiveConditions.jsx';
+import { conditionsOf } from '../../tokenState.js';
+import { useExtras } from './masterHub/extras.jsx';
+import { experienceChips, walletChips } from './masterHub/core.js';
+import { HoldingGroups } from './masterHub/ExperienceIcon.jsx';
 import SheetViewModal from './SheetViewModal.jsx';
 import { AptitudeGrant } from '../routine/AptitudeSummary.jsx';
 import { grantXp } from '../../lib/xp.js';
@@ -33,6 +38,10 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   const [giving, setGiving] = useState(false);
   const [viewing, setViewing] = useState(false);
   const [amountText, setAmountText] = useState('1');
+  const extras = useExtras();
+  // Experiências personalizadas: todos veem (como o XP). Carteira de moedas: só o dono e o mestre (a RLS só entrega a eles).
+  const wallet = canEdit ? walletChips(extras, row.id) : [];
+  const experiences = experienceChips(extras, row.id);
   const amount = Math.max(1, Math.min(999, Math.trunc(Number(amountText)) || 1));
   const max = safeMaxima(row.data);
   const value = k => currentValue(state, max, k);
@@ -42,14 +51,15 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     try { await saveState(tableId, row.id, next); } catch (e) { setError(e.message); }
   }
   async function change(k, v) {
-    const base = { life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v, max }; // max permite ao servidor registrar a primeira alteracao
+    const { faint: _faint, ...rest } = state || {}; // o desmaio só continua se ainda valer (abaixo); o resto (condições) fica
+    const base = { ...rest, life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v, max }; // max permite ao servidor registrar a primeira alteracao; ...state mantém o resto (condições)
     // O prazo/desmaio do mestre so vale enquanto o personagem continua na Incapacitação 4.
     const keep = state?.faint && incapacitation({ ...base, faint: state.faint }, max).total === 4;
     return persist(keep ? { ...base, faint: state.faint } : base);
   }
   async function setFaint(faint) {
     const wasFainted = Boolean(state?.faint?.fainted);
-    await persist({ life: value('life'), stamina: value('stamina'), mana: value('mana'), max, faint });
+    await persist({ ...state, life: value('life'), stamina: value('stamina'), mana: value('mana'), max, faint });
     const who = row.name || 'O personagem';
     const text = faint.fainted ? `💤 ${who} desmaiou (Incapacitação 5).`
       : wasFainted ? `✨ ${who} foi reanimado.`
@@ -63,6 +73,8 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     </div>
     <p className="muted">{member.profiles?.display_name} · {row.data.race || 'Raça livre'}</p>
     {canEdit && <MoneyTag value={row.data?.money} />}
+    <ActiveConditions conditions={conditionsOf(state)} />
+    <HoldingGroups wallet={wallet} experience={experiences} />
     {viewing && <SheetViewModal data={row.data} owner={member.profiles?.display_name} tableId={tableId} characterId={row.id} onClose={() => setViewing(false)} />}
     {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
       <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}

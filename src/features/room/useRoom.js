@@ -124,6 +124,7 @@ export function useRoom(tableId, user, displayName) {
   }, []);
   const addMessage = useCallback(m => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]), []);
   const addRoll = useCallback(r => setRolls(prev => prev.some(x => x.id === r.id) ? prev : [...prev, r]), []);
-  const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: state })), []);
+  // Atualização local de vida/stamina/mana/desmaio. As condições (state.conditions) só mudam por RPC do mestre: nunca são sobrescritas aqui.
+  const patchState = useCallback((characterId, state) => setStates(prev => ({ ...prev, [characterId]: { ...state, ...(prev[characterId]?.conditions ? { conditions: prev[characterId].conditions } : {}) } })), []);
   return { stateLog, rewards, ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

@@ -2,14 +2,21 @@ import React, { useEffect, useId, useState } from 'react';
 import { resolveSubject, modulesAvailable, MODULE_BUTTONS } from './boardSheetAccess.js';
 import SheetIdentityCard from './SheetIdentityCard.jsx';
 import ModuleContent from './ModuleContent.jsx';
+import { conditionsOf } from '../../../tokenState.js';
+import { useExtras } from '../masterHub/extras.jsx';
+import { experienceChips, walletChips } from '../masterHub/core.js';
 import './boardSheet.css';
 
 const MIN_KEY = 'elara-board-sheet-min';
 const loadMin = () => { try { return localStorage.getItem(MIN_KEY) === '1'; } catch { return false; } };
 
+// Experiências personalizadas aparecem para todos (como o XP); a carteira só para quem pode ver tudo (dono e mestre). Em grupos separados.
+const walletOf = (extras, id, full) => (full ? walletChips(extras, id) : []);
+
 // Painel da ficha no topo do tabuleiro: identidade sempre visível + módulos que abrem um de cada vez.
 // Segue o token selecionado (sem seleção: a ficha de quem está jogando). Não guarda dados da ficha: lê/edita as mesmas fontes da ficha.
-export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, tableId, sheets, auth, closed = false }) {
+export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, tableId, sheets, auth, closed = false, embedded = false, states = null }) {
+  const extras = useExtras();
   const subject = resolveSubject({ sel, myCharacter, isGm, characters, sessionSheets: sheets?.session?.sheets || [] });
   const available = modulesAvailable(subject);
   const [open, setOpen] = useState(null);   // chave do módulo aberto
@@ -26,7 +33,8 @@ export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, ta
   const module = MODULE_BUTTONS.find(m => m.key === (current || shown));
   const title = !available ? (subject.kind === 'limited' ? 'Ficha privada' : 'Sem ficha para consultar') : '';
 
-  if (minimized) {
+  // embedded: usado dentro da Central do Mestre (sem minimizar e sem mexer na preferência do painel da sala).
+  if (minimized && !embedded) {
     const who = subject.data?.name || (subject.kind === 'creature' ? 'Token sem ficha' : subject.kind === 'none' ? 'Nenhum personagem' : 'Ficha');
     return <section className="board-sheet mini" aria-label="Ficha do personagem">
       <div className="bsp-mini"><span className="bsp-mini-name">Ficha · <b>{who}</b></span>
@@ -36,8 +44,8 @@ export default function BoardSheetPanel({ sel, myCharacter, isGm, characters, ta
   return <section className="board-sheet" aria-label="Ficha do personagem">
     <div className="bsp-top">
       <div className="bsp-id-wrap">
-        <SheetIdentityCard data={subject.data} full={subject.full} kind={subject.kind} />
-        <button type="button" className="bsp-min" aria-expanded="true" aria-label="Minimizar a ficha" title="Minimizar a ficha" onClick={toggleMin}>−</button>
+        <SheetIdentityCard data={subject.data} full={subject.full} kind={subject.kind} conditions={conditionsOf(states?.[subject.characterId])} wallet={subject.data ? walletOf(extras, subject.characterId, subject.full) : []} experience={subject.data ? experienceChips(extras, subject.characterId) : []} />
+        {!embedded && <button type="button" className="bsp-min" aria-expanded="true" aria-label="Minimizar a ficha" title="Minimizar a ficha" onClick={toggleMin}>−</button>}
       </div>
       <div className="bsp-modules" role="group" aria-label="Módulos da ficha">
         {MODULE_BUTTONS.map((m, i) => <button key={m.key} type="button" disabled={!available} title={title || undefined}

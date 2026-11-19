@@ -21,6 +21,11 @@ function DieText({ die, steps, kind, bonus = 0 }) {
 }
 import './peek.css';
 import AptitudeSummary from '../routine/AptitudeSummary.jsx';
+import ActiveConditions from '../sheet/ActiveConditions.jsx';
+import { conditionsOf } from '../../tokenState.js';
+import { useExtras } from './masterHub/extras.jsx';
+import { experienceChips, walletChips } from './masterHub/core.js';
+import { HoldingGroups } from './masterHub/ExperienceIcon.jsx';
 
 // Bônus de rolagem de itens equipados ao lado do dado.
 const Bonus = ({ value }) => (value ? <small className="peek-bonus"> ({value > 0 ? `+${value}` : `−${Math.abs(value)}`})</small> : null);
@@ -46,6 +51,10 @@ const grouped = list => {
 // mine: o token é do próprio jogador (só ele vê a própria mana; os outros jogadores não).
 export default function SheetPeek({ data, state, onClose, limited = false, mine = false, aptitude = null, editable = false, characterId = null, tableId = null }) {
   const [sending, setSending] = useState(null); // { id, name, max, index }
+  const extras = useExtras();
+  // Experiências são públicas na mesa (como o XP); a carteira de moedas só o dono e o mestre veem (a RLS só entrega a eles; `limited` esconde dos outros).
+  const wallet = characterId && !limited ? walletChips(extras, characterId) : [];
+  const experiences = characterId ? experienceChips(extras, characterId) : [];
   const [itemError, setItemError] = useState('');
   // Gastar item, ajustar cantil e enviar valem no servidor (mesma mochila da ficha); o token relê a ficha logo em seguida.
   const run = async fn => { setItemError(''); try { await fn(); } catch (e) { setItemError(e.message); } };
@@ -71,6 +80,8 @@ export default function SheetPeek({ data, state, onClose, limited = false, mine 
     <h4>{c.name || 'Sem nome'}</h4>
     <p className="muted">{[c.race, c.concept, `Nível ${d.level}`, `${c.xp} XP`].filter(Boolean).join(' · ')}</p>
     {!limited && <MoneyTag value={c.money} />}
+    <ActiveConditions conditions={conditionsOf(state)} />
+    <HoldingGroups wallet={wallet} experience={experiences} compact chipClass="peek-pill" />
     <VitalBars state={state} max={max} showMana={!limited || mine} />
     {limited ? null : <>
     <IncapPanel state={state} max={max} baseMovement={d.movement} compact />

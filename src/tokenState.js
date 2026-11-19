@@ -8,23 +8,36 @@ export const HIDDEN_NAME = '?';
 export const MAX_EFFECTS = 8;
 export const MAX_EFFECT_LABEL = 24;
 export const FREE_EFFECT_ICON = '✦';
+export const MAX_EFFECT_NOTE = 120;
+export const MAX_EFFECT_DURATION = 40;
 
-// Efeitos prontos (o mestre ainda pode escrever um texto livre curto).
+// Efeitos prontos (o mestre ainda pode escrever um texto livre curto). `label` é o rótulo das criaturas; `labelM` o dos personagens.
 export const EFFECT_PRESETS = [
-  { id: 'poison', label: 'Envenenada', icon: '☠️' },
-  { id: 'stun', label: 'Atordoada', icon: '💫' },
-  { id: 'burn', label: 'Em chamas', icon: '🔥' },
-  { id: 'bleed', label: 'Sangrando', icon: '🩸' },
-  { id: 'freeze', label: 'Congelada', icon: '❄️' },
-  { id: 'paralyze', label: 'Paralisada', icon: '⛓️' },
-  { id: 'sleep', label: 'Dormindo', icon: '💤' },
-  { id: 'fear', label: 'Assustada', icon: '😱' },
-  { id: 'charm', label: 'Enfeitiçada', icon: '💜' },
-  { id: 'blind', label: 'Cega', icon: '🙈' },
+  { id: 'poison', label: 'Envenenada', labelM: 'Envenenado', icon: '☠️' },
+  { id: 'stun', label: 'Atordoada', labelM: 'Atordoado', icon: '💫' },
+  { id: 'burn', label: 'Em chamas', labelM: 'Em chamas', icon: '🔥' },
+  { id: 'bleed', label: 'Sangrando', labelM: 'Sangrando', icon: '🩸' },
+  { id: 'freeze', label: 'Congelada', labelM: 'Congelado', icon: '❄️' },
+  { id: 'paralyze', label: 'Paralisada', labelM: 'Paralisado', icon: '⛓️' },
+  { id: 'sleep', label: 'Dormindo', labelM: 'Dormindo', icon: '💤' },
+  { id: 'fear', label: 'Assustada', labelM: 'Assustado', icon: '😱' },
+  { id: 'charm', label: 'Enfeitiçada', labelM: 'Enfeitiçado', icon: '💜' },
+  { id: 'blind', label: 'Cega', labelM: 'Cego', icon: '🙈' },
+  { id: 'confused', label: 'Confusa', labelM: 'Confuso', icon: '😵' },
+  { id: 'cursed', label: 'Amaldiçoada', labelM: 'Amaldiçoado', icon: '🧿' },
+  { id: 'blessed', label: 'Abençoada', labelM: 'Abençoado', icon: '✨' },
+  { id: 'exhausted', label: 'Exausta', labelM: 'Exausto', icon: '😮‍💨' },
+  { id: 'incapacitated', label: 'Incapacitada', labelM: 'Incapacitado', icon: '🤕' },
 ];
 const presetById = Object.fromEntries(EFFECT_PRESETS.map(p => [p.id, p]));
 
 const cleanLabel = text => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_EFFECT_LABEL);
+const cleanText = (text, max) => String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+// Observação e duração são opcionais e só entram no efeito quando preenchidas (a duração é só um texto: não expira sozinha).
+const withDetails = (e, src) => {
+  const note = cleanText(src?.note, MAX_EFFECT_NOTE), duration = cleanText(src?.duration, MAX_EFFECT_DURATION);
+  return { ...e, ...(note ? { note } : {}), ...(duration ? { duration } : {}) };
+};
 const sameLabel = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 let seq = 0;
 const newId = () => `e${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -37,21 +50,29 @@ export function effectsOf(token) {
   for (const e of raw) {
     const label = cleanLabel(e?.label);
     if (!label || out.some(x => sameLabel(x.label, label))) continue;
-    out.push({ id: typeof e.id === 'string' && e.id ? e.id.slice(0, 40) : newId(), label, icon: typeof e.icon === 'string' && e.icon ? e.icon.slice(0, 8) : FREE_EFFECT_ICON });
+    out.push(withDetails({ id: typeof e.id === 'string' && e.id ? e.id.slice(0, 40) : newId(), label, icon: typeof e.icon === 'string' && e.icon ? e.icon.slice(0, 8) : FREE_EFFECT_ICON }, e));
     if (out.length >= MAX_EFFECTS) break;
   }
   return out;
 }
 
-// Acrescenta um efeito: { preset: 'poison' } para um dos prontos ou { label: 'Texto livre' }. Devolve a mesma lista
-// (sem mudança) se o texto for vazio, repetido ou a lista já estiver cheia.
+// Acrescenta um efeito: { preset: 'poison' } para um dos prontos ou { label: 'Texto livre' }, com { note, duration } opcionais
+// e { gender: 'm' } para o rótulo no masculino (personagens). Devolve a mesma lista (sem mudança) se o texto for vazio,
+// repetido ou a lista já estiver cheia.
 export function addEffect(effects, input) {
   const list = effectsOf({ effects });
   const preset = input?.preset ? presetById[input.preset] : null;
-  const label = preset ? preset.label : cleanLabel(input?.label);
+  const label = preset ? (input?.gender === 'm' ? preset.labelM : preset.label) : cleanLabel(input?.label);
   if (!label || list.length >= MAX_EFFECTS || list.some(e => sameLabel(e.label, label))) return list;
-  return [...list, { id: preset ? preset.id : newId(), label, icon: preset ? preset.icon : FREE_EFFECT_ICON }];
+  return [...list, withDetails({ id: preset ? preset.id : newId(), label, icon: preset ? preset.icon : FREE_EFFECT_ICON }, input)];
 }
+
+// Condições ativas de um personagem: ficam em table_character_state.state.conditions (escritas só pelo mestre, por RPC) e usam o
+// mesmo formato dos efeitos das criaturas.
+export const conditionsOf = state => effectsOf({ effects: state?.conditions });
+
+// O que o token mostra: personagem -> condições do estado da mesa; criatura -> efeitos do próprio token.
+export const tokenEffects = (token, states) => (token?.character_id ? conditionsOf(states?.[token.character_id]) : effectsOf(token));
 
 export const removeEffect = (effects, id) => effectsOf({ effects }).filter(e => e.id !== id);
 

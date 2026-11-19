@@ -1,9 +1,13 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Modal from "../../ui/Modal.jsx";
 import { useConfirm } from "../../ui/ConfirmProvider.jsx";
 import { CATEGORIES, MARKET_ITEMS } from "../../market/items.js";
 import CustomItemFields, { emptyItemForm, itemFromForm } from "../sheet/CustomItemFields.jsx";
 import { giveItem } from "../../lib/items.js";
+import { masterHubReady, upsertShopItem, newRequestId } from "../../lib/masterHub.js";
+import { saleOptions, priceText } from "../../market/shop.js";
+import ShopSaleOptions, { emptySale } from "./masterHub/ShopSaleOptions.jsx";
+import { useExtras } from "./masterHub/extras.jsx";
 import "../sheet/market.css";
 import "../sheet/itemControls.css";
 
@@ -14,6 +18,10 @@ const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace(".", ",")} 
 // A permissão é conferida no servidor (gm_give_item); este modal só aparece para o mestre.
 export default function GmItemsModal({ tableId, targets, initialTarget, onClose }) {
   const askConfirm = useConfirm();
+  const extras = useExtras();
+  const [sale, setSale] = useState(emptySale());
+  const [shopReady, setShopReady] = useState(false);
+  useEffect(() => { let alive = true; masterHubReady(false, 2).then(v => { if (alive) setShopReady(v === true); }); return () => { alive = false; }; }, []);
   const [tab, setTab] = useState("catalog");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0].id);
@@ -47,6 +55,24 @@ export default function GmItemsModal({ tableId, targets, initialTarget, onClose 
     finally { setBusy(false); }
   }
 
+  const saleCheck = saleOptions(sale, extras.currencies);
+  const canSell = tab === "create" && sale.sell && Boolean(custom) && saleCheck.ok && saleCheck.sell;
+  async function putOnSale() {
+    if (!canSell || busy) return;
+    const currency = extras.currencies.find(c => c.id === saleCheck.currencyId);
+    if (!(await askConfirm({ title: "Colocar à venda?", text: `Colocar "${custom.name}" à venda na Loja do Mestre por ${priceText(saleCheck.price, currency)} ${currency?.name || ""}? Os jogadores compram na aba "Loja do Mestre" do Mercado.`, actionLabel: "Colocar à venda" }))) return;
+    setBusy(true);
+    setMsg({ text: "", error: false });
+    try {
+      await upsertShopItem({ tableId, custom, currencyId: saleCheck.currencyId, price: saleCheck.price, requestId: newRequestId() });
+      setMsg({ text: `${custom.name} está à venda na Loja do Mestre.`, error: false });
+      setForm(emptyItemForm());
+      setSale(emptySale());
+      extras.refresh();
+    } catch (e) { setMsg({ text: e.message, error: true }); }
+    finally { setBusy(false); }
+  }
+
   return <Modal onClose={onClose} busy={busy} aria-labelledby="gm-items-title">
     <div className="item-modal" style={{ maxWidth: 680 }}>
       <h2 id="gm-items-title">Entregar itens</h2>
@@ -65,7 +91,10 @@ export default function GmItemsModal({ tableId, targets, initialTarget, onClose 
           </label>)}
           {!list.length && <p className="muted">Nenhum item encontrado.</p>}
         </div>
-      </> : <form className="ci-form" onSubmit={e => e.preventDefault()}><CustomItemFields form={form} set={set} /></form>}
+      </> : <form className="ci-form" onSubmit={e => e.preventDefault()}>
+        <CustomItemFields form={form} set={set} />
+        {shopReady && <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} />}
+      </form>}
 
       <div className="gm-footer">
         <div className="row">
@@ -83,6 +112,7 @@ export default function GmItemsModal({ tableId, targets, initialTarget, onClose 
       <div className="item-modal-actions">
         <button type="button" className="outline" disabled={busy} onClick={onClose}>Fechar</button>
         <button type="button" className="primary" disabled={!valid || busy} onClick={give}>{busy ? "Entregando…" : "Entregar"}</button>
+        {tab === "create" && sale.sell && <button type="button" className="primary" disabled={!canSell || busy} onClick={putOnSale}>Colocar à venda</button>}
       </div>
     </div>
   </Modal>;

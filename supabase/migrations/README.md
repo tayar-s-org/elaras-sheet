@@ -36,3 +36,15 @@ Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replac
   (transferência atômica entre personagens aprovados da mesma mesa) e `gm_give_item` (mestre entrega item do catálogo ou criado por ele); todas
   escrevem em `characters.data.inventory` com lock da linha. Tabela `inventory_log` (só leitura para membros; dispara a sincronização da ficha e do token).
   Aditiva; pode ser repetida. Teste de banco: `node scripts/itemsDbTest.mjs` (cria e apaga contas descartáveis).
+
+- `0040_master_hub.sql`: **Central do Mestre**. Histórico administrativo (`master_audit_log`, só o mestre lê), moedas e carteiras
+  (`table_currencies`, `character_wallets`), tipos de experiência e contadores (`table_experience_types`, `character_experience`), o gatilho
+  `state_keep_conditions` (preserva `table_character_state.state.conditions` contra qualquer escrita que não seja do RPC) e os RPCs do mestre
+  (`gm_adjust_money`, `gm_adjust_xp`, `gm_give_items`, `gm_upsert_currency`, `gm_delete_currency`, `gm_wallet_adjust`, `gm_upsert_experience_type`,
+  `gm_delete_experience_type`, `gm_experience_adjust`, `gm_set_conditions`, `master_hub_version`). Todos idempotentes por `request_id`.
+  Não reescreve `grant_money`, `grant_xp` nem `gm_give_item`. Aditiva; pode ser repetida. **Aplique e valide
+  (`node scripts/masterHubDbTest.mjs`) antes de publicar o app que usa a Central.** Detalhes em `src/features/room/masterHub/README.md`.
+- `0041_master_shop.sql`: **Loja do Mestre**. `table_shop_items` (item do mestre + moeda da mesa + preço), `gm_shop_upsert`/`gm_shop_delete` (mestre) e `shop_buy` (jogador
+  compra para o próprio personagem: debita a carteira e põe o item na mochila numa transação; idempotente por `request_id`). `master_hub_version()` passa a devolver 2.
+  Depende da 0040. Aditiva; pode ser repetida. Não reescreve nenhuma função em uso. **Aplique e valide (`node scripts/masterHubDbTest.mjs`) antes de publicar o app.**
+- `0042_experience_public.sql`: os contadores de experiência (`character_experience`, da 0040) passam a ser lidos por **todos os membros da mesa** (antes só dono e mestre), como o XP. Só troca a política de leitura; a escrita continua só pelo RPC do mestre e a carteira de moedas continua privada. Depende da 0040; pode ser repetida.

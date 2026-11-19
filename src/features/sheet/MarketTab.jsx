@@ -10,6 +10,9 @@ import { QtyMinus, LiquidUnits, SendMenu } from "./ItemControls.jsx";
 import TransferModal from "./TransferModal.jsx";
 import { formatMoney, normalizeMoney } from "../../money.js";
 import "../../ui/money.css";
+import MasterShop from "./MasterShop.jsx";
+import { useExtras, useTableExtras } from "../room/masterHub/extras.jsx";
+import { visibleListings } from "../../market/shop.js";
 import "./market.css";
 
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -36,6 +39,11 @@ function Stats({ item }) {
 // Mercado: compra de equipamento do livro com o dinheiro da ficha; itens equipados somam à Resistência, ao Aparar e à carga.
 export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, tableId, initialView = "shop" }) {
   const askConfirm = useConfirm();
+  // Loja do Mestre: dados da sala (provedor) ou, na página da ficha, uma leitura própria da mesa dela (a RLS já limita ao que o dono pode ver).
+  const roomExtras = useExtras();
+  const ownExtras = useTableExtras(tableId, roomExtras.status === "off" && Boolean(tableId));
+  const extras = roomExtras.status !== "off" ? roomExtras : ownExtras;
+  const shopCount = visibleListings(extras.shop, false).length;
   const [view, setView] = useState(initialView);
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
@@ -82,10 +90,11 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
     <div className="tabs-row" role="tablist">
       <button type="button" role="tab" aria-selected={view === "shop"} className={view === "shop" ? "primary" : "outline"} onClick={() => setView("shop")}>Loja</button>
       <button type="button" role="tab" aria-selected={view === "custom"} className={view === "custom" ? "primary" : "outline"} onClick={() => setView("custom")}>Item custom</button>
+      <button type="button" role="tab" aria-selected={view === "master"} className={view === "master" ? "primary" : "outline"} onClick={() => setView("master")}>Loja do Mestre{shopCount ? ` (${shopCount})` : ""}</button>
       <button type="button" role="tab" aria-selected={view === "bag"} className={view === "bag" ? "primary" : "outline"} onClick={() => setView("bag")}>Mochila ({c.inventory.reduce((n, e) => n + e.qty, 0)})</button>
     </div>
 
-    {view === "custom" ? <CustomItemForm cloudId={cloudId} tableId={tableId} /> : view === "shop" ? <>
+    {view === "master" ? <MasterShop extras={extras} cloudId={cloudId} tableId={tableId} setToast={setToast} /> : view === "custom" ? <CustomItemForm cloudId={cloudId} tableId={tableId} /> : view === "shop" ? <>
       <div className="mk-filters">
         <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar item em todo o mercado…" aria-label="Buscar item" />
       </div>

@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { masterHubReady, giveItems, newRequestId } from './masterHub.js';
 
 // Funções do servidor para a mochila (migração 0039). Elas escrevem em characters.data.inventory, a mesma fonte da ficha:
 // a ficha aberta reconcilia a diferença (sheetRebase.js) e o token relê a ficha (useLiveCharacters).
@@ -31,6 +32,8 @@ export async function transferItem({ tableId, from, to, id, qty, index = null })
 }
 // Mestre: entrega item do catálogo ({ id }) ou customizado novo ({ custom }).
 export async function giveItem(tableId, characterId, { id = null, custom = null, qty }) {
+  // Com a migração 0040, a entrega passa pelo RPC da Central (idempotente e registrada no histórico administrativo).
+  if (await masterHubReady() === true) { await giveItems({ tableId, characterId, id, custom, qty, requestId: newRequestId() }); notifyInventoryChanged(); return; }
   const { error } = await supabase.rpc('gm_give_item', { p_table: tableId, p_character: characterId, p_id: id, p_custom: custom, p_qty: qty });
   fail(error);
   notifyInventoryChanged();

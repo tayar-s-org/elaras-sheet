@@ -2,9 +2,19 @@ import React from "react";
 import { tokenUrl } from "../../lib/tokens.js";
 import MoneyTag from "../../ui/MoneyTag.jsx";
 import LiveVitals from "./LiveVitals.jsx";
+import ActiveConditions from "./ActiveConditions.jsx";
+import { useCharacterConditions, useTableExtras } from "../room/masterHub/extras.jsx";
+import ExperienceIcon from "../room/masterHub/ExperienceIcon.jsx";
 
 // tableId e cloudId: a ficha já vinculada a uma mesa mostra Vida, Stamina e Mana atuais como no token.
 export default function SheetSummary({ c, d, tableId, cloudId }) {
+  // Mesmas fontes do token e do Grupo: condições (estado da mesa) e carteira/contadores (a RLS entrega só os do próprio dono).
+  const conditions = useCharacterConditions(tableId, cloudId);
+  const extras = useTableExtras(tableId, Boolean(tableId && cloudId));
+  const wallet = cloudId ? extras.currencies.map(x => ({ key: `c${x.id}`, label: x.name, icon: x.symbol, amount: extras.wallets[cloudId]?.[x.id] || 0 })) : [];
+  const exps = cloudId ? extras.types.map(x => ({ key: `t${x.id}`, label: x.name, icon: x.icon, amount: extras.experience[cloudId]?.[x.id] || 0 })) : [];
+  const list = (title, items) => items.length > 0 && <div className="summary-holding-group"><small className="holding-label">{title}</small>
+    <ul className="summary-holdings" aria-label={title}>{items.map(h => <li key={h.key}><span>{h.label}</span><b><ExperienceIcon icon={h.icon} /> {h.amount}</b></li>)}</ul></div>;
   return (
         <aside className="summary">
           <p className="eyebrow">FICHA EM TEMPO REAL</p>
@@ -14,6 +24,9 @@ export default function SheetSummary({ c, d, tableId, cloudId }) {
           <h2>{c.name || "Seu personagem"}</h2>
           <p className="summary-level">Nível {d.level}<span> · {c.xp} XP</span></p>
           <MoneyTag value={c.money} />
+          {list('Moedas', wallet)}
+          {list('Experiências', exps)}
+          <ActiveConditions conditions={conditions} />
           <p className="muted">
             {c.race} · {c.village}
           </p>

@@ -1,0 +1,112 @@
+@reference "../../../tailwind.css";
+/* Central do Mestre: reaproveita a estrutura do painel da ficha (.bsp-*: botões, região animada, minimizar). */
+.master-hub { @apply grid gap-[8px] min-w-0; container-type: inline-size; }
+.mh-top { display: grid; grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); align-items: stretch; gap: 10px; }
+.mh-id-wrap { @apply relative flex min-w-0; }
+.mh-id { @apply flex flex-1 items-center gap-[12px] p-[8px_36px_8px_12px] min-w-0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
+.mh-crest { @apply flex-none grid place-items-center w-[48px] h-[48px] rounded-[50%]; border: 2px solid var(--gold); color: var(--gold); background: var(--gold-soft); font-size: 1.4rem; }
+.mh-id-text { @apply min-w-0; }
+.mh-id-text .eyebrow { @apply m-0; font-size: .65rem; }
+.mh-id-text h3 { @apply m-0 overflow-hidden whitespace-nowrap text-ellipsis; font-family: var(--font-display); font-size: 1.15rem; line-height: 1.15; }
+.mh-id-text > p:not(.eyebrow) { @apply m-[1px_0_0] text-app-muted overflow-hidden whitespace-nowrap text-ellipsis; font-size: .8rem; }
+.mh-chips { list-style: none; @apply m-[4px_0_0] p-0 flex flex-wrap gap-[4px]; }
+.mh-chip { @apply inline-flex items-center gap-[4px] cursor-pointer; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: inherit; font-size: .78rem; }
+.mh-chip:hover { border-color: var(--accent); }
+.mh-modules { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, 1fr); gap: 6px; min-width: 0; }
+.mh-tab { @apply justify-center; }
+.mh-body { max-height: min(62vh, 620px); }
+.mh-mini { @apply flex items-center justify-between gap-[10px] p-[4px_8px_4px_12px]; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); font-size: .9rem; }
+.mh-mini .outline { padding: 4px 12px; }
+.room-immersive .mh-body { max-height: min(48vh, 440px); }
+
+.mh-sections { @apply grid gap-[14px]; }
+.mh-section { @apply grid gap-[8px] min-w-0; }
+.mh-section + .mh-section { border-top: 1px solid var(--border); padding-top: 12px; }
+.mh-section h3 { @apply m-0; font-size: 1.05rem; }
+.mh-section h4 { @apply m-0; font-size: .9rem; }
+.mh-hint { @apply m-0; font-size: .85rem; }
+.mh-form { @apply flex flex-wrap items-end gap-[8px]; }
+.mh-form > h4 { flex: 1 1 100%; }
+.mh-form .field { @apply min-w-0; }
+.mh-picker select { min-width: 180px; }
+.mh-list { list-style: none; @apply m-0 p-0 grid gap-[6px]; }
+.mh-list > li { @apply flex flex-wrap items-center justify-between gap-[8px] p-[6px_10px]; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.mh-preview { list-style: none; @apply m-0 p-0 grid gap-[2px]; font-size: .88rem; }
+.mh-table-wrap { @apply overflow-x-auto; }
+.mh-table { @apply w-full; border-collapse: collapse; font-size: .85rem; }
+.mh-table th, .mh-table td { @apply text-left p-[4px_8px]; border-bottom: 1px solid var(--border); }
+.mh-results { @apply grid gap-[6px] p-[8px_10px]; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.mh-results.warn { border-color: var(--warning); }
+.mh-results p { @apply m-0; }
+.mh-results ul { list-style: none; @apply m-0 p-0 grid gap-[2px]; font-size: .88rem; }
+.mh-results li.bad { color: var(--danger); }
+.mh-results li small { @apply text-app-muted; }
+.mh-results li.bad small { color: inherit; }
+
+.mh-players { @apply grid gap-[12px]; }
+.mh-player-list { list-style: none; @apply m-0 p-0 grid gap-[6px]; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.mh-player-list > li { @apply grid gap-[2px]; }
+.mh-player { @apply flex items-center gap-[10px] w-full text-left cursor-pointer; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); color: inherit; }
+.mh-player:hover { border-color: var(--accent); }
+.mh-player.active { background: var(--selection); border-color: var(--accent); }
+.mh-portrait { @apply flex-none grid place-items-center w-[44px] h-[44px] rounded-[50%] object-cover; border: 2px solid var(--gold); color: var(--gold); background: var(--gold-soft); font-family: var(--font-display); }
+.mh-player-main { @apply grid min-w-0; }
+.mh-player-main small { @apply text-app-muted; font-size: .76rem; }
+.active-conditions { list-style: none; @apply m-0 p-0 flex flex-wrap gap-[4px]; }
+.active-conditions.compact .effect-chip { padding: 1px 7px; font-size: .75rem; }
+.active-conditions .effect-chip small { @apply text-app-muted; }
+.effect-details { @apply flex flex-wrap gap-[6px]; }
+.effect-details input { flex: 1 1 160px; @apply min-w-0; }
+
+.mh-filters { @apply flex flex-wrap items-end gap-[8px]; }
+.mh-audit { list-style: none; @apply m-0 p-0 grid gap-[4px]; }
+.mh-audit details { border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.mh-audit summary { @apply flex flex-wrap items-center gap-[8px] p-[6px_10px] cursor-pointer; }
+.mh-audit-title { flex: 1 1 200px; @apply min-w-0; font-size: .9rem; }
+.mh-audit time { @apply text-app-muted; font-size: .75rem; }
+.mh-cat { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: .72rem; @apply uppercase; letter-spacing: .04em; }
+.mh-audit-detail { @apply grid gap-[2px] m-0 p-[4px_12px_10px]; font-size: .85rem; }
+.mh-audit-detail > div { @apply flex gap-[8px]; }
+.mh-audit-detail dt { @apply text-app-muted; flex: 0 0 130px; }
+.mh-audit-detail dd { @apply m-0 min-w-0 wrap-anywhere; }
+
+@container (max-width: 760px) {
+  .mh-top { grid-template-columns: minmax(0, 1fr); }
+  .mh-modules { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; }
+  .mh-tab { padding: 8px 4px; font-size: .82rem; }
+  .mh-tab .bsp-num { display: none; }
+}
+@container (max-width: 430px) {
+  .mh-modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Status ativos, carteira e contadores na ficha, no Grupo e no resumo do token */
+.summary-holdings { list-style: none; @apply m-[6px_0] p-0 grid gap-[2px]; font-size: .85rem; }
+.summary-holdings li { @apply flex justify-between gap-[8px]; }
+.summary-holdings span { @apply text-app-muted; }
+.party-holdings { @apply flex flex-wrap gap-[4px] m-[4px_0]; }
+.master-hub .mh-tab:last-child { grid-column: auto; } /* o último botão do painel da ficha ocupa 2 colunas; aqui são 10 botões iguais */
+
+/* Botões do soundpad dentro do módulo: ocupam a largura toda e quebram em linhas; o volume vai embaixo */
+.mh-section .sfx-bar { @apply flex-col items-stretch p-0 m-0; border: 0; }
+.mh-section .sfx-pads { flex: none; }
+.mh-section .sfx-bar .music-volume { @apply ml-0; }
+
+.peek-experiences { @apply flex flex-wrap gap-[4px] m-[4px_0_0]; }
+
+/* Ícones de experiência (imagem ou emoji) e seletor do formulário */
+.xp-icon { width: 1.2em; height: 1.2em; vertical-align: -0.25em; object-fit: contain; }
+.mh-icon-field { flex: 1 1 100%; }
+.mh-icon-picker { @apply flex flex-wrap gap-[4px]; }
+.mh-icon-opt { @apply grid place-items-center cursor-pointer; width: 38px; height: 38px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); color: inherit; font-size: 1.15rem; }
+.mh-icon-opt .xp-icon { width: 26px; height: 26px; }
+.mh-icon-opt:hover { border-color: var(--accent); }
+.mh-icon-opt.active { border-color: var(--accent); background: var(--selection); }
+
+/* Moedas e experiências em grupos separados, cada um com o seu rótulo */
+.holding-groups { @apply grid gap-[4px] mt-[4px]; }
+.holding-group { @apply flex flex-wrap items-center gap-[6px]; }
+.holding-label { @apply text-app-muted uppercase; font-size: .62rem; letter-spacing: .06em; min-width: 5.6em; }
+.holding-chips { @apply flex flex-wrap gap-[4px]; }
+.summary-holding-group { @apply grid gap-[2px] m-[6px_0]; }
+.summary-holding-group .summary-holdings { margin: 0; }

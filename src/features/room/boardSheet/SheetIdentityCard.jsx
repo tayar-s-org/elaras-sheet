@@ -3,12 +3,14 @@ import { calculate, validateCharacter } from '../../../rules.js';
 import { stageForXP } from '../../../catalogRules.js';
 import { formatMoney } from '../../../money.js';
 import { tokenUrl } from '../../../lib/tokens.js';
+import ActiveConditions from '../../sheet/ActiveConditions.jsx';
+import { HoldingGroups } from '../masterHub/ExperienceIcon.jsx';
 import '../../../ui/money.css';
 
 const initials = name => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 
 // Identidade compacta, sempre visível. `full` = dinheiro e pontos (dono ou mestre); sem ele, só o que os outros jogadores já veem.
-export default function SheetIdentityCard({ data, full, kind }) {
+export default function SheetIdentityCard({ data, full, kind, conditions = [], wallet = [], experience = [] }) {
   let c = null, d = null;
   try { c = data ? validateCharacter(data) : null; d = c ? calculate(c) : null; } catch { c = null; }
   if (!c) {
@@ -26,6 +28,8 @@ export default function SheetIdentityCard({ data, full, kind }) {
       <p>{[c.race, c.age && `${c.age}`].filter(Boolean).join(' · ') || 'Raça não definida'} · Nível {d.level} · {c.xp} XP · {stageForXP(c.xp)}</p>
       {full ? <p className="bsp-money"><span className="money-coin" aria-hidden="true">$</span> <b>{formatMoney(c.money)}</b> · Pontos: {d.remaining + d.spent} no total · {d.spent} gastos · {d.remaining} livres</p>
         : <p>Dinheiro e demais módulos são privados.</p>}
+      {conditions.length > 0 && <div className="bsp-extras"><ActiveConditions conditions={conditions} compact /></div>}
+      <HoldingGroups wallet={wallet} experience={experience} compact />
     </div>
   </div>;
 }

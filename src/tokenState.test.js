@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   HIDDEN_NAME, MAX_EFFECTS, MAX_EFFECT_LABEL, EFFECT_PRESETS, effectsOf, addEffect, removeEffect, effectBadges,
-  isNameHidden, displayName, imageVisible, mergeSecrets, applyTokenRow,
+  isNameHidden, displayName, imageVisible, mergeSecrets, applyTokenRow, conditionsOf, tokenEffects,
 } from './tokenState.js';
 
 test('jogadores veem "?" enquanto o nome está oculto; o mestre sempre vê o real', () => {
@@ -99,4 +99,32 @@ test('a migração 0034 existe e protege o nome e a imagem (segredos só do mest
   assert.match(sql, /add column if not exists effects/);
   assert.match(sql, /create table if not exists public\.board_token_secrets/);
   assert.match(sql, /using \(public\.is_gm\(table_id\)\)/);
+});
+
+test('efeitos aceitam observação e duração opcionais, só quando preenchidas', () => {
+  const list = addEffect([], { preset: 'stun', note: '  fica  zonzo ', duration: '3 rodadas' });
+  assert.deepEqual(list[0], { id: 'stun', label: 'Atordoada', icon: '💫', note: 'fica zonzo', duration: '3 rodadas' });
+  assert.deepEqual(addEffect([], { preset: 'stun' })[0], { id: 'stun', label: 'Atordoada', icon: '💫' });
+  const long = effectsOf({ effects: [{ id: 'x', label: 'Teste', note: 'n'.repeat(500), duration: 'd'.repeat(500) }] })[0];
+  assert.equal(long.note.length, 120);
+  assert.equal(long.duration.length, 40);
+});
+
+test('rótulo no masculino para personagens e presets novos', () => {
+  assert.equal(addEffect([], { preset: 'blind', gender: 'm' })[0].label, 'Cego');
+  assert.equal(addEffect([], { preset: 'blind' })[0].label, 'Cega');
+  for (const label of ['Confuso', 'Amaldiçoado', 'Abençoado', 'Exausto', 'Incapacitado', 'Atordoado', 'Envenenado', 'Sangrando', 'Paralisado']) {
+    assert.ok(EFFECT_PRESETS.some(p => p.labelM === label), label);
+  }
+  for (const p of EFFECT_PRESETS) assert.ok(p.label.length <= MAX_EFFECT_LABEL && p.labelM.length <= MAX_EFFECT_LABEL);
+});
+
+test('condições do personagem usam o mesmo formato e o token mostra o certo', () => {
+  const states = { pc1: { life: 3, conditions: [{ id: 'blind', label: 'Cego', icon: '🙈', duration: '1 cena' }] } };
+  assert.equal(conditionsOf(states.pc1)[0].duration, '1 cena');
+  assert.deepEqual(conditionsOf(undefined), []);
+  assert.deepEqual(conditionsOf({ life: 1 }), []);
+  assert.equal(tokenEffects({ character_id: 'pc1', effects: [{ id: 'o', label: 'Outro', icon: 'x' }] }, states)[0].label, 'Cego');
+  assert.equal(tokenEffects({ character_id: null, effects: [{ id: 'o', label: 'Outro', icon: 'x' }] }, states)[0].label, 'Outro');
+  assert.deepEqual(tokenEffects({ character_id: 'pc2' }, states), []);
 });

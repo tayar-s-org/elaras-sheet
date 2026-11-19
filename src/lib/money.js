@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { masterHubReady, adjustMoney, newRequestId } from './masterHub.js';
 
 const fail = error => {
   if (!error) return;
@@ -9,6 +10,8 @@ const fail = error => {
 
 // Mestre: adiciona (valor positivo) ou remove (negativo) dinheiro de uma ficha vinculada a um jogador da mesa.
 export async function grantMoney(tableId, characterId, amount, note = '') {
+  // Com a migração 0040, o mesmo ajuste passa pelo RPC da Central (idempotente e registrado no histórico administrativo).
+  if (await masterHubReady() === true) { await adjustMoney({ tableId, characterId, mode: 'add', amount, note, requestId: newRequestId() }); return; }
   const { error } = await supabase.rpc('grant_money', { p_table: tableId, p_character: characterId, p_amount: amount, p_note: note });
   // A 0012 so aceita valores de 1 a 1.000.000; remover precisa da migration 0013.
   if (error && amount < 0 && /entre 1 e 1\.000\.000/.test(error.message || '')) throw new Error('Falta aplicar a migration 0013 (remover dinheiro) no Supabase.');
