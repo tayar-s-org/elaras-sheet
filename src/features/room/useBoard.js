@@ -15,6 +15,7 @@ export function useBoard(tableId, user, room) {
   const [error, setError] = useState('');
   const dragging = useRef(new Set());
   const boardRef = useRef(null);
+  const mapRequest = useRef(0);
   const { onBroadcast } = room;
 
   const refreshItems = useCallback(async id => {
@@ -23,7 +24,14 @@ export function useBoard(tableId, user, room) {
     setMarks(items.marks);
   }, []);
   const refreshMap = useCallback(async b => {
-    try { setMapSrc(b?.map_path ? await mapUrl(b.map_path) : null); } catch (e) { setError(e.message); }
+    const request = ++mapRequest.current;
+    setMapSrc(null);
+    try {
+      const src = b?.map_path ? await mapUrl(b.map_path) : null;
+      if (mapRequest.current === request) setMapSrc(src);
+    } catch (e) {
+      if (mapRequest.current === request) setError(e.message);
+    }
   }, []);
 
   useEffect(() => {
@@ -44,7 +52,10 @@ export function useBoard(tableId, user, room) {
             const prev = boardRef.current;
             boardRef.current = { ...prev, ...p.new };
             setBoard(boardRef.current);
-            if (p.new.map_path !== prev?.map_path) refreshMap(p.new);
+            if (p.new.map_path !== prev?.map_path) {
+              refreshMap(p.new);
+              refreshItems(p.new.id).catch(e=>setError(e.message));
+            }
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'board_tokens', filter: `table_id=eq.${tableId}` }, p => {
             if (p.eventType === 'DELETE') setTokens(prev => prev.filter(t => t.id !== p.old.id));
@@ -60,7 +71,7 @@ export function useBoard(tableId, user, room) {
           .subscribe();
       } catch (e) { if (alive) { setError(e.message); setBoard(prev => (prev === undefined ? null : prev)); } }
     })();
-    return () => { alive = false; if (channel) supabase.removeChannel(channel); };
+    return () => { alive = false; mapRequest.current += 1; if (channel) supabase.removeChannel(channel); };
   }, [tableId, user?.id, refreshItems, refreshMap]);
 
   // Posicoes provisorias vindas de outros jogadores durante o arraste.

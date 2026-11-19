@@ -1,10 +1,12 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { updateToken, removeToken, addToken, loadCreatureDetails, saveCreatureToken, addMark, removeMark, snapToGrid, updateBoard, loadBoardItems, relayoutBoard, applyMoves, fitMapSize, BOARD_BASE, DEFAULT_SIZE } from '../../lib/board.js';
+import { updateToken, removeToken, addToken, loadCreatureDetails, saveCreatureToken, addMark, removeMark } from '../../lib/board.js';
 import { uploadTokenImage, tokenUrl, saveTokenArtwork } from '../../lib/tokens.js';
 import { setCharacterTokenImage } from '../../lib/cloud.js';
 import { loadPresets, savePreset } from '../../lib/presets.js';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
+import MapWorkspace from './MapWorkspace.jsx';
+import { boardGrid, gridLines, snapInsideGrid } from '../../boardGrid.js';
 import MusicPlayer from './MusicPlayer.jsx';
 import SoundBar from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
@@ -44,7 +46,7 @@ function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initials = name => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot }) {
+export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false }) {
   const { board, tokens, marks, mapSrc, drags, error, setError, local } = boardState;
   const svgRef = useRef(null);
   const [view, setViewRaw] = useState(null); // { x, y, w } em unidades do mapa
@@ -58,16 +60,18 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const [tokenOverride, setTokenOverride] = useState({}); // ficha -> imagem recém-salva, até a leitura periódica das fichas trazer a nova
   const [busy, setBusy] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
+  const [mapTools,setMapTools] = useState(null);
   const [presetNotice, setPresetNotice] = useState("");
   const [audioOpen, setAudioOpen] = useState(null);
+  const [immersiveAudio,setImmersiveAudio] = useState(false);
   const gesture = useRef(null);
   const lastSend = useRef(0);
 
   const myCharacter = members.find(m => m.user_id === me)?.character_id;
   const W = board?.width || 2000;
   const H = board?.height || 1400;
-  const grid = board?.grid || { size: 70, visible: true };
-  const gsize = clamp(Number(grid.size) || 70, 20, 400);
+  const grid = boardGrid(board?.grid);
+  const gsize = grid.size;
   const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
   // O token inteiro (nao so o centro) fica dentro do tabuleiro.
   // Tokens de criatura têm o mesmo tamanho dos de jogador (o mestre pode ajustar o `size` de cada um no módulo do mestre).
@@ -87,47 +91,35 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const tokenHalf = t => unit(t) / 2;
   const keepIn = (v, half, max) => (max <= half * 2 ? max / 2 : clamp(v, half, max - half));
 
-  // Limites da visao: o maximo de zoom out faz o mapa cobrir toda a area do tabuleiro (sem margens) e nao se pode arrastar para fora dele.
+  const fitWidth = (ratio = ratioRef.current) => Math.max(W, H / ratio);
   const constrain = v => {
     if (!v) return v;
     const r = ratioRef.current;
-    const maxW = Math.min(W, H / r);
-    const w = clamp(v.w, Math.min(W / 8, maxW), maxW);
-    return { w, x: clamp(v.x, 0, W - w), y: clamp(v.y, 0, H - w * r) };
+    const width = clamp(v.w, W / 8, fitWidth(r));
+    const height = width * r;
+    return { w:width, x:width >= W ? (W-width)/2 : clamp(v.x,0,W-width),
+      y:height >= H ? (H-height)/2 : clamp(v.y,0,H-height) };
   };
   const setView = next => setViewRaw(prev => constrain(typeof next === 'function' ? next(prev) : next));
+  const frameMap = () => setView({ x:0, y:0, w:fitWidth() });
+  useEffect(() => { frameMap(); }, [W,H,board?.id,board?.map_path]);
 
-  // Enquadra o mapa quando o tabuleiro (ou o mapa) muda de tamanho.
-  useEffect(() => { setView({ x: 0, y: 0, w: W }); }, [W, H, board?.id]);
-
-  // Cura tabuleiros antigos: sem mapa, o tamanho padrao; com mapa, ~2000 no lado maior (tokens vao junto, na mesma posicao relativa).
-  // Corrige o caso de um mapa pequeno ou enorme ter deixado o tabuleiro minusculo/gigante e os tokens fora da tela.
-  const healed = useRef(null);
-  useEffect(() => {
-    if (!isGm || !board || healed.current === board.id) return;
-    healed.current = board.id;
-    const target = board.map_path
-      ? (Math.max(board.width, board.height) === BOARD_BASE ? null : fitMapSize(board.width, board.height))
-      : (board.width === DEFAULT_SIZE.width && board.height === DEFAULT_SIZE.height ? null : DEFAULT_SIZE);
-    if (!target) return;
-    (async () => {
-      try {
-        const items = await loadBoardItems(board.id);
-        await updateBoard(board.id, { width: target.width, height: target.height });
-        const moved = await relayoutBoard(board, items.tokens, target);
-        local.setBoard({ ...board, width: target.width, height: target.height });
-        local.setTokens(prev => applyMoves(prev, moved));
-        local.setMarks([]);
-      } catch (e) { setError(e.message); }
-    })();
-  }, [isGm, board?.id, board?.map_path, board?.width, board?.height]);
   // Acompanha o tamanho do SVG (janela redimensionada, painel aberto) e reajusta a visao.
   useEffect(() => {
     const el = svgRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(() => {
       const b = el.getBoundingClientRect();
-      if (b.width) { ratioRef.current = b.height / b.width; setViewRaw(prev => constrain(prev)); }
+      if (!b.width || !b.height) return;
+      const previousRatio = ratioRef.current;
+      const ratio = b.height / b.width;
+      if (Math.abs(previousRatio-ratio) < 0.001) return;
+      ratioRef.current = ratio;
+      setViewRaw(prev => {
+        if (!prev) return prev;
+        const w = prev.w * fitWidth(ratio) / fitWidth(previousRatio);
+        return constrain({ w, x:prev.x+(prev.w-w)/2, y:prev.y+(prev.w*previousRatio-w*ratio)/2 });
+      });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -161,14 +153,14 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     const factor = e.deltaY < 0 ? 0.88 : 1.14;
     setView(v => {
       if (!v) return v;
-      const w = clamp(v.w * factor, W / 8, W * 1.5);
+      const w = clamp(v.w * factor, W / 8, fitWidth());
       const k = w / v.w;
       return { w, x: pt.x - (pt.x - v.x) * k, y: pt.y - (pt.y - v.y) * k };
     });
   }
   wheelRef.current = onWheel;
   const zoomBy = factor => view && setView(v => {
-    const w = clamp(v.w * factor, W / 8, W * 1.5);
+    const w = clamp(v.w * factor, W / 8, fitWidth());
     const cx = v.x + v.w / 2, cy = v.y + (v.w * svgRatio()) / 2;
     return { w, x: cx - w / 2, y: cy - (w * svgRatio()) / 2 };
   });
@@ -240,7 +232,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       room.sendBroadcast('drag', { id: g.id, done: true });
       return;
     }
-    const final = grid.visible ? { x: keepIn(snapToGrid(g.x, gsize), g.half, W), y: keepIn(snapToGrid(g.y, gsize), g.half, H) } : { x: g.x, y: g.y };
+    const final = grid.snap ? { x: snapInsideGrid(g.x,gsize,grid.x,g.half,W), y: snapInsideGrid(g.y,gsize,grid.y,g.half,H) } : { x: g.x, y: g.y };
     local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, ...final } : t)));
     room.sendBroadcast('drag', { id: g.id, ...final, done: true });
     try { await updateToken(g.id, final); } catch (err) { setError(err.message); local.reloadItems(); }
@@ -372,8 +364,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   async function moveSelected(token, dx, dy, direction) {
     if (movingToken || gesture.current || !canMove(token)) return;
     const half = tokenHalf(token);
-    const x = grid.visible ? snapToGrid(token.x + dx * gsize, gsize) : token.x + dx * gsize;
-    const y = grid.visible ? snapToGrid(token.y + dy * gsize, gsize) : token.y + dy * gsize;
+    const x = grid.snap ? snapInsideGrid(token.x+dx*gsize,gsize,grid.x,half,W) : token.x + dx * gsize;
+    const y = grid.snap ? snapInsideGrid(token.y+dy*gsize,gsize,grid.y,half,H) : token.y + dy * gsize;
     const next = {
       x: dx ? keepIn(x, half, W) : token.x,
       y: dy ? keepIn(y, half, H) : token.y,
@@ -406,8 +398,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const vb = view ? `${view.x} ${view.y} ${view.w} ${view.w * svgRatio()}` : `0 0 ${W} ${H}`;
   const lines = [];
   if (grid.visible) {
-    for (let x = 0; x <= W; x += gsize) lines.push(<line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} />);
-    for (let y = 0; y <= H; y += gsize) lines.push(<line key={`h${y}`} x1={0} y1={y} x2={W} y2={y} />);
+    for (const x of gridLines(W,gsize,grid.x)) lines.push(<line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} />);
+    for (const y of gridLines(H,gsize,grid.y)) lines.push(<line key={`h${y}`} x1={0} y1={y} x2={W} y2={y} />);
   }
   const sel = visibleTokens.find(t => t.id === selected);
   const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
@@ -421,7 +413,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       <div role="group" aria-label="Zoom" className="tabs-row">
         <button className="outline" aria-label="Diminuir zoom" onClick={() => zoomBy(1.25)}>−</button>
         <button className="outline" aria-label="Aumentar zoom" onClick={() => zoomBy(0.8)}>+</button>
-        <button className="outline" onClick={() => setView({ x: 0, y: 0, w: W })}>Enquadrar</button>
+        <button className="outline" onClick={frameMap}>Enquadrar</button>
       </div>
       {!closed && (myCharacter || isGm) && <div className="toolbar-end">
         {myCharacter && <div role="group" aria-label="Meu token" className="tabs-row">
@@ -437,8 +429,12 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         </div>}
       </div>}
     </div>
-    {board.settings?.music && <MusicPlayer board={board} isGm={isGm} local={local} setError={setError} />}
-    <SoundBar pad={pad} isGm={isGm} />
+    {immersive && <button type="button" className="text-button immersive-audio-toggle" aria-expanded={immersiveAudio}
+      aria-controls="board-audio-controls" onClick={()=>setImmersiveAudio(v=>!v)}>{immersiveAudio ? 'Recolher áudio' : 'Mostrar áudio'}</button>}
+    <div id="board-audio-controls" hidden={immersive && !immersiveAudio}>
+      {board.settings?.music && <MusicPlayer board={board} isGm={isGm} local={local} setError={setError} />}
+      <SoundBar pad={pad} isGm={isGm} />
+    </div>
     <div className="board-wrap">
     {visibleTokens.length > 0 && <div className="board-token-controls">
       <label className="field">
@@ -459,8 +455,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       aria-label="Tabuleiro compartilhado" onPointerDown={onPointerDown} onPointerMove={onPointerMove}
       onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onLostPointerCapture={onPointerUp}>
       <rect x="0" y="0" width={W} height={H} className="board-bg" />
-      {mapSrc && <image href={mapSrc} x="0" y="0" width={W} height={H} preserveAspectRatio="none" />}
-      <g className="board-grid">{lines}</g>
+      {mapSrc && <image href={mapSrc} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid meet" />}
+      <g className="board-grid" opacity={grid.opacity}>{lines}</g>
       <g>{marks.map(m => <g key={m.id} data-mark={m.id} transform={`translate(${m.x} ${m.y})`} className="board-mark">
         <circle r={gsize * 0.16} fill={m.color} stroke="#000" strokeWidth="2" />
         <title>{m.kind === 'note' ? m.text : `Marcador de ${names[m.created_by] || 'jogador'}`}</title>
@@ -519,7 +515,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     {error && <p role="alert" className="muted">{error}</p>}
     {isGm && audioOpen && <AudioModal kind={audioOpen} board={board} pad={pad} local={local} setError={setError} onClose={() => setAudioOpen(null)} />}
     {isGm && masterOpen && <MasterModule board={board} tokens={tokens} marks={marks} members={members} characters={characters}
-      selected={sel} onSelect={setSelected} room={room} local={local} mode={masterOpen} initialNotice={masterOpen === "presets" ? presetNotice : ""}
+      selected={sel} onSelect={setSelected} room={room} local={local} mode={masterOpen} onMapTools={view => { setMasterOpen(false); setMapTools(view); }} initialNotice={masterOpen === "presets" ? presetNotice : ""}
       onGoToToken={token => {
         setSelected(token.id);
         setView(previous => {
@@ -535,6 +531,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         if (creatureOf(t)) await editCreature(t);
         else { setMasterOpen(false); setMaker({ token: t }); }
       }} />}
+    {isGm && mapTools && <MapWorkspace board={board} marks={marks} local={local} room={room} initial={mapTools} onClose={()=>setMapTools(null)} />}
     {maker && <TokenMaker name={maker.preset?.name || maker.token?.name || characters[myCharacter]?.name || ''}
       saveLabel={maker.preset ? 'Salvar alterações' : maker.creature ? (maker.token ? 'Salvar alterações' : 'Colocar no mapa') : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
       imagePath={maker.creature ? maker.preset?.image_path || maker.token?.image_path

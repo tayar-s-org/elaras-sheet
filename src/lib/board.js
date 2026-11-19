@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { boardGrid } from '../boardGrid.js';
 import { mergeSecrets } from '../tokenState.js';
 
 const fail = error => { if (error) throw new Error(error.message || 'Erro ao acessar a nuvem.'); };
@@ -69,35 +70,39 @@ export async function mapUrl(path) {
   return data.signedUrl;
 }
 
-const readSize = file => new Promise((resolve, reject) => {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight }); };
-  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível ler a imagem.')); };
-  img.src = url;
-});
-
-// Envia o mapa para maps/{mesa}/{uuid}.ext e atualiza o tabuleiro; remove o arquivo anterior.
-export async function uploadMap(board, file, tokens = []) {
-  if (!MAP_TYPES.includes(file.type)) throw new Error('Use uma imagem PNG, JPEG ou WebP.');
+export function validateMapFile(file) {
+  if (!MAP_TYPES.includes(file?.type)) throw new Error('Use uma imagem PNG, JPEG ou WebP.');
   if (file.size > MAP_MAX_BYTES) throw new Error('A imagem passa de 5 MB.');
-  const { width, height } = await readSize(file);
-  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const path = `${board.table_id}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('maps').upload(path, file, { contentType: file.type, upsert: false });
-  fail(error);
-  const size = fitMapSize(width, height);
-  await updateBoard(board.id, { map_path: path, width: size.width, height: size.height });
-  if (board.map_path) await supabase.storage.from('maps').remove([board.map_path]);
-  const moved = await relayoutBoard(board, tokens, size);
-  return { path, width: size.width, height: size.height, moved };
 }
-// Tirar o mapa volta o tabuleiro ao tamanho padrao (senao ele ficaria com o tamanho enorme do mapa antigo).
-export async function removeMap(board, tokens = []) {
-  await updateBoard(board.id, { map_path: null, width: DEFAULT_SIZE.width, height: DEFAULT_SIZE.height });
-  if (board.map_path) await supabase.storage.from('maps').remove([board.map_path]);
-  const moved = await relayoutBoard(board, tokens, DEFAULT_SIZE);
-  return { ...DEFAULT_SIZE, moved };
+
+export async function putMapFile(bucket, tableId, file) {
+  validateMapFile(file);
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${tableId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type });
+  fail(error);
+  return path;
+}
+
+export async function saveBoardGrid(board, grid) {
+  const query = supabase.from('boards').update({ grid:boardGrid(grid) }).eq('id',board.id);
+  const match = board.map_path ? query.eq('map_path',board.map_path) : query.is('map_path',null);
+  const { data, error } = await match.select(BOARD_COLS).maybeSingle();
+  fail(error);
+  if (!data) throw new Error('O mapa mudou durante a calibração. Abra o mapa atualizado e tente novamente.');
+  return data;
+}
+
+export async function switchBoardMap(board, path, size, grid, clearMarks) {
+  const { data, error } = await supabase.rpc('switch_board_map', {
+    p_board: board.id, p_previous: board.map_path || null, p_path: path,
+    p_width: size.width, p_height: size.height, p_grid: boardGrid(grid), p_clear_marks: clearMarks,
+  }).single();
+  fail(error);
+  if (board.map_path && board.map_path !== data.map_path) {
+    await supabase.storage.from('maps').remove([board.map_path]).catch(() => {});
+  }
+  return data;
 }
 
 // O tabuleiro tem sempre ~2000 unidades no lado maior, qualquer que seja o tamanho da imagem: assim a grade de 70
@@ -110,23 +115,6 @@ export function fitMapSize(width, height) {
   return { width: clampNum(Math.round(width * scale), 200, 12000), height: clampNum(Math.round(height * scale), 200, 12000) };
 }
 
-// Mudou o tamanho do tabuleiro: leva os tokens junto (mesma posicao relativa) e apaga os marcadores, que eram do mapa antigo.
-export async function relayoutBoard(board, tokens, size) {
-  const sx = size.width / (board.width || size.width), sy = size.height / (board.height || size.height);
-  const cell = Math.min(400, Math.max(20, Number(board.grid?.size) || 70));
-  // Tokens que ja estavam fora do tabuleiro antigo vao para o centro do novo, lado a lado (escalar nao os traria de volta).
-  const outside = tokens.filter(t => t.x < 0 || t.y < 0 || t.x > board.width || t.y > board.height);
-  const moves = tokens.map(t => {
-    const i = outside.indexOf(t);
-    if (i >= 0) {
-      return { id: t.id, x: Math.round(clampNum(size.width / 2 + ((i % 6) - 2.5) * cell * 1.5, 0, size.width)), y: Math.round(clampNum(size.height / 2 + (Math.floor(i / 6) - 0.5) * cell * 1.5, 0, size.height)) };
-    }
-    return { id: t.id, x: Math.round(clampNum(t.x * sx, 0, size.width)), y: Math.round(clampNum(t.y * sy, 0, size.height)) };
-  }).filter(m => { const t = tokens.find(x => x.id === m.id); return Math.abs(m.x - t.x) > 0.5 || Math.abs(m.y - t.y) > 0.5; });
-  await Promise.all(moves.map(m => updateToken(m.id, { x: m.x, y: m.y })));
-  await clearMarks(board.id);
-  return moves;
-}
 // Aplica uma lista de movimentos {id,x,y} a uma lista de tokens (estado local).
 export const applyMoves = (tokens, moves) => tokens.map(t => { const m = moves.find(x => x.id === t.id); return m ? { ...t, x: m.x, y: m.y } : t; });
 
@@ -141,11 +129,6 @@ export async function gatherTokens(board, tokens) {
   }));
   await Promise.all(moves.map(m => updateToken(m.id, { x: m.x, y: m.y })));
   return moves;
-}
-
-// Posicao ajustada a grade (centro da celula) quando a grade esta visivel.
-export function snapToGrid(value, size) {
-  return Math.round(value / size - 0.5) * size + size / 2;
 }
 
 export async function loadCreatureDetails(id) {

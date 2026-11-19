@@ -1,0 +1,14 @@
+.map-workspace { width:min(100%,1040px); max-width:none; max-height:calc(100dvh - 48px); overflow:auto; display:grid; gap:14px; }
+.map-workspace .row, .map-workspace .tabs-row { flex-wrap:wrap; }
+.map-workspace select { max-width:100%; }
+.map-generator, .map-calibration, .map-library { display:grid; gap:12px; }
+.map-generator iframe { display:block; width:100%; height:min(52dvh, 540px); min-height:230px; border:1px solid var(--border); border-radius:8px; background:var(--surface-soft); }
+.map-drop, .map-library-item { padding:12px; border:1px solid var(--border); border-radius:8px; overflow-wrap:anywhere; }
+.map-drop { border-style:dashed; }
+.map-preview { overflow:auto; max-height:52dvh; border:1px solid var(--border); border-radius:8px; }
+.map-preview svg { display:block; height:auto; }
+.map-fields { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+.map-fields .field { flex:1 1 160px; min-width:0; }
+.map-fields > p { flex-basis:100%; }
+.map-draft { margin:0; padding:0; min-width:0; border:0; display:grid; gap:12px; }
+@media (max-width:540px) { .map-workspace { padding:15px; } }

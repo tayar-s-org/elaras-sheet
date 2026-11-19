@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from '../../ui/Modal.jsx';
-import { updateBoard, uploadMap, removeMap, addToken, loadCreatureDetails, saveCreatureToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
+import { updateBoard, addToken, loadCreatureDetails, saveCreatureToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
 import { creatureOf, metaWithHideHp, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
 import { loadPresets, savePreset, deletePreset } from '../../lib/presets.js';
 import { tokenUrl } from '../../lib/tokens.js';
@@ -8,15 +8,13 @@ import './master.css';
 
 const COLORS = ['#7a4dff', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
 
-export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, onClose, onCreateCreature, onEditImage, onEditPreset, mode = "map", onGoToToken, initialNotice = "" }) {
-  const fileRef = useRef(null);
+export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, onClose, onCreateCreature, onEditImage, onEditPreset, mode = "map", onMapTools, onGoToToken, initialNotice = "" }) {
   const [presets, setPresets] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState(initialNotice);
   const [placed, setPlaced] = useState(null);
   const library = mode === 'presets';
   const [busy, setBusy] = useState(false);
-  const grid = board.grid || { size: 70, visible: true };
   const creature = selected ? creatureOf(selected) : null;
 
 
@@ -31,12 +29,6 @@ export default function MasterModule({ board, tokens, marks, members, characters
     await updateToken(token.id, patch);
     local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, ...patch } : t)));
   });
-  const setGrid = patch => run(async () => {
-    const next = { ...grid, ...patch };
-    local.setBoard({ ...board, grid: next });
-    await updateBoard(board.id, { grid: next });
-  });
-
   useEffect(() => {
     let alive = true;
     loadPresets(board.table_id).then(p => { if (alive) setPresets(p); }).catch(e => { if (alive) { setPresets([]); setError(e.message); } });
@@ -61,18 +53,13 @@ export default function MasterModule({ board, tokens, marks, members, characters
       {!library && <><section className="master-section" aria-labelledby="m-map">
         <h3 id="m-map">Mapa</h3>
         <div className="row master-actions">
-          <button type="button" className="outline" disabled={busy} onClick={() => fileRef.current.click()}>{board.map_path ? 'Trocar mapa' : 'Enviar mapa'}</button>
-          {board.map_path && <button type="button" className="text-button danger" disabled={busy}
-            onClick={() => window.confirm('Remover o mapa?') && run(async () => { const r = await removeMap(board, tokens); local.setBoard({ ...board, map_path: null, width: r.width, height: r.height }); local.setTokens(prev => applyMoves(prev, r.moved)); local.setMarks([]); local.reloadMap(); })}>Remover mapa</button>}
+          <button type="button" className="primary" onClick={() => onMapTools('generate')}>Gerar mapa</button>
+          <button type="button" className="outline" onClick={() => onMapTools('library')}>Biblioteca de mapas</button>
+          <button type="button" className="outline" onClick={() => onMapTools('import')}>Importar imagem</button>
           <button className="outline" disabled={busy || !tokens.length} title="Se algum token ficou fora da tela, traz todos para o centro" onClick={() => run(async () => { const moves = await gatherTokens(board, tokens); local.setTokens(prev => applyMoves(prev, moves)); })}>Trazer tokens ao centro</button>
-          <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/webp"
-            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) run(async () => { const r = await uploadMap(board, f, tokens); local.setBoard({ ...board, map_path: r.path, width: r.width, height: r.height }); local.setTokens(prev => applyMoves(prev, r.moved)); local.setMarks([]); local.reloadMap(); }); }} />
         </div>
-        <p className="muted">PNG, JPEG ou WebP até 5 MB. Só quem está na mesa vê o mapa.</p>
+        <p className="muted">Ajuste a grade sobre a imagem em Mapas e grade.</p>
         <div className="form-grid compact">
-          <label className="field"><span>Tamanho da célula (px)</span>
-            <input type="number" min="20" max="400" defaultValue={grid.size} key={grid.size}
-              onBlur={e => { const v = Math.min(400, Math.max(20, Number(e.target.value) || 70)); if (v !== grid.size) setGrid({ size: v }); }} /></label>
           <label className="field"><span>Tamanho dos tokens</span>
             <select value={String(board.settings?.tokenScale || 1.25)} onChange={e => run(async () => {
               const settings = { ...(board.settings || {}), tokenScale: Number(e.target.value) };
@@ -81,7 +68,6 @@ export default function MasterModule({ board, tokens, marks, members, characters
             })}>
               <option value="0.8">Pequeno</option><option value="1">Igual à célula</option><option value="1.25">Grande</option>
               <option value="1.5">Maior</option><option value="2">Enorme</option></select></label>
-          <label className="check"><input type="checkbox" checked={Boolean(grid.visible)} onChange={e => setGrid({ visible: e.target.checked })} /> Mostrar grade e ajustar à grade</label>
         </div>
       </section>
 

@@ -19,10 +19,11 @@ export async function updateTable(id, patch) {
 }
 export async function deleteTable(id) {
   // Os mapas ficam no Storage fora do banco: apaga a pasta da mesa antes (se falhar, a mesa ainda e apagada).
-  try {
-    const { data: files } = await supabase.storage.from('maps').list(id, { limit: 100 });
-    if (files?.length) await supabase.storage.from('maps').remove(files.map(f => `${id}/${f.name}`));
-  } catch { /* arquivos orfaos sao so desperdicio de espaco */ }
+  await Promise.allSettled(['maps','map-library'].map(async bucket => {
+    const storage = supabase.storage.from(bucket);
+    const { data: files } = await storage.list(id, { limit: 1000 });
+    if (files?.length) await storage.remove(files.map(f => `${id}/${f.name}`));
+  }));
   const { error } = await supabase.from('tables').delete().eq('id', id);
   fail(error);
 }

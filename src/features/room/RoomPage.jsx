@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { loginThen, navigate } from '../../lib/router.js';
 import { STATUS_LABEL } from '../../lib/tables.js';
 import { useRoom } from './useRoom.js';
@@ -31,6 +31,67 @@ const loadSettings = () => {
 };
 
 export default function RoomPage({ auth, id }) {
+  const [immersive, setImmersive] = useState(false);
+  const [docks, setDocks] = useState({ party:false, dice:false });
+  const fullscreenButton = useRef(null);
+  const nativeFullscreen = useRef(false);
+
+  const exitImmersive = useCallback(() => {
+    setImmersive(false);
+    if (nativeFullscreen.current && document.fullscreenElement === document.documentElement) {
+      document.exitFullscreen?.().catch(()=>{});
+    }
+    nativeFullscreen.current = false;
+    requestAnimationFrame(()=>fullscreenButton.current?.focus());
+  }, []);
+
+  async function enterImmersive() {
+    setDocks({ party:false, dice:false });
+    setImmersive(true);
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      try {
+        await document.documentElement.requestFullscreen();
+        nativeFullscreen.current = true;
+      } catch { /* A sala ampliada continua disponível na janela. */ }
+    }
+    requestAnimationFrame(()=>fullscreenButton.current?.focus());
+  }
+
+  useEffect(() => {
+    if (!immersive) return undefined;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const topbar = document.querySelector('.topbar');
+    const inert = topbar?.inert;
+    if (topbar) topbar.inert = true;
+    const changed = () => {
+      if (nativeFullscreen.current && !document.fullscreenElement) exitImmersive();
+    };
+    const key = event => {
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]')) {
+        event.preventDefault();
+        exitImmersive();
+      }
+    };
+    document.addEventListener('fullscreenchange',changed);
+    document.addEventListener('keydown',key);
+    return () => {
+      document.body.style.overflow = overflow;
+      if (topbar) topbar.inert = inert;
+      document.removeEventListener('fullscreenchange',changed);
+      document.removeEventListener('keydown',key);
+      if (nativeFullscreen.current && document.fullscreenElement === document.documentElement) document.exitFullscreen?.().catch(()=>{});
+      nativeFullscreen.current = false;
+    };
+  }, [immersive,exitImmersive]);
+
+  function toggleDock(name) {
+    const narrow=window.matchMedia('(max-width: 980px)').matches;
+    setDocks(prev=>({
+      party:name==='party' ? !prev.party : !narrow && prev.party,
+      dice:name==='dice' ? !prev.dice : !narrow && prev.dice,
+    }));
+  }
   const [tab, setTab] = useState('chat');
   const [ctrlError, setCtrlError] = useState('');
   const [diceSettings, setDiceSettingsState] = useState(loadSettings);
@@ -91,7 +152,7 @@ export default function RoomPage({ auth, id }) {
     ...(isGm ? [['items', pendingTotal ? `Aprovações (${pendingTotal})` : 'Aprovações']] : []),
     ['table', isGm ? 'Administração' : 'Mesa'],
   ];
-  const activeTab = tabs.some(([key]) => key === tab) ? tab : 'chat';
+  const activeTab = immersive ? 'dice' : tabs.some(([key]) => key === tab) ? tab : 'chat';
   const run = async fn => {
     setCtrlError('');
     try { await fn(); } catch (err) { setCtrlError(err.message); }
@@ -116,7 +177,16 @@ export default function RoomPage({ auth, id }) {
     document.getElementById(`room-tab-${key}`)?.focus();
   }
 
-  return <main className="room">
+  return <main className={`room${immersive ? ' room-immersive' : ''}${docks.party ? ' dock-party-open' : ''}${docks.dice ? ' dock-dice-open' : ''}`}>
+    {immersive && <nav className="immersive-toolbar" aria-label="Painéis do tabuleiro">
+      <button type="button" className="outline" aria-controls="immersive-party" aria-expanded={docks.party} onClick={()=>toggleDock('party')}>{isGm?'Grupo':'Fichas'}</button>
+      <button type="button" className="outline" aria-controls="room-tools" aria-expanded={docks.dice} onClick={()=>toggleDock('dice')}>Dados e histórico</button>
+      <button ref={fullscreenButton} type="button" className="outline" onClick={exitImmersive}>Sair da tela cheia</button>
+    </nav>}
+    {immersive && <aside className="immersive-party" id="immersive-party" hidden={!docks.party} aria-label={isGm?'Grupo':'Fichas'}>
+      <div className="row"><h2>{isGm?'Grupo':'Fichas'}</h2><button type="button" className="quiet" onClick={()=>toggleDock('party')}>Recolher</button></div>
+      <PartyPanel tableId={id} me={auth.user.id} isGm={isGm} members={members} characters={characters} states={states} patchState={room.patchState} closed={closed} />
+    </aside>}
     <nav className="room-quick-nav" aria-label="Ações rápidas da sala">
       <button type="button" className="outline" onClick={() => jumpToPanel('chat')}>Chat</button>
       <button type="button" className="outline" onClick={() => jumpToPanel('dice')}>Dados</button>
@@ -141,19 +211,21 @@ export default function RoomPage({ auth, id }) {
       {error && <p role="alert" className="muted">{error}</p>}
     </aside>
     <section className="room-board" aria-label="Tabuleiro">
-      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating}
-        logSlot={<TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} rewards={room.rewards} hidden={hidden} members={members} characters={characters} me={auth.user.id} isGm={isGm} />} />
+      {!immersive && <button ref={fullscreenButton} type="button" className="outline room-fullscreen-toggle" onClick={enterImmersive}>Tela cheia</button>}
+      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating} immersive={immersive}
+        logSlot={<div className="room-table-log"><TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} rewards={room.rewards} hidden={hidden} members={members} characters={characters} me={auth.user.id} isGm={isGm} /></div>} />
     </section>
-    <aside className="room-panel" id="room-tools">
-      <div className="tabs-row" role="tablist" aria-label="Ferramentas da sala">
+    <aside className="room-panel" id="room-tools" hidden={immersive && !docks.dice}>
+      {immersive && <div className="row"><h2 id="immersive-dice-title">Dados</h2><button type="button" className="quiet" onClick={()=>toggleDock('dice')}>Recolher</button></div>}
+      {!immersive && <div className="tabs-row" role="tablist" aria-label="Ferramentas da sala">
         {tabs.map(([key, label], index) => <button key={key} type="button" role="tab"
           id={`room-tab-${key}`} aria-controls="room-tool-panel" aria-selected={activeTab === key}
           tabIndex={activeTab === key ? 0 : -1} className={activeTab === key ? 'primary' : 'outline'}
           onClick={() => setTab(key)} onKeyDown={event => handleTabKey(event, index)}>{label}</button>)}
-      </div>
+      </div>}
       {closed && <p className="callout">Esta mesa foi encerrada. O histórico continua visível, mas ninguém pode escrever.</p>}
       {ctrlError && <p role="alert" className="muted">{ctrlError}</p>}
-      <div id="room-tool-panel" className="room-tool-panel" role="tabpanel" aria-labelledby={`room-tab-${activeTab}`}>
+      <div id="room-tool-panel" className="room-tool-panel" role={immersive ? "region" : "tabpanel"} aria-labelledby={immersive ? "immersive-dice-title" : `room-tab-${activeTab}`}>
       {activeTab === 'items' && isGm ? <>
           <GmAlertToggle alert={gmAlert} total={pendingTotal} />
           <JoinApprovals table={table} members={members} reload={room.reload} run={run} />
