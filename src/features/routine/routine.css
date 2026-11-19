@@ -72,7 +72,7 @@
 .rq-card.st-approved, .rq-status.st-approved { --st: var(--success); }
 .rq-card.st-pending, .rq-status.st-pending { --st: var(--warning); }
 .rq-card.st-rejected, .rq-status.st-rejected { --st: var(--danger); }
-.rq-card.st-changes, .rq-status.st-changes { --st: #a89bd8; }
+.rq-card.st-changes, .rq-status.st-changes { --st: var(--accent); }
 .rq-card.st-done, .rq-status.st-done { --st: var(--gold); }
 .rq-status { padding: 1px 10px; border-radius: 999px; border: 1px solid var(--st); color: var(--st); font-size: .74rem; font-weight: 700; }
 .rq-body, .rq-desc { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -288,3 +288,20 @@
 .th-table thead th { position: sticky; top: 0; z-index: 2; color: var(--text); font-weight: 700; border-bottom: 2px solid var(--border); }
 .th-table tbody tr:nth-child(even):not(.th-detail) { background: color-mix(in srgb, var(--surface-soft) 55%, var(--surface)); }
 @media (max-width: 760px) { .th-scroll { max-height: none; overflow: visible; } }
+
+.cc-day-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cc-day-head .cc-week { margin-inline-start: 0; }
+.cc-day-action.outline {
+  min-height: 32px;
+  min-width: min(32px, 100%);
+  padding: 2px 4px;
+  font-size: .85rem;
+  font-variant-numeric: tabular-nums;
+}
+.cc-day-action[aria-pressed="true"] { background: var(--selection); }
+.rb-apply.outline { min-height: 32px; justify-self: start; }

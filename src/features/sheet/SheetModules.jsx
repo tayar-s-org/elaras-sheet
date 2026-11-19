@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+import React from "react";
+import Modal from '../../ui/Modal.jsx';
 import { stageForXP } from "../../catalogRules.js";
 import { formatMoney } from "../../money.js";
 import "../../ui/money.css";
@@ -91,14 +92,14 @@ function Summary({ index, c, d }) {
     }
     case 3:
       return <>
-        <h4 className="mod-sub">Vantagens ({c.advantages.length})</h4>
+        <h3 className="mod-sub">Vantagens ({c.advantages.length})</h3>
         {c.advantages.length ? <div className="mod-details">{groupedAdvantages(c.advantages).map(([label, n, power, description]) => <Detail key={label} title={n > 1 ? `${label} ×${n}` : label} tag={power ? "poder" : ""} tone={power ? "power" : ""}>{description ? <p>{description}</p> : <p className="muted">Sem descrição. Escreva o efeito em Editar.</p>}</Detail>)}</div> : <Empty>Nenhuma vantagem.</Empty>}
-        <h4 className="mod-sub">Complicações ({c.hindrances.length})</h4>
+        <h3 className="mod-sub">Complicações ({c.hindrances.length})</h3>
         {c.hindrances.length ? <div className="mod-details">{c.hindrances.map((h, i) => <Detail key={i} title={h.name || "Sem nome"} tag={h.severity} tone={h.severity === "Maior" ? "major" : "minor"}>{h.description ? <p>{h.description}</p> : <p className="muted">Sem descrição.</p>}</Detail>)}</div> : <Empty>Nenhuma complicação.</Empty>}
       </>;
     case 4:
       return <>
-        <h4 className="mod-sub">Poderes ({c.powers.length})</h4>
+        <h3 className="mod-sub">Poderes ({c.powers.length})</h3>
         {c.powers.length ? <ul className="mod-spells">{c.powers.map((p, i) => <li key={i} className="mod-spell">
           <b className="mod-spell-name">{p.name || "Sem nome"}{p.upgrades?.length ? <small> · {p.upgrades.length} melhoria(s)</small> : null}</b>
           <span className="mod-spell-facts">
@@ -116,7 +117,7 @@ function Summary({ index, c, d }) {
       const bonus = [["Armadura", c.armor], ["Movimento", c.movementBonus], ["Aparar", c.parryBonus], ["Mana", c.manaBonus]].filter(([, v]) => v);
       const load = d.inventory;
       return <>
-        <h4 className="mod-sub">Itens ({c.inventory.reduce((n, e) => n + e.qty, 0)})</h4>
+        <h3 className="mod-sub">Itens ({c.inventory.reduce((n, e) => n + e.qty, 0)})</h3>
         {bag.length ? <div className="mod-details">{bag.map(e => {
           const fx = itemEffects(resolveItem(e));
           return <Detail key={e.id} title={e.qty > 1 ? `${e.name} ×${e.qty}` : e.name} tag={e.equipped ? "equipado" : ""} tone={e.equipped ? "power" : ""}>
@@ -131,7 +132,7 @@ function Summary({ index, c, d }) {
     case 5:
       return <>
         {c.history.trim() ? <p className="mod-text">{excerpt(c.history)}</p> : <Empty>Nenhuma história escrita.</Empty>}
-        {c.notes.trim() && <><h4 className="mod-sub">Anotações</h4><p className="mod-text">{excerpt(c.notes, 140)}</p></>}
+        {c.notes.trim() && <><h3 className="mod-sub">Anotações</h3><p className="mod-text">{excerpt(c.notes, 140)}</p></>}
       </>;
     case 6:
       return <p className="mod-text">Consulte o PDF do livro e as regras do mestre sem sair da ficha.</p>;
@@ -174,12 +175,6 @@ export function SheetOverview({ c, d, apt }) {
 export default function SheetModules({ ctx, editing, setEditing }) {
   const { c, d } = ctx;
   const apt = useAptitudeFor({ characterId: ctx.cloudId, tableId: ctx.tableId || null });
-  useEffect(() => {
-    if (editing == null) return undefined;
-    const onKey = e => { if (e.key === "Escape") setEditing(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [editing, setEditing]);
 
   return <>
     <div className="sheet-modules">
@@ -210,14 +205,14 @@ export default function SheetModules({ ctx, editing, setEditing }) {
         ];
       })}
     </div>
-    {editing != null && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setEditing(null); }}>
-      <div className="mod-editor" role="dialog" aria-modal="true" aria-labelledby="mod-editor-title">
+    {editing != null && <Modal onClose={() => setEditing(null)} aria-labelledby="mod-editor-title">
+      <div className="mod-editor">
         <header className="mod-editor-head">
           <h2 id="mod-editor-title">{editing === "guide" ? "Guia de criação" : editing === "market" ? "Mercado" : editing === "aptitude" ? "Aptidão" : MODULES[editing]}</h2>
           <button type="button" className="primary" onClick={() => setEditing(null)}>Concluir</button>
         </header>
         <div className="mod-editor-body">{renderEditor(editing, ctx)}</div>
       </div>
-    </div>}
+    </Modal>}
   </>;
 }

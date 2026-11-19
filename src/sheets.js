@@ -37,6 +37,7 @@ export function setSheetTable(session,id,table) {
 export function openCloudSheet(session,row) {
   const existing=session.sheets.find(s=>s.cloud?.id===row.id);
   const cloud={id:row.id,revision:row.revision,base:JSON.stringify(row.character)};
+  if(session.closedCloudIds?.includes(row.id)) session={...session,closedCloudIds:session.closedCloudIds.filter(id=>id!==row.id)};
   if(existing) return {...session,activeId:existing.id,sheets:session.sheets.map(s=>s.id===existing.id?(JSON.stringify(s.character)===s.cloud.base?{...s,character:row.character,cloud,...tableOf(row)}:{...s,...tableOf(row)}):s)};
   // Uma unica aba em branco e intocada e substituida em vez de ficar sobrando ao lado.
   const only=session.sheets.length===1 && !session.sheets[0].cloud && JSON.stringify(session.sheets[0].character)===JSON.stringify(newCharacter());
@@ -78,6 +79,11 @@ export function closeSheet(session,id) {
   if (!sheets.length) return openSheet({...session,sheets:[],activeId:''});
   return {...session,sheets,activeId:session.activeId===id?sheets[Math.min(index,sheets.length-1)].id:session.activeId};
 }
+export function closeCloudTab(session,id) {
+  const cloudId=session.sheets.find(s=>s.id===id)?.cloud?.id;
+  if(!cloudId) return session;
+  return closeSheet({...session,closedCloudIds:[...new Set([...(session.closedCloudIds||[]),cloudId])]},id);
+}
 export function restoreSheets(storage) {
   try {
     const raw=JSON.parse(storage.getItem(SHEETS_STORAGE));
@@ -96,7 +102,10 @@ export function restoreSheets(storage) {
       });
       const editKeys=Object.fromEntries(Object.entries(raw.editKeys||{}).filter(([id,key])=>/^[a-f0-9-]{36}$/.test(id) && typeof key==='string' && /^[a-f0-9]{64}$/.test(key)));
       for(const s of sheets)if(s.remote?.editToken)editKeys[s.remote.id]=s.remote.editToken;
-      return {sheets,activeId:sheets.some(s=>s.id===raw.activeId)?raw.activeId:sheets[0].id,...(Object.keys(editKeys).length?{editKeys}:{})};
+      const closedCloudIds=Array.isArray(raw.closedCloudIds)
+        ? raw.closedCloudIds.filter(id=>typeof id==='string' && /^[a-f0-9-]{36}$/.test(id) && !sheets.some(s=>s.cloud?.id===id))
+        : [];
+      return {sheets,...(closedCloudIds.length?{closedCloudIds}:{}),activeId:sheets.some(s=>s.id===raw.activeId)?raw.activeId:sheets[0].id,...(Object.keys(editKeys).length?{editKeys}:{})};
     }
   } catch { /* Fall back to the previous single-sheet draft, which stays untouched. */ }
   try {

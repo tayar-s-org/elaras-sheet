@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
+import Modal from '../../ui/Modal.jsx';
 import './deleteTable.css';
 
 const norm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -11,11 +11,6 @@ export default function DeleteTableDialog({ table, onConfirm, onCancel }) {
   const [error, setError] = useState('');
   const match = norm(typed) === norm(table.name);
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape' && !busy) onCancel(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onCancel]);
 
   async function confirm(e) {
     e.preventDefault();
@@ -25,8 +20,8 @@ export default function DeleteTableDialog({ table, onConfirm, onCancel }) {
     try { await onConfirm(); } catch (err) { setError(err.message); setBusy(false); }
   }
 
-  return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !busy) onCancel(); }}>
-    <form className="modal delete-table" role="alertdialog" aria-modal="true" aria-labelledby="del-title" aria-describedby="del-text" onSubmit={confirm}>
+  return <Modal onClose={onCancel} aria-labelledby="del-title" busy={busy} role="alertdialog" aria-describedby="del-text">
+    <form className="modal delete-table" onSubmit={confirm}>
       <h2 id="del-title">Apagar a mesa “{table.name}”?</h2>
       <div id="del-text" className="delete-table-text">
         <p><b>Isso não pode ser desfeito.</b> Ao apagar a mesa, somem para todos os participantes:</p>
@@ -39,12 +34,12 @@ export default function DeleteTableDialog({ table, onConfirm, onCancel }) {
         <p>As fichas dos jogadores continuam nas contas deles, mas ficam sem mesa.</p>
       </div>
       <label className="field"><span>Digite <b>{table.name}</b> para confirmar</span>
-        <input value={typed} autoFocus autoComplete="off" onChange={e => setTyped(e.target.value)} placeholder={table.name} aria-label="Nome da mesa para confirmar" /></label>
+        <input value={typed} data-modal-focus autoComplete="off" onChange={e => setTyped(e.target.value)} placeholder={table.name} aria-label="Nome da mesa para confirmar" /></label>
       {error && <p role="alert" className="delete-table-error">{error}</p>}
       <div className="row">
         <button type="button" className="quiet" disabled={busy} onClick={onCancel}>Cancelar</button>
         <button type="submit" className="danger-solid" disabled={!match || busy}>{busy ? 'Apagando…' : 'Apagar mesa para sempre'}</button>
       </div>
     </form>
-  </div>, document.body);
+  </Modal>;
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newCharacter,elaraCharacter} from './rules.js';
-import {SHEETS_STORAGE,LEGACY_STORAGE,openSheet,editSheet,closeSheet,restoreSheets,openServerSheet,openCloudSheet,setCloud} from './sheets.js';
+import {SHEETS_STORAGE,LEGACY_STORAGE,openSheet,editSheet,closeSheet,closeCloudTab,restoreSheets,openServerSheet,openCloudSheet,setCloud} from './sheets.js';
 import {createPdfBlob,importPdf} from './pdf.js';
 
 test('reabrir ficha do servidor preserva edição, chave e aba existente',()=>{
@@ -138,4 +138,16 @@ test('a mesa escolhida para uma ficha em rascunho sobrevive ao recarregar e lixo
   forged.sheets[0].tableId = 'não é id';
   const cleaned = restoreSheets({ getItem: () => JSON.stringify(forged) });
   assert.equal('tableId' in cleaned.sheets[0], false);
+});
+
+test('fechar uma aba da nuvem preserva a ficha e a sincronização pode reabri-la',()=>{
+  const row={id:'11111111-1111-4111-8111-111111111111',revision:2,character:elaraCharacter()};
+  const session=openCloudSheet({sheets:[],activeId:''},row);
+  const closed=closeCloudTab(session,session.activeId);
+  const restored=restoreSheets({getItem:key=>key===SHEETS_STORAGE?JSON.stringify(closed):null});
+  assert.deepEqual(restored.closedCloudIds,[row.id]);
+  assert.equal(restored.sheets.some(sheet=>sheet.cloud?.id===row.id),false);
+  const reopened=openCloudSheet(restored,row);
+  assert.equal(reopened.sheets.find(sheet=>sheet.id===reopened.activeId).character.name,row.character.name);
+  assert.deepEqual(reopened.closedCloudIds,[]);
 });

@@ -108,6 +108,9 @@ function Slot({ index, row, e, stats, canEdit, brushRow, painting, onApply, onCl
         <span className="rb-name">{actionLabel(row, stats)}</span>
         {canEdit && <button type="button" className="tc-x" aria-label={`Limpar a hora ${HOURS[index]}`} onClick={() => onClear(index)}>×</button>}
       </div> : <span className="rb-empty">{canEdit ? 'Solte uma ação aqui' : 'Livre'}</span>}
+      {canEdit && brushRow && <button type="button" className="outline rb-apply"
+        aria-label={`Aplicar ${actionLabel(brushRow, stats)} às ${HOURS[index]}`}
+        onClick={() => onApply(index, brushRow)}>Aplicar</button>}
       {(text || issue) && <small className={e.ok && !issue ? 'rb-effect' : 'rb-effect bad'} title={text}>{issue ? `Falta: ${issue}` : text}</small>}
     </div>
     <span className="rb-delta">

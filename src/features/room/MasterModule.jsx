@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Modal from '../../ui/Modal.jsx';
 import { updateBoard, uploadMap, removeMap, addToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
 import { creatureOf, metaWithHideHp, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
 import { loadPresets, savePreset, deletePreset } from '../../lib/presets.js';
@@ -17,11 +18,6 @@ export default function MasterModule({ board, tokens, marks, members, characters
   const grid = board.grid || { size: 70, visible: true };
   const creature = selected ? creatureOf(selected) : null;
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
 
   const run = async fn => {
     setBusy(true);
@@ -51,8 +47,8 @@ export default function MasterModule({ board, tokens, marks, members, characters
     && !tokens.some(t => t.character_id === m.character_id));
   const place = i => ({ x: board.width / 2 + (i % 5) * 20, y: board.height / 2 + (i % 5) * 20 });
 
-  return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-    <div className="modal master-module" role="dialog" aria-modal="true" aria-labelledby="master-title">
+  return <Modal onClose={onClose} aria-labelledby="master-title" busy={busy}>
+    <div className="modal master-module">
       <div className="row master-head">
         <h2 id="master-title">Módulo do mestre</h2>
         <button type="button" className="quiet" onClick={onClose}>Fechar</button>
@@ -171,5 +167,5 @@ export default function MasterModule({ board, tokens, marks, members, characters
           onClick={() => window.confirm('Apagar todos os marcadores?') && run(async () => { await clearMarks(board.id); local.setMarks([]); })}>Limpar marcadores ({marks.length})</button>
       </section>
     </div>
-  </div>;
+  </Modal>;
 }
