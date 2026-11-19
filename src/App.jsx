@@ -28,6 +28,7 @@ import HomePage from "./features/home/HomePage.jsx";
 import TopBar from "./features/sheet/TopBar.jsx";
 import SheetSummary from "./features/sheet/SheetSummary.jsx";
 import SheetModules from "./features/sheet/SheetModules.jsx";
+import { sheetOps } from "./features/sheet/sheetOps.js";
 import Toast from "./ui/Toast.jsx";
 import Assistant from "./assistant/Assistant.jsx";
 
@@ -98,9 +99,7 @@ export default function App() {
   };
   const [requestedPage, setRequestedPage] = useState(null);
   const d = calculate(c);
-  const update = (key, value) => setC((prev) => ({ ...prev, [key]: value }));
-  const rule = (key, value) =>
-    setC((prev) => ({ ...prev, rules: { ...prev.rules, [key]: value } }));
+  const { update, rule, changeItem, addItem } = sheetOps(c, setC);
   useEffect(() => {
     try {
       localStorage.setItem(SHEETS_STORAGE, JSON.stringify(session));
@@ -192,21 +191,6 @@ export default function App() {
     const timer = setTimeout(() => setToast(""), 6500);
     return () => clearTimeout(timer);
   }, [toast]);
-  function changeItem(key, index, field, value) {
-    update(
-      key,
-      c[key].map((x, i) => (i === index ? { ...x, [field]: value } : x)),
-    );
-  }
-  function addItem(key) {
-    const item =
-      key === "advantages"
-        ? { name: "", description: "", power: false }
-        : key === "hindrances"
-          ? { name: "", description: "", severity: "Menor" }
-          : { name: "", description: "", cost: "" };
-    update(key, [...c[key], item]);
-  }
   async function signOut() {
     await auth.signOut();
     // As fichas ficam na conta; limpa os rascunhos deste navegador para o proximo usuario.
@@ -234,10 +218,10 @@ export default function App() {
     : route === "/entrar" ? <AuthPage auth={auth} />
     : route === "/mesas" ? <TablesPage auth={auth} />
     : route.startsWith("/mesa/") ? <TablePage key={route} auth={auth} id={route.slice(6)} />
-    : route.startsWith("/sala/") ? <RoomPage auth={auth} id={route.slice(6)} />
+    : route.startsWith("/sala/") ? <RoomPage auth={auth} id={route.slice(6)} sheets={{ session, setSession, setConfirm, setToast }} />
     : route.startsWith("/convite/") ? <InvitePage auth={auth} code={route.slice(9)} />
     : <HomePage auth={auth} />;
-  if (page) return <>{topbar}{page}<Assistant /></>;
+  if (page) return <>{topbar}{page}<Toast toast={toast} onClose={() => setToast("")} /><Assistant /></>;
   return (
     <>
       {topbar}

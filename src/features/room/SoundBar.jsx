@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 const KEY = 'elara-soundbar-min';
 const readMin = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
 
-// Soundpad na tela da mesa: o mestre vê os botões dos sons; todos têm o volume dos efeitos.
-export default function SoundBar({ pad, isGm }) {
+function GmSoundBar({ pad, isGm }) {
   const { sounds, active, vol, setVol, play, stop, stopAll } = pad;
   const [minimized, setMinimized] = useState(readMin);
   const toggle = () => setMinimized(v => {
@@ -36,4 +35,20 @@ export default function SoundBar({ pad, isGm }) {
         onChange={e => setVol({ volume: Number(e.target.value), muted: false })} />
     </span>
   </div>;
+}
+
+// Soundpad do mestre na tela da mesa (botões dos sons + volume). Jogadores não têm janela: só o SfxVolume na barra do tabuleiro.
+export default function SoundBar({ pad, isGm }) {
+  return isGm ? <GmSoundBar pad={pad} isGm /> : null;
+}
+
+// Volume dos efeitos sonoros para os jogadores: som ligado/desligado e controle deslizante, compacto, ao lado de "Tela cheia".
+export function SfxVolume({ pad }) {
+  const { vol, setVol } = pad;
+  return <span className="sfx-volume" role="group" aria-label="Volume dos efeitos sonoros">
+    <button type="button" className="outline" aria-pressed={vol.muted} title={vol.muted ? 'Ligar os efeitos sonoros' : 'Desligar os efeitos sonoros'}
+      onClick={() => setVol(v => ({ ...v, muted: !v.muted }))}>{vol.muted ? 'Efeitos: off' : 'Efeitos: on'}</button>
+    <input type="range" min="0" max="1" step="0.05" value={vol.volume} aria-label="Volume dos efeitos sonoros"
+      onChange={e => setVol({ volume: Number(e.target.value), muted: false })} />
+  </span>;
 }

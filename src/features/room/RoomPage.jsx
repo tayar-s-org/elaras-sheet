@@ -30,7 +30,7 @@ const loadSettings = () => {
   try { return { anim: !reduced, sound: true, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { anim: !reduced, sound: true }; }
 };
 
-export default function RoomPage({ auth, id }) {
+export default function RoomPage({ auth, id, sheets }) {
   const [immersive, setImmersive] = useState(false);
   const [docks, setDocks] = useState({ party:false, dice:false });
   const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 980px)').matches);
@@ -249,8 +249,7 @@ export default function RoomPage({ auth, id }) {
       {error && <p role="alert" className="muted">{error}</p>}
     </aside>
     <section className="room-board" aria-label="Tabuleiro" inert={Boolean(overlayDock)}>
-      {!immersive && <button ref={fullscreenButton} type="button" className="outline room-fullscreen-toggle" onClick={enterImmersive}>Tela cheia</button>}
-      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} diceSettings={diceSettings} markAnimating={markAnimating} immersive={immersive}
+      <BoardView tableId={id} me={auth.user.id} members={members} characters={characters} isGm={isGm} closed={closed} room={room} boardState={boardState} sheets={sheets} auth={auth} fullscreenAction={!immersive && <button ref={fullscreenButton} type="button" className="outline" onClick={enterImmersive}>Tela cheia</button>} diceSettings={diceSettings} markAnimating={markAnimating} immersive={immersive}
         logSlot={<div className="room-table-log"><TableLog messages={messages} rolls={rolls} stateLog={room.stateLog} rewards={room.rewards} hidden={hidden} members={members} characters={characters} me={auth.user.id} isGm={isGm} /></div>} />
     </section>
     <aside className="room-panel" id="room-tools" hidden={immersive && !docks.dice}

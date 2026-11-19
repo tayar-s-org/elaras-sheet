@@ -101,3 +101,5 @@
 @media (max-width: 540px) {
   .preset-actions { flex-basis: 100%; }
 }
+.sfx-volume { @apply inline-flex items-center gap-[8px]; }
+.sfx-volume input[type=range] { @apply w-[90px]; }

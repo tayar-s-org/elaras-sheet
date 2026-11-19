@@ -53,3 +53,7 @@
 .mod-spell-facts i { font-style: normal; font-size: .66rem; letter-spacing: .05em; @apply uppercase text-app-muted; }
 .mod-spell-desc summary { @apply cursor-pointer; font-size: .8rem; @apply text-app-accent; }
 .mod-spell-desc p { @apply m-[4px_0_0]; font-size: .84rem; @apply whitespace-pre-wrap wrap-anywhere; }
+/* Mochila com ações por item (painel do tabuleiro): o cartão ocupa a linha e os botões ficam ao lado. */
+.mod-bag-row { @apply grid gap-[4px]; }
+.mod-bag-line { @apply flex items-start gap-[6px]; }
+.mod-bag-line > .mod-detail { @apply flex-1 min-w-0; }

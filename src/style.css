@@ -860,7 +860,6 @@ dialog.modal-backdrop::backdrop { background: transparent; }
 .board-move-status:not(:empty) { flex-basis: 100%; font-size: .9rem; @apply wrap-anywhere; }
 .board-token-controls button[aria-disabled="true"] { opacity: .6; cursor: wait; }
 
-.room-fullscreen-toggle { margin-block-end: 8px; }
 .room.room-immersive {
   --left-dock: 0px;
   --right-dock: 0px;

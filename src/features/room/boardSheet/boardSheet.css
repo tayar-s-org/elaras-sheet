@@ -1,0 +1,45 @@
+@reference "../../../tailwind.css";
+.board-sheet { @apply grid gap-[8px] min-w-0; container-type: inline-size; }
+.bsp-top { display: grid; grid-template-columns: minmax(250px, 440px) minmax(0, 1fr); align-items: stretch; gap: 10px; }
+.bsp-identity { @apply flex items-center gap-[10px] p-[6px_12px]; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
+.bsp-identity.empty p { @apply m-0; }
+.bsp-portrait { @apply flex-none grid place-items-center w-[52px] h-[52px] rounded-[50%] object-cover; border: 2px solid var(--gold); color: var(--gold); background: var(--gold-soft); font-family: var(--font-display); font-size: 1.25rem; }
+.bsp-id-text { @apply min-w-0 overflow-hidden; }
+.bsp-id-text h3 { @apply m-0; font-family: var(--font-display); font-size: 1.1rem; line-height: 1.15; }
+.bsp-id-text p { @apply m-[1px_0_0] text-app-muted; font-size: .78rem; line-height: 1.25; }
+.bsp-id-text h3, .bsp-id-text p { @apply overflow-hidden whitespace-nowrap text-ellipsis; }
+.bsp-id-text .bsp-concept { @apply text-app-text; }
+.bsp-money b { color: var(--gold); }
+.bsp-modules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, 1fr); gap: 6px; min-width: 0; }
+.bsp-tab:last-child { grid-column: span 2; } /* 7 botões: o último ocupa 2 colunas e o retângulo fecha */
+.bsp-tab { @apply inline-flex items-baseline justify-center gap-[5px] cursor-pointer whitespace-nowrap; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); color: inherit; font-family: var(--font-display); font-weight: 700; font-size: .92rem; }
+.bsp-tab:hover:not(:disabled) { border-color: var(--accent); }
+.bsp-tab.active { background: var(--selection); border-color: var(--accent); }
+.bsp-tab:disabled { opacity: .5; cursor: not-allowed; }
+.bsp-num { font-size: .7rem; color: var(--gold); }
+/* Expande e recolhe suavemente: a altura vai de 0 ao conteúdo (limitado, com rolagem interna). */
+.bsp-region { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.bsp-region.open { grid-template-rows: 1fr; }
+.bsp-clip { @apply overflow-hidden min-h-0; }
+.bsp-body { @apply overflow-auto p-[14px_16px]; max-height: min(55vh, 520px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.bsp-region:not(.open) .bsp-body { visibility: hidden; border-color: transparent; padding-block: 0; transition: visibility 0s .22s; }
+.bsp-readonly { @apply grid gap-[8px]; }
+.room-immersive .bsp-body { max-height: min(45vh, 420px); }
+/* Pela largura do painel (a coluna do tabuleiro varia), não pela da janela. */
+@container (max-width: 760px) {
+  .bsp-top { grid-template-columns: minmax(0, 1fr); }
+  .bsp-tab { padding: 8px 4px; font-size: .82rem; }
+  .bsp-num { display: none; }
+}
+@container (max-width: 430px) {
+  .bsp-tab { padding: 8px 2px; font-size: .72rem; @apply overflow-hidden text-ellipsis; }
+}
+@media (prefers-reduced-motion: reduce) { .bsp-region, .bsp-region:not(.open) .bsp-body { transition: none; } }
+.bsp-actions { @apply flex justify-end; margin-bottom: 10px; }
+.bsp-id-wrap { @apply relative flex min-w-0; }
+.bsp-id-wrap .bsp-identity { @apply flex-1; padding-right: 32px; }
+.bsp-min { @apply absolute top-[4px] right-[4px] w-[24px] h-[24px] p-0 grid place-items-center cursor-pointer; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: inherit; font-size: 1rem; line-height: 1; }
+.bsp-min:hover { border-color: var(--accent); }
+.bsp-mini { @apply flex items-center justify-between gap-[10px] p-[4px_8px_4px_12px]; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
+.bsp-mini-name { @apply min-w-0 overflow-hidden whitespace-nowrap text-ellipsis; font-size: .9rem; }
+.bsp-mini .outline { padding: 4px 12px; }

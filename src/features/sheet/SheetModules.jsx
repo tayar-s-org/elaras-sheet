@@ -60,7 +60,8 @@ const Chip = ({ label, value, tone }) => <span className={`mod-chip${tone ? ` ${
 const Stat = ({ label, value }) => <div className="mod-stat"><b>{value}</b><span>{label}</span></div>;
 
 // Resumos diretos (so leitura) de cada modulo da ficha.
-function Summary({ index, c, d }) {
+// bagActions (opcional, só a Mochila): (entrada) => ({ inline, below }) com botões extras por item; a ficha não usa.
+export function Summary({ index, c, d, bagActions }) {
   switch (index) {
     case 0: {
       const src = tokenUrl(c.tokenImage);
@@ -120,10 +121,12 @@ function Summary({ index, c, d }) {
         <h3 className="mod-sub">Itens ({c.inventory.reduce((n, e) => n + e.qty, 0)})</h3>
         {bag.length ? <div className="mod-details">{bag.map(e => {
           const fx = itemEffects(resolveItem(e));
-          return <Detail key={e.id} title={e.qty > 1 ? `${e.name} ×${e.qty}` : e.name} tag={e.equipped ? "equipado" : ""} tone={e.equipped ? "power" : ""}>
+          const detail = <Detail key={e.id} title={e.qty > 1 ? `${e.name} ×${e.qty}` : e.name} tag={e.equipped ? "equipado" : ""} tone={e.equipped ? "power" : ""}>
             {fx.lines.length ? <ul>{fx.lines.map(l => <li key={l}>{l}</li>)}</ul> : <p className="muted">Sem efeito em regras.</p>}
             {fx.notes && <p>{fx.notes}</p>}
           </Detail>;
+          const extra = bagActions?.(e);
+          return extra ? <div className="mod-bag-row" key={e.id}><div className="mod-bag-line">{detail}{extra.inline}</div>{extra.below}</div> : detail;
         })}</div> : <Empty>Nada na mochila. Compre equipamento no Mercado.</Empty>}
         {bag.length > 0 && <p className="mod-facts">Carga {kg(load.weight)} / {kg(load.capacity)}{load.overload ? ` · sobrecarga −${load.overload} de Movimento` : ""} · itens em roxo estão equipados</p>}
         {bonus.length > 0 && <div className="mod-chips">{bonus.map(([k, v]) => <Chip key={k} label={`Bônus de ${k}`} value={v > 0 ? `+${v}` : v} />)}</div>}
@@ -141,7 +144,7 @@ function Summary({ index, c, d }) {
   }
 }
 
-function renderEditor(index, ctx) {
+export function renderEditor(index, ctx) {
   switch (index) {
     case 0: return <IdentityTab {...ctx} />;
     case 1: return <AttributesTab {...ctx} />;

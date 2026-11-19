@@ -9,7 +9,7 @@ import MasterModule from './MasterModule.jsx';
 import MapWorkspace from './MapWorkspace.jsx';
 import { boardGrid, gridLines, snapInsideGrid } from '../../boardGrid.js';
 import MusicPlayer from './MusicPlayer.jsx';
-import SoundBar from './SoundBar.jsx';
+import SoundBar, { SfxVolume } from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
@@ -17,6 +17,7 @@ import CreatureSheetPeek from './CreatureSheetPeek.jsx';
 import { creatureOf, uniqueName, metaForCopy, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
 import { displayName, imageVisible, isNameHidden, effectsOf, addEffect, removeEffect, effectBadges } from '../../tokenState.js';
 import SheetPeek from './SheetPeek.jsx';
+import BoardSheetPanel from './boardSheet/BoardSheetPanel.jsx';
 import { useAptitudeFor } from '../routine/AptitudeSummary.jsx';
 import { safeMaxima, currentValue } from './vitals.js';
 
@@ -47,7 +48,7 @@ function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initials = name => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false }) {
+export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false, sheets = null, auth = null, fullscreenAction = null }) {
   const askConfirm = useConfirm();
   const { board, tokens, marks, mapSrc, drags, error, setError, local } = boardState;
   const svgRef = useRef(null);
@@ -407,15 +408,18 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
 
   return <div className="board">
+    <BoardSheetPanel sel={sel} myCharacter={myCharacter} isGm={isGm} characters={characters} tableId={tableId} sheets={sheets} auth={auth} closed={closed} />
     <div className="board-toolbar">
       <div role="group" aria-label="Ferramentas" className="tabs-row">
         <button className={tool === 'move' ? 'primary' : 'outline'} aria-pressed={tool === 'move'} onClick={() => setTool('move')}>Mover</button>
         <button className={tool === 'marker' ? 'primary' : 'outline'} aria-pressed={tool === 'marker'} onClick={() => setTool('marker')} disabled={closed}>Marcador</button>
       </div>
-      <div role="group" aria-label="Zoom" className="tabs-row">
+      <div role="group" aria-label="Zoom e visualização" className="tabs-row">
         <button className="outline" aria-label="Diminuir zoom" onClick={() => zoomBy(1.25)}>−</button>
         <button className="outline" aria-label="Aumentar zoom" onClick={() => zoomBy(0.8)}>+</button>
         <button className="outline" onClick={frameMap}>Enquadrar</button>
+        {fullscreenAction}
+        {!isGm && <SfxVolume pad={pad} />}
       </div>
       {!closed && (myCharacter || isGm) && <div className="toolbar-end">
         {myCharacter && <div role="group" aria-label="Meu token" className="tabs-row">
