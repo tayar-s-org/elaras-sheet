@@ -8,8 +8,7 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
   const hintId = useId();
   const [picking, setPicking] = useState(false);
   const [points, setPoints] = useState([]);
-  const [columns, setColumns] = useState(1);
-  const [rows, setRows] = useState(1);
+  const [sample, setSample] = useState(null);
   const [suggestion, setSuggestion] = useState(null);
   const [notice, setNotice] = useState('');
   const svg = useRef(null);
@@ -41,8 +40,28 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
   }, [picking,cursor,zoom]);
 
   function markPoint(point) {
-    setPoints(previous => previous.length === 2 ? [point] : [...previous,point]);
     setCursor(point);
+    if (!points.length) {
+      setPoints([point]);
+      setNotice('');
+      return;
+    }
+    const fit = fitCalibration(points[0],point,1,1);
+    if (!fit) {
+      setNotice('Escolha o canto oposto do mesmo quadrado. Se precisar, aumente o zoom.');
+      return;
+    }
+    const { uneven, ...values } = fit;
+    patch(values);
+    setInputs({});
+    setSample({
+      x: Math.min(points[0].x, point.x),
+      y: Math.min(points[0].y, point.y),
+      size: values.size,
+    });
+    setPoints([]);
+    setPicking(false);
+    setNotice(uneven ? 'Grade ajustada pela média dos dois lados. Confira o alinhamento ou marque outro quadrado.' : 'Grade ajustada em todo o mapa. Confira a prévia antes de aplicar.');
   }
 
   function moveCursor(event) {
@@ -57,6 +76,7 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
   }
 
   function updateField([key,,min,max], value) {
+    setSample(null);
     setInputs(previous=>({ ...previous,[key]:value }));
     const n = Number(value);
     if (value.trim() && Number.isFinite(n) && n >= min && n <= max) patch({[key]:n});
@@ -69,19 +89,6 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
     const point = new DOMPoint(event.clientX,event.clientY).matrixTransform(matrix.inverse());
     if (point.x < 0 || point.x > width || point.y < 0 || point.y > height) return;
     markPoint(point);
-  }
-
-  function calibrate() {
-    if (points.length !== 2) return;
-    const fit = fitCalibration(points[0],points[1],columns,rows);
-    if (!fit) {
-      setNotice('Marque dois cantos diferentes e use uma célula entre 20 e 400 unidades.');
-      return;
-    }
-    const { uneven, ...values } = fit;
-    setSuggestion(values);
-    setPicking(false);
-    setNotice(uneven ? 'As medidas dos eixos diferem. Confira a prévia e refine o ajuste manualmente.' : 'Sugestão calculada. Confira as linhas antes de usar.');
   }
 
   async function detect() {
@@ -107,17 +114,21 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
   }
 
   return <section className="map-calibration" aria-label="Calibração da grade">
-    <div className="tabs-row">
-      <button type="button" className="outline" disabled={!image || Boolean(suggestion)} onClick={detect}>Detectar grade</button>
-      <button type="button" className="outline" disabled={Boolean(suggestion)} aria-pressed={picking} onClick={() => {
+    <div className="map-calibration-tools">
+      <button type="button" className={picking ? 'outline' : 'primary'} disabled={Boolean(suggestion)} aria-pressed={picking} onClick={() => {
         setPicking(!picking);
         setPoints([]);
+        setSample(null);
         setNotice('');
-        setCursor({x:width/2,y:height/2});
-      }}>{picking ? 'Cancelar marcação' : 'Marcar cantos'}</button>
-      <label className="map-zoom">Zoom <select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Mapa inteiro</option><option value={1.5}>150%</option><option value={2}>200%</option></select></label>
+        setCursor(null);
+      }}>{picking ? 'Cancelar marcação' : 'Ajustar por um quadrado'}</button>
+      <button type="button" className="quiet" disabled={!image || Boolean(suggestion) || picking} onClick={detect}>Detectar automaticamente</button>
+      <label className="map-zoom">Zoom <select value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Mapa inteiro</option><option value={2}>200%</option><option value={4}>400%</option><option value={8}>800%</option></select></label>
     </div>
-    {picking && <p id={hintId} className="map-calibration-hint">Marque dois cantos opostos. Com teclado, use as setas (Shift para mover mais rápido) e Enter para marcar.</p>}
+    <p id={hintId} role="status" className="map-calibration-hint">
+      {picking ? (points.length ? '2 de 2 · Marque o canto oposto do mesmo quadrado.' : '1 de 2 · Marque um canto de um quadrado do mapa.') : 'Use um quadrado do mapa como referência para alinhar toda a grade.'}
+      {picking && <small> Pelo teclado, mova com as setas (Shift para acelerar) e marque com Enter.</small>}
+    </p>
     <div ref={preview} className={`map-preview${zoom>1 ? ' is-zoomed' : ''}`}>
       <svg ref={svg} viewBox={`0 0 ${width} ${height}`} style={zoom>1 ? {width:`${zoom*100}%`} : undefined}
         onClick={choosePoint} onKeyDown={moveCursor} tabIndex={picking ? 0 : undefined}
@@ -129,6 +140,8 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
           {gridLines(width,displayed.size,displayed.x).map(x=><line key={x} x1={x} x2={x} y1={0} y2={height} vectorEffect="non-scaling-stroke"/>)}
           {gridLines(height,displayed.size,displayed.y).map(y=><line key={y} y1={y} y2={y} x1={0} x2={width} vectorEffect="non-scaling-stroke"/>)}
         </g>}
+        {!picking && sample && !suggestion && <rect x={sample.x} y={sample.y} width={sample.size} height={sample.size}
+          fill="none" stroke="#ffcf63" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
         {picking && cursor && <g stroke="#ffcf63" strokeWidth="3">
           <line x1={0} x2={width} y1={cursor.y} y2={cursor.y} vectorEffect="non-scaling-stroke"/>
           <line x1={cursor.x} x2={cursor.x} y1={0} y2={height} vectorEffect="non-scaling-stroke"/>
@@ -136,23 +149,19 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
         {picking && points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={Math.max(width,height)/140} fill="#ffcf63" stroke="#191923" strokeWidth={3}/>)}
       </svg>
     </div>
-    {picking && <div className="map-fields">
-      <p role="status">{points.length}/2 cantos marcados</p>
-      <label className="field">Colunas <input type="number" min="1" max="100" value={columns} onChange={e=>setColumns(Math.max(1,Math.min(100,Math.trunc(Number(e.target.value))||1)))} /></label>
-      <label className="field">Linhas <input type="number" min="1" max="100" value={rows} onChange={e=>setRows(Math.max(1,Math.min(100,Math.trunc(Number(e.target.value))||1)))} /></label>
-      <button type="button" className="outline" disabled={points.length!==2} onClick={calibrate}>Calcular ajuste</button>
-    </div>}
     {notice && <p role="status">{notice}</p>}
     {suggestion && <div className="map-suggestion callout">
       <p>Na prévia: célula {rounded(displayed.size)}, deslocamento {rounded(displayed.x)} × {rounded(displayed.y)}.</p>
       <div className="tabs-row">
         <button type="button" className="primary" onClick={() => {
-          patch(suggestion); setInputs({}); setSuggestion(null); setNotice('Valores aceitos na prévia. Aplique no tabuleiro ou salve na biblioteca para gravar.');
+          patch(suggestion); setSample(null); setInputs({}); setSuggestion(null); setNotice('Valores aceitos na prévia. Aplique no tabuleiro ou salve na biblioteca para gravar.');
         }}>Usar na prévia</button>
         <button type="button" className="outline" onClick={() => { setSuggestion(null); setNotice('Sugestão descartada.'); }}>Descartar sugestão</button>
       </div>
     </div>}
-    <div className="map-fields">
+    <details className="map-advanced">
+      <summary>Ajustes finos e exibição</summary>
+      <div className="map-fields">
       {fields.map(field => {
         const [key,label,min,max] = field;
         const invalid = invalidField(field);
@@ -169,6 +178,7 @@ export default function MapCalibration({ image, size, grid, setGrid, onPendingSu
       <label className="field">Opacidade da grade <input type="range" min="0.05" max="1" step="0.01" value={grid.opacity} onChange={e=>patch({opacity:Number(e.target.value)})}/></label>
       <label className="check"><input type="checkbox" checked={grid.visible} onChange={e=>patch({visible:e.target.checked})}/> Mostrar grade</label>
       <label className="check"><input type="checkbox" checked={grid.snap} onChange={e=>patch({snap:e.target.checked})}/> Encaixar tokens</label>
-    </div>
+      </div>
+    </details>
   </section>;
 }

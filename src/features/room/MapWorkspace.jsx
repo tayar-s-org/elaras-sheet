@@ -159,12 +159,14 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
     <div className="modal map-workspace">
       <header className="row"><h2 id="map-workspace-title">Mapas e grade</h2><button type="button" className="quiet" disabled={busy} onClick={closeWorkspace}>Fechar</button></header>
       <div className="map-workspace-body">
-      <nav className="tabs-row" aria-label="Ferramentas de mapa">
-        <button type="button" className={view==='generate'?'primary':'outline'} disabled={busy} aria-pressed={view==='generate'} onClick={()=>setView('generate')}>Gerar mapa</button>
-        <button type="button" className={view==='library'?'primary':'outline'} disabled={busy} aria-pressed={view==='library'} onClick={()=>setView('library')}>Biblioteca de mapas</button>
-        <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(board.map_path ? await readMapFile('maps',board.map_path) : null,null,true)))}>Ajustar grade atual</button>
-        {draft && view!=='calibrate' && <button type="button" className="outline" disabled={busy} onClick={()=>setView('calibrate')}>Voltar à prévia</button>}
-      </nav>
+      {view==='calibrate' || view==='import' ? <div className="map-section-heading">
+        <button type="button" className="quiet" disabled={busy} onClick={()=>setView('library')}>← Biblioteca</button>
+        <h3>{view==='import' ? 'Importar mapa' : draft?.current ? 'Ajustar grade atual' : name || 'Prévia do mapa'}</h3>
+      </div> : <nav className="map-navigation" aria-label="Ferramentas de mapa">
+        <button type="button" className="quiet" disabled={busy} aria-pressed={view==='library'} onClick={()=>setView('library')}>Biblioteca</button>
+        <button type="button" className="quiet" disabled={busy} aria-pressed={view==='generate'} onClick={()=>setView('generate')}>Gerador</button>
+        {draft && <button type="button" className="quiet" disabled={busy} onClick={()=>setView('calibrate')}>Retomar prévia</button>}
+      </nav>}
       {error && <p role="alert" className="callout">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={e=>{importFile(e.target.files?.[0]);e.target.value='';}} />
@@ -181,10 +183,17 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
         </div>
       </>}
       {view==='library' && <section className="map-library" aria-label="Mapas salvos">
-        <div className="tabs-row">
-          <button type="button" className="outline" disabled={busy} onClick={()=>setView('import')}>Importar para a biblioteca</button>
-          {board.map_path && <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(await readMapFile('maps',board.map_path),null,true)))}>Salvar mapa atual</button>}
-          {board.map_path && <button type="button" className="text-button danger" disabled={busy} onClick={removeMap}>Remover mapa do tabuleiro</button>}
+        <div className="map-active">
+          <div><h3>Tabuleiro da mesa</h3><p className="muted">{board.map_path ? 'Mapa em uso' : 'Sem imagem de mapa'}</p></div>
+          <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(board.map_path ? await readMapFile('maps',board.map_path) : null,null,true)))}>Ajustar grade atual</button>
+          {board.map_path && <details className="map-actions">
+            <summary>Mais ações</summary>
+            <button type="button" className="text-button danger" disabled={busy} onClick={removeMap}>Remover mapa do tabuleiro</button>
+          </details>}
+        </div>
+        <div className="map-section-heading">
+          <h3>Mapas salvos</h3>
+          <button type="button" className="primary" disabled={busy} onClick={()=>setView('import')}>Importar mapa</button>
         </div>
         {!entries && <p role="status">Carregando biblioteca…</p>}
         {entries?.length===0 && <p className="muted">Nenhum mapa salvo nesta mesa.</p>}
@@ -197,11 +206,16 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
             <button type="submit" className="primary" disabled={busy||!rename.name.trim()}>Salvar nome</button>
             <button type="button" className="quiet" disabled={busy} onClick={()=>setRename(null)}>Cancelar</button>
           </form> : <>
-            <strong>{entry.name}</strong> <small className="muted">Célula de {Number(boardGrid(entry.grid).size.toFixed(1))}</small>
-            <div className="tabs-row">
-              <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(await readSavedMap(entry.image_path),entry)))}>Prévia e carregamento</button>
-              <button type="button" className="quiet" disabled={busy} onClick={()=>setRename({id:entry.id,name:entry.name})}>Renomear</button>
-              <button type="button" className="text-button danger" disabled={busy} onClick={()=>deleteEntry(entry)}>Excluir</button>
+            <div className="map-entry-label"><strong>{entry.name}</strong><small className="muted">Célula de {Number(boardGrid(entry.grid).size.toFixed(1))}</small></div>
+            <div className="map-entry-controls">
+              <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(await readSavedMap(entry.image_path),entry)))}>Abrir prévia</button>
+              <details className="map-actions">
+                <summary aria-label={`Mais ações para ${entry.name}`}>Mais ações</summary>
+                <div className="tabs-row">
+                  <button type="button" className="quiet" disabled={busy} onClick={()=>setRename({id:entry.id,name:entry.name})}>Renomear</button>
+                  <button type="button" className="text-button danger" disabled={busy} onClick={()=>deleteEntry(entry)}>Excluir</button>
+                </div>
+              </details>
             </div>
           </>}
         </article>)}
@@ -218,7 +232,7 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
         {!pendingSuggestion && invalidFields && <p role="status">Corrija os campos da grade antes de gravar.</p>}
         <div className="tabs-row">
           {draft.file && <button type="button" className="outline" disabled={busy||!name.trim()||pendingSuggestion||invalidFields} onClick={()=>run(saveDraft)}>Salvar na biblioteca</button>}
-          <button type="button" className="primary" disabled={busy||pendingSuggestion||invalidFields} onClick={requestLoad}>{draft.current ? 'Aplicar grade ao tabuleiro' : 'Carregar no tabuleiro'}</button>
+          <button type="button" className="primary" disabled={busy||pendingSuggestion||invalidFields} onClick={requestLoad}>{draft.current ? 'Aplicar grade na mesa' : 'Carregar na mesa'}</button>
         </div>
       </footer>}
     </div>
