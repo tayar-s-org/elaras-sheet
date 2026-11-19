@@ -36,22 +36,18 @@ export default function SheetSummary({ c, d, tableId, cloudId }) {
             </div>}
           <div className="points">
             <div className="row" data-deficit={d.remaining < 0} data-ok={d.remaining === 0}>
-              <h3>Pontos de criação</h3>
-              <strong
-                className={
-                  d.remaining !== null && d.remaining < 0 ? "negative" : ""
-                }
-              >
-                {d.remaining ?? "—"}
-              </strong>
+              <div className="points-label">
+                <h3>Pontos de criação</h3>
+                <p>
+                  {d.remaining === null
+                    ? "Defina o orçamento em Identidade"
+                    : d.remaining < 0
+                      ? "Orçamento excedido"
+                      : d.remaining === 0 ? "Todos os pontos usados" : "Pontos disponíveis"}
+                </p>
+              </div>
+              <strong>{d.remaining ?? "—"}</strong>
             </div>
-            <p className="muted">
-              {d.remaining === null
-                ? "Defina os pontos iniciais em Identidade."
-                : d.remaining < 0
-                  ? "Você ultrapassou o orçamento definido."
-                  : "pontos disponíveis"}
-            </p>
             <div className="point-line point-total"><span>Total de pontos</span><b>{d.remaining + d.spent}</b></div>
             <div className="point-line point-total"><span>Pontos gastos</span><b>{d.spent}</b></div>
             {[
