@@ -35,7 +35,7 @@ export function createPdfBlob(character) {
     pdf.text(
       pdf
         .splitTextToSize(
-          clean(`${c.race} | ${c.concept || "Aventureiro de Manrakora"}`),
+          clean(`${c.race} | ${c.concept || "Aventureiro"}`),
           176,
         )
         .slice(0, 1),

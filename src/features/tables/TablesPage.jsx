@@ -65,7 +65,7 @@ function CreateTab() {
   return <form className="join-form" onSubmit={submit}>
     <label className="field"><span>Nome da mesa</span><input required maxLength={100} value={form.name} onChange={e => set('name', e.target.value)} /></label>
     <label className="field"><span>Descrição</span><textarea rows="3" maxLength={2000} value={form.description} onChange={e => set('description', e.target.value)} /></label>
-    <label className="field"><span>Sistema</span><select disabled value="sw"><option value="sw">Savage Worlds (mesa Manrakora)</option></select></label>
+    <label className="field"><span>Sistema</span><select disabled value="sw"><option value="sw">Savage Worlds</option></select></label>
     <label className="field"><span>Visibilidade</span>
       <select value={form.visibility} onChange={e => set('visibility', e.target.value)}>
         <option value="private">Privada (só por convite)</option>
