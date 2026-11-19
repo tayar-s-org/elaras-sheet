@@ -40,15 +40,16 @@ export default function CreaturePeek({ token, isGm, onAdjust, onRemove, onClose,
       {onDuplicate && <button type="button" className="outline creature-dup" aria-label={`Duplicar ${shownName}`} title="Duplicar esta criatura" onClick={onDuplicate}>⧉</button>}
       {onRemove && <button type="button" className="outline creature-delete" aria-label={`Apagar o token ${token.name || 'da criatura'}`} title="Apagar este token do tabuleiro" onClick={onRemove}>🗑</button>}
     </div>}
+    {children}
     {!isGm && effects.length > 0 && <EffectEditor effects={effects} />}
-    {isGm && onToggleName && <div className="creature-flags">
+    {isGm && onToggleName && <details className="creature-flags">
+      <summary>Efeitos e visibilidade{effects.length ? ` (${effects.length})` : ''}</summary>
       <label className="check"><input type="checkbox" checked={nameHidden} disabled={busy} onChange={e => onToggleName(e.target.checked)} />
         Ocultar nome e foto dos jogadores (aparece “?”)</label>
       <div>
         <h5 className="creature-section-title">Efeitos</h5>
         <EffectEditor effects={effects} disabled={busy} onAdd={onAddEffect} onRemove={onRemoveEffect} />
       </div>
-    </div>}
-    {children}
+    </details>}
   </aside>;
 }

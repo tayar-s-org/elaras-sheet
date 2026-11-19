@@ -51,3 +51,10 @@
 .token-set summary { cursor: pointer; }
 
 .creature-sheet-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.token-basics { margin-block: 16px; }
+.token-appearance > summary { cursor: pointer; font-weight: 700; }
+.token-actions { flex-wrap: wrap; }
+.token-actions > p { flex: 1 0 100%; margin: 0; }
+.token-field-error { color: var(--danger); font-size: .875rem; }
+.token-maker [aria-invalid="true"] { border-color: var(--danger); }

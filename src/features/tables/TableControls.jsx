@@ -56,13 +56,9 @@ function GmPanel({ table, me, members, reload, run, showJoinApprovals }) {
   const patch = changes => run(async () => { await updateTable(table.id, changes); await reload(); });
   const decide = (userId, status) => run(async () => { await decideMember(table.id, userId, status); await reload(); });
   return <>
-    {me?.status === 'approved' && <section className="item-card">
-      <h3>Jogar também</h3>
-      <p className="muted">Escolha uma ficha sua para jogar nesta mesa além de mestrar. Na sala, ela ganha token no tabuleiro e rolagens com os atributos da ficha.</p>
-      <CharacterPicker table={table} me={me} reload={reload} run={run} />
-    </section>}
     <section className="item-card">
-      <h3>Controle da mesa</h3>
+      <h3>Administração da mesa</h3>
+      <p className="muted">Gerencie o acesso e os convites aqui. Na sala, use o tabuleiro para preparar e jogar com criaturas.</p>
       <div className="form-grid">
         <label className="field"><span>Estado</span>
           <select value={table.status} onChange={e => patch({ status: e.target.value })}>
@@ -92,6 +88,11 @@ function GmPanel({ table, me, members, reload, run, showJoinApprovals }) {
         <button className="text-button danger" onClick={() => window.confirm(`Remover ${m.profiles?.display_name} da mesa?`) && decide(m.user_id, 'kicked')}>Expulsar</button>
       </div>)}
     </section>
+    {me?.status === 'approved' && <section className="item-card">
+      <h3>Sua ficha como jogador</h3>
+      <p className="muted">Escolha uma ficha sua para jogar nesta mesa além de mestrar. Na sala, ela ganha token no tabuleiro e rolagens com os atributos da ficha.</p>
+      <CharacterPicker table={table} me={me} reload={reload} run={run} />
+    </section>}
     <section className="danger-zone" aria-label="Zona de perigo">
       <h3>Zona de perigo</h3>
       <p>Apagar a mesa remove tabuleiro, chat, rotinas e tudo o que ela guarda, para todos os jogadores. Antes de apagar, o app pede para você digitar o nome da mesa.</p>

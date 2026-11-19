@@ -58,6 +58,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const [tokenOverride, setTokenOverride] = useState({}); // ficha -> imagem recém-salva, até a leitura periódica das fichas trazer a nova
   const [busy, setBusy] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
+  const [presetNotice, setPresetNotice] = useState("");
   const [audioOpen, setAudioOpen] = useState(null);
   const gesture = useRef(null);
   const lastSend = useRef(0);
@@ -280,11 +281,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   };
   const removeTokenEffect = (token, id) => patchCreature(token, { effects: removeEffect(token.effects, id) });
   const editCreature = async token => {
-    try {
-      const details = await loadCreatureDetails(token.id);
-      setMasterOpen(false);
-      setMaker({ creature: true, token, details });
-    } catch (err) { setError(err.message); }
+    const details = await loadCreatureDetails(token.id);
+    setMasterOpen(false);
+    setMaker({ creature: true, token, details });
   };
 
   const saveCreature = async (blob, extra) => {
@@ -430,7 +429,9 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
           <button className="outline" onClick={() => setMaker({ token: myToken || null })}>{myToken || sheetImage(myCharacter) ? 'Editar token' : 'Criar token'}</button>
         </div>}
         {isGm && <div role="group" aria-label="Mestre" className="tabs-row">
-          <button type="button" className="outline master-button" onClick={() => setMasterOpen(true)}>Módulo do mestre</button>
+          <button type="button" className="primary" onClick={() => setMaker({ creature: true })}>Nova criatura</button>
+          <button type="button" className="outline" onClick={() => { setPresetNotice(""); setMasterOpen("presets"); }}>Predefinições</button>
+          <button type="button" className="outline master-button" onClick={() => setMasterOpen('map')}>Mapa e tokens</button>
           <button type="button" className="outline music-button" onClick={() => setAudioOpen('music')}>Música</button>
           <button type="button" className="outline sound-button" onClick={() => setAudioOpen('sound')}>Soundpad</button>
         </div>}
@@ -518,15 +519,24 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     {error && <p role="alert" className="muted">{error}</p>}
     {isGm && audioOpen && <AudioModal kind={audioOpen} board={board} pad={pad} local={local} setError={setError} onClose={() => setAudioOpen(null)} />}
     {isGm && masterOpen && <MasterModule board={board} tokens={tokens} marks={marks} members={members} characters={characters}
-      selected={sel} onSelect={setSelected} room={room} local={local} setError={setError} onClose={() => setMasterOpen(false)}
-      onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, token: null }); }}
+      selected={sel} onSelect={setSelected} room={room} local={local} mode={masterOpen} initialNotice={masterOpen === "presets" ? presetNotice : ""}
+      onGoToToken={token => {
+        setSelected(token.id);
+        setView(previous => {
+          const width = previous?.w || W;
+          return { w: width, x: token.x - width / 2, y: token.y - width * svgRatio() / 2 };
+        });
+        svgRef.current?.scrollIntoView({ block: 'nearest' });
+      }}
+      onClose={() => setMasterOpen(false)}
+      onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, fromPresets: masterOpen === "presets" }); }}
       onEditPreset={preset => { setMasterOpen(false); setMaker({ creature: true, preset, details: preset.details }); }}
-      onEditImage={t => {
-        if (creatureOf(t)) editCreature(t);
+      onEditImage={async t => {
+        if (creatureOf(t)) await editCreature(t);
         else { setMasterOpen(false); setMaker({ token: t }); }
       }} />}
     {maker && <TokenMaker name={maker.preset?.name || maker.token?.name || characters[myCharacter]?.name || ''}
-      saveLabel={maker.preset ? 'Salvar predefinição' : maker.creature ? 'Salvar criatura' : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
+      saveLabel={maker.preset ? 'Salvar alterações' : maker.creature ? (maker.token ? 'Salvar alterações' : 'Colocar no mapa') : maker.token || isGm ? 'Salvar token' : 'Salvar e colocar'}
       imagePath={maker.creature ? maker.preset?.image_path || maker.token?.image_path
         : maker.token && maker.token.character_id !== myCharacter ? maker.token.image_path : sheetImage(myCharacter) || maker.token?.image_path}
       artwork={maker.creature ? maker.details?.artwork
@@ -537,10 +547,16 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         noHp: Boolean(creatureOf(maker.token)?.noHp), sheet: maker.details?.sheet,
         hideHp: maker.preset ? maker.details?.hideHp : Boolean(creatureOf(maker.token)?.hideHp),
         hideName: maker.preset ? maker.details?.hideName : isNameHidden(maker.token),
-        editing: Boolean(maker.token || maker.preset),
+        editing: Boolean(maker.token || maker.preset), preset: Boolean(maker.preset),
       } : undefined}
       onSave={saveTokenImage}
       onSavePreset={maker.creature && !maker.preset && !creatureOf(maker.token)?.noHp ? saveCreaturePreset : undefined}
-      onClose={() => setMaker(null)} />}
+      onClose={reason => {
+        if (maker.preset || (maker.fromPresets && reason !== "placed")) {
+          setPresetNotice(maker.preset && reason === "saved" ? "Predefinição atualizada." : "");
+          setMasterOpen("presets");
+        }
+        setMaker(null);
+      }} />}
   </div>;
 }

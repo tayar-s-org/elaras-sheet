@@ -1,8 +1,27 @@
 import React from 'react';
+import { parseFormula } from '../../diceRoll.js';
 import { ATTRIBUTES } from '../../rules.js';
 
-export default function CreatureSheetFields({ value, onChange }) {
+export function creatureFieldErrors(value) {
+  const errors = {};
+  const check = (key, formula) => {
+    if (!formula?.trim()) return;
+    try { parseFormula(formula); } catch (error) { errors[key] = error.message; }
+  };
+  ATTRIBUTES.forEach(attr => check(`attr-${attr}`, value.attributes?.[attr]));
+  for (const [list, fields] of [['skills', ['formula']], ['attacks', ['attack', 'damage']]]) {
+    (value[list] || []).forEach((row, index) => {
+      fields.forEach(field => check(`${list}-${index}-${field}`, row[field]));
+      if (!row.name?.trim() && fields.some(field => row[field]?.trim())) errors[`${list}-${index}-name`] = 'Informe um nome para esta linha.';
+    });
+  }
+  return errors;
+}
+
+export default function CreatureSheetFields({ value, onChange, errors }) {
   const patch = fields => onChange({ ...value, ...fields });
+  const errorText = key => errors[key] && <small id={`creature-error-${key}`} className="token-field-error">{errors[key]}</small>;
+  const errorProps = key => errors[key] ? { 'aria-invalid': true, 'aria-describedby': `creature-error-${key}` } : {};
   function rows(key, title, fields) {
     const entries = value[key] || [];
     return <fieldset className="token-set">
@@ -10,22 +29,24 @@ export default function CreatureSheetFields({ value, onChange }) {
       {entries.map((entry, index) => <div className="form-grid compact" key={index}>
         {fields.map(([field, label, placeholder]) => <label className="field" key={field}>
           <span>{label} {index + 1}</span>
-          <input value={entry[field] || ''} maxLength={field === 'name' ? 60 : 80} placeholder={placeholder}
+          <input value={entry[field] || ''} maxLength={field === 'name' ? 60 : 80} placeholder={placeholder} {...errorProps(`${key}-${index}-${field}`)}
             onChange={event => patch({ [key]: entries.map((row, i) => i === index ? { ...row, [field]: event.target.value } : row) })} />
+          {errorText(`${key}-${index}-${field}`)}
         </label>)}
         <button type="button" className="text-button danger" onClick={() => patch({ [key]: entries.filter((_, i) => i !== index) })}>Remover {title.toLowerCase()} {index + 1}</button>
       </div>)}
       <button type="button" className="outline" disabled={entries.length >= 20} onClick={() => patch({ [key]: [...entries, {}] })}>Adicionar {title.toLowerCase()}</button>
     </fieldset>;
   }
-  return <details className="token-set">
+  return <details className="token-set" data-quick-sheet>
     <summary>Ficha rápida · só o mestre</summary>
     <div className="token-controls">
       <p className="muted">Preencha somente o que for usar. Ex.: 1d8+2 ou 1d6! para um dado explosivo.</p>
       <div className="form-grid compact">
         {ATTRIBUTES.map(attr => <label className="field" key={attr}><span>{attr}</span>
-          <input maxLength={80} placeholder="1d6" value={value.attributes?.[attr] || ''}
+          <input maxLength={80} placeholder="1d6" value={value.attributes?.[attr] || ''} {...errorProps(`attr-${attr}`)}
             onChange={event => patch({ attributes: { ...value.attributes, [attr]: event.target.value } })} />
+          {errorText(`attr-${attr}`)}
         </label>)}
         {[['parry', 'Aparar'], ['toughness', 'Resistência']].map(([field, label]) => <label className="field" key={field}>
           <span>{label}</span><input maxLength={12} value={value[field] || ''} onChange={event => patch({ [field]: event.target.value })} />

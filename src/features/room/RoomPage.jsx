@@ -89,7 +89,7 @@ export default function RoomPage({ auth, id }) {
   const tabs = [
     ['chat', 'Chat'], ['dice', 'Dados'], ['party', isGm ? 'Grupo' : 'Fichas'],
     ...(isGm ? [['items', pendingTotal ? `Aprovações (${pendingTotal})` : 'Aprovações']] : []),
-    ['table', 'Mesa'],
+    ['table', isGm ? 'Administração' : 'Mesa'],
   ];
   const activeTab = tabs.some(([key]) => key === tab) ? tab : 'chat';
   const run = async fn => {

@@ -1,4 +1,4 @@
-.master-module { width: min(680px, 94vw); max-height: 88vh; overflow-y: auto; display: grid; gap: 4px; }
+.master-module { width: min(680px, 100%); max-width: 100%; min-width: 0; max-height: min(88vh, calc(100dvh - 48px)); overflow-y: auto; display: grid; gap: 4px; }
 .master-head { align-items: center; }
 .master-head h2 { margin: 0; }
 .master-section { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); }
@@ -77,3 +77,26 @@
 .effect-free input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--field); color: var(--text); font: inherit; }
 .name-hidden-note { color: var(--warning); }
 .board-token .token-effects text { font-size: inherit; }
+
+.master-head { flex-wrap: wrap; }
+.master-section, .master-section .item-card, .preset-item { min-width: 0; }
+.master-module .preset-name { overflow-wrap: anywhere; min-width: 0; }
+.creature-sheet { display: grid; gap: 8px; padding-block: 8px; }
+.creature-sheet-heading, .creature-roll-action { display: grid; gap: 3px; }
+.creature-defenses { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
+.creature-defenses div { display: flex; align-items: baseline; gap: 5px; }
+.creature-defenses dd { margin: 0; font-weight: 700; }
+.creature-attack { display: grid; gap: 5px; }
+.creature-flags > summary, .creature-sheet summary { cursor: pointer; }
+.creature-flags > summary { margin-bottom: 6px; }
+
+.preset-feedback { flex: 1 0 100%; }
+.preset-feedback p { margin: 0 0 6px; }
+@media (max-width: 540px) {
+  .master-module { padding: 16px; }
+  .master-module .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.preset-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+@media (max-width: 540px) {
+  .preset-actions { flex-basis: 100%; }
+}

@@ -80,7 +80,7 @@ export default function DicePanel({ tableId, me, members, characters, states, on
 
     <section className="dice2-section" aria-label="Rolar da ficha">
       <h4 className="dice2-title">Rolar da ficha</h4>
-      {!character ? <p className="muted">Vincule uma ficha sua na aba "Mesa" para rolar atributos e perícias.</p>
+      {!character ? <p className="muted">Vincule uma ficha sua nos controles da mesa para rolar atributos e perícias. Para rolar por uma criatura, selecione-a no tabuleiro.</p>
         : !trait ? <p className="muted">Não consegui ler a ficha vinculada. Abra a ficha e confira se ela está salva.</p> : <>
         <div className="dice2-char">{character.name || 'Sem nome'}</div>
         <label className="dice2-label"><span>Atributo ou perícia</span>

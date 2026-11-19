@@ -4,7 +4,7 @@ import { SHAPES, FRAMES, defaultDesign, drawToken, canvasToBlob, loadFrameImage 
 import { TOKEN_SIZE, tokenSourceUrl, tokenUrl } from '../../lib/tokens.js';
 import { CREATURE_FRAME, CREATURE_BG, parseHp, MAX_HP } from '../../creature.js';
 import { cleanCreatureSheet, CREATURE_SIZES, HEX_COLOR, tokenArtwork } from '../../tokenArtwork.js';
-import CreatureSheetFields from './CreatureSheetFields.jsx';
+import CreatureSheetFields, { creatureFieldErrors } from './CreatureSheetFields.jsx';
 import './token.css';
 
 const PREVIEW = 320;
@@ -30,6 +30,8 @@ function ColorControl({ label, value, onChange }) {
 }
 
 export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, saveLabel = 'Salvar token', creature, artwork, imagePath }) {
+  const editorRef = useRef(null);
+  const [attempted, setAttempted] = useState(false);
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const drag = useRef(null);
@@ -103,8 +105,20 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
     frameImage: design.frame === 'creature' ? frameImg : null,
     legacyBase: Boolean(legacyPath && !sourceFile && design.legacyBase && design.frame === 'none'),
   };
-  const ready = imageState === 'ready' && (design.frame !== 'creature' || Boolean(frameImg || frameFailed))
-    && (!creature || (cName.trim() && (parseHp(cHp) !== null || (creature.noHp && !cHp.trim()))));
+  const ready = imageState === 'ready' && (design.frame !== 'creature' || Boolean(frameImg || frameFailed));
+  const nameError = creature && !cName.trim();
+  const hpError = creature && parseHp(cHp) === null && (!creature.noHp || cHp.trim());
+  const fieldErrors = creature ? creatureFieldErrors(sheet) : {};
+  function validateFields() {
+    if (!nameError && !hpError && !Object.keys(fieldErrors).length) return true;
+    setAttempted(true);
+    if (Object.keys(fieldErrors).length) {
+      const details = editorRef.current?.querySelector('[data-quick-sheet]');
+      if (details) details.open = true;
+    }
+    requestAnimationFrame(() => editorRef.current?.querySelector('[aria-invalid="true"]')?.focus());
+    return false;
+  }
   useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, shown, image); });
 
   const loadFile = useCallback(file => {
@@ -174,7 +188,7 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
   }
 
   async function savePresetOnly() {
-    if (saving.current) return;
+    if (saving.current || !validateFields()) return;
     saving.current = true;
     setBusy(true);
     setError('');
@@ -187,14 +201,14 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
     setBusy(false);
   }
   async function save() {
-    if (saving.current) return;
+    if (saving.current || !validateFields()) return;
     saving.current = true;
     setBusy(true);
     setError('');
     try {
       const data = payload();
       await onSave(await render(), data);
-      onClose();
+      onClose(creature && !creature.editing ? "placed" : "saved");
     } catch (e) {
       setError(e.message);
       saving.current = false;
@@ -204,9 +218,30 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
 
   const drawnFrame = design.frame !== 'none' && design.frame !== 'creature';
   return <Modal onClose={onClose} aria-labelledby="token-title" busy={busy}>
-    <div className="modal token-maker">
-      <h2 id="token-title">{creature ? (creature.editing ? 'Editar criatura' : 'Criar criatura') : imagePath ? 'Editar token' : 'Criar token'}</h2>
-      <div className="token-maker-body">
+    <div className="modal token-maker" ref={editorRef}>
+      <h2 id="token-title">{creature ? (creature.preset ? 'Editar predefinição' : creature.editing ? 'Editar criatura' : 'Nova criatura') : imagePath ? 'Editar token' : 'Criar token'}</h2>
+        {creature && <div className="token-controls token-basics">
+          <div className="form-grid compact token-creature">
+            <label className="field"><span>Nome da criatura</span>
+              <input maxLength={60} value={cName} required aria-invalid={attempted && nameError || undefined} aria-describedby={attempted && nameError ? "creature-name-error" : undefined} placeholder="Ex.: Goblin, Dragão Vermelho" onChange={e => setCName(e.target.value)} />
+              {attempted && nameError && <small id="creature-name-error" className="token-field-error">Informe o nome da criatura.</small>}</label>
+            <label className="field"><span>Vida máxima</span>
+              <input type="number" min="1" max={MAX_HP} inputMode="numeric" value={cHp} required={!creature.noHp} aria-invalid={attempted && hpError ? true : undefined} aria-describedby={attempted && hpError ? "creature-hp-error" : undefined} placeholder="Ex.: 30" onChange={e => setCHp(e.target.value)} />
+              {attempted && hpError && <small id="creature-hp-error" className="token-field-error">Use um inteiro entre 1 e {MAX_HP}.</small>}</label>
+            <label className="field"><span>Tamanho no mapa</span>
+              <select value={size} onChange={e => setSize(Number(e.target.value))}>
+                {!CREATURE_SIZES.some(([value]) => value === size) && <option value={size}>{size}× · tamanho atual</option>}
+                {CREATURE_SIZES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="check token-nohp"><input type="checkbox" checked={hideHp} onChange={e => setHideHp(e.target.checked)} /> Mostrar vida apenas ao mestre</label>
+            <label className="check token-nohp"><input type="checkbox" checked={hideName} onChange={e => setHideName(e.target.checked)} /> Ocultar nome e foto dos jogadores</label>
+          </div>
+          {creature && <CreatureSheetFields value={sheet} onChange={setSheet} errors={attempted ? fieldErrors : {}} />}
+        </div>}
+      <details className="token-appearance" open={creature ? undefined : true}>
+        <summary>Aparência{creature ? ' · imagem opcional' : ''}</summary>
+        <div className="token-maker-body">
         <div className="token-stage">
           <div className={`token-drop${over ? ' over' : ''}`}
             onDragOver={e => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
@@ -222,22 +257,7 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
           <small className="muted">{image ? 'Arraste a imagem para enquadrar; a roda do mouse dá zoom.' : 'Arraste uma imagem até aqui, escolha um arquivo ou cole (Ctrl+V).'}</small>
         </div>
 
-        <div className="token-controls">
-          {creature && <div className="form-grid compact token-creature">
-            <label className="field"><span>Nome da criatura</span>
-              <input maxLength={60} value={cName} placeholder="Ex.: Goblin, Dragão Vermelho" onChange={e => setCName(e.target.value)} /></label>
-            <label className="field"><span>Vida máxima</span>
-              <input type="number" min="1" max={MAX_HP} inputMode="numeric" value={cHp} placeholder="Ex.: 30" onChange={e => setCHp(e.target.value)} /></label>
-            <label className="field"><span>Tamanho no mapa</span>
-              <select value={size} onChange={e => setSize(Number(e.target.value))}>
-                {!CREATURE_SIZES.some(([value]) => value === size) && <option value={size}>{size}× · tamanho atual</option>}
-                {CREATURE_SIZES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
-            <label className="check token-nohp"><input type="checkbox" checked={hideHp} onChange={e => setHideHp(e.target.checked)} /> Mostrar vida apenas ao mestre</label>
-            <label className="check token-nohp"><input type="checkbox" checked={hideName} onChange={e => setHideName(e.target.checked)} /> Ocultar nome e foto dos jogadores</label>
-          </div>}
-          {creature && <CreatureSheetFields value={sheet} onChange={setSheet} />}
+          <div className="token-controls">
           <label className="field"><span>Zoom</span>
             <input type="range" min="0.3" max="4" step="0.01" value={design.zoom} disabled={!image} onChange={e => patch({ zoom: Number(e.target.value) })} /></label>
           <label className="field"><span>Rotação ({design.rotate}°)</span>
@@ -272,15 +292,16 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
             {!creature && !image && <label className="field"><span>Iniciais (sem imagem)</span>
               <input maxLength={2} value={design.initials} onChange={e => patch({ initials: e.target.value })} /></label>}
           </fieldset>
+          </div>
         </div>
-      </div>
-      {error && <p role="alert" className="token-error">{error}</p>}
-      {note && <p role="status" className="muted">{note}</p>}
+      </details>
       <div className="row token-actions">
+        {error && <p role="alert" className="token-error">{error}</p>}
+        {note && <p role="status" className="muted">{note}</p>}
         <button type="button" className="quiet" disabled={busy} onClick={onClose}>Cancelar</button>
         <span className="token-actions-right">
           <button type="button" className="outline" disabled={busy || imageState !== 'ready'} onClick={download}>Baixar PNG</button>
-          {onSavePreset && <button type="button" className="outline" disabled={busy || !ready} title="Guarda a criatura nas predefinições sem colocá-la no mapa" onClick={savePresetOnly}>Salvar predefinição</button>}
+          {onSavePreset && <button type="button" className="outline" disabled={busy || !ready} title="Guarda a criatura nas predefinições sem colocá-la no mapa" onClick={savePresetOnly}>Salvar como predefinição</button>}
           {onSave && <button type="button" className="primary" disabled={busy || !ready || (!creature && !image && !design.initials)} onClick={save}>{busy ? 'Salvando…' : saveLabel}</button>}
         </span>
       </div>
