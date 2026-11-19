@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { navigate } from '../../lib/router.js';
+import { loginThen, navigate } from '../../lib/router.js';
 import { createTable, myMemberships, listPublic, joinPublic, joinByCode, STATUS_LABEL, MEMBER_LABEL } from '../../lib/tables.js';
 import JoinForm from './JoinForm.jsx';
 
@@ -81,8 +81,8 @@ function CreateTab() {
 
 function CodeTab() {
   const [code, setCode] = useState('');
-  return <JoinForm submitLabel="Entrar com o código" onSubmit={async ({ message, characterId }) => {
-    navigate(`/sala/${await joinByCode(code, message, characterId)}`);
+  return <JoinForm submitLabel="Enviar pedido com o código" onSubmit={async ({ message, characterId }) => {
+    navigate(`/mesa/${await joinByCode(code, message, characterId)}`);
   }}>
     <label className="field"><span>Código de convite</span>
       <input required maxLength={16} value={code} onChange={e => setCode(e.target.value)} autoCapitalize="characters" /></label>
@@ -95,7 +95,7 @@ export default function TablesPage({ auth }) {
   if (!auth.user) return <main className="page">
     <h1>Mesas</h1>
     <p className="muted">Entre na sua conta para criar mesas e participar das de outros jogadores.</p>
-    <button className="primary" onClick={() => navigate('/entrar')}>Entrar</button>
+    <button className="primary" onClick={() => loginThen('/mesas')}>Entrar</button>
   </main>;
   return <main className="page">
     <p className="eyebrow">JOGUE COM SEUS AMIGOS</p>

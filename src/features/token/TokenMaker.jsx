@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Modal from '../../ui/Modal.jsx';
 import { SHAPES, FRAMES, defaultDesign, drawToken, canvasToBlob, loadFrameImage } from './tokenArt.js';
 import { TOKEN_SIZE } from '../../lib/tokens.js';
 import { CREATURE_FRAME, CREATURE_BG, parseHp, MAX_HP } from '../../creature.js';
@@ -47,11 +48,6 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
 
   useEffect(() => { if (canvasRef.current) drawToken(canvasRef.current, PREVIEW, shown, image); }, [design, image, creature, cName, frameImg]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
 
   const loadFile = useCallback(file => {
     setError('');
@@ -125,8 +121,8 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
   }
 
   const frame = FRAMES.find(f => f.id === design.frame);
-  return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-    <div className="modal token-maker" role="dialog" aria-modal="true" aria-labelledby="token-title">
+  return <Modal onClose={onClose} aria-labelledby="token-title" busy={busy}>
+    <div className="modal token-maker">
       <h2 id="token-title">{creature ? (creature.editing ? 'Editar criatura' : 'Criar criatura') : 'Criador de token'}</h2>
       <div className="token-maker-body">
         <div className="token-stage">
@@ -198,5 +194,5 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
         </span>
       </div>
     </div>
-  </div>;
+  </Modal>;
 }

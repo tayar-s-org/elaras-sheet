@@ -25,7 +25,7 @@ export default function JoinForm({ onSubmit, submitLabel = 'Pedir para entrar', 
         <option value="">Escolher depois</option>
         {characters.map(c => <option key={c.id} value={c.id}>{c.name || 'Sem nome'}</option>)}
       </select>
-      {!characters.length && <small>Salve uma ficha na nuvem para vinculá-la à mesa.</small>}
+      <small>Você pode enviar o pedido sem ficha. Depois que a entrada for aprovada, crie ou vincule uma ficha a esta mesa.</small>
     </label>
     <label className="field"><span>Mensagem ao mestre (opcional)</span>
       <input maxLength={300} value={message} onChange={e => setMessage(e.target.value)} />

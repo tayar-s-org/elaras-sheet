@@ -3,7 +3,7 @@ import { cloudConfigured } from '../../lib/supabase.js';
 import { loginThen } from '../../lib/router.js';
 
 // Faixa de estado do salvamento. As fichas da conta aparecem como abas logo abaixo (abertas ao entrar).
-export default function CloudSheets({ auth, sheet, status, onSync, syncing }) {
+export default function CloudSheets({ auth, sheet, status, onSync, syncing, onDelete }) {
   const cloud = sheet.cloud;
   const dirty = cloud && JSON.stringify(sheet.character) !== cloud.base;
 
@@ -22,6 +22,7 @@ export default function CloudSheets({ auth, sheet, status, onSync, syncing }) {
       <span className={`save-status ${status?.state || 'idle'}`} role="status">{status?.state === 'saving' ? 'Salvando…' : status?.state === 'error' ? status.message : dirty ? 'Alterações serão salvas sozinhas…' : cloud ? `Salvo na nuvem · versão ${cloud.revision}` : sheet.tableId ? 'Ficha em branco (salva ao editar)' : 'Escolha a mesa para esta ficha ser salva'}</span>
       {onSync && <button type="button" className="outline" disabled={syncing} onClick={onSync}
         title="Traz a versão mais recente das suas fichas da nuvem e abre as que faltam">{syncing ? 'Sincronizando…' : 'Sincronizar com a nuvem'}</button>}
+      {onDelete && <button type="button" className="text-button danger" disabled={syncing} onClick={onDelete}>Excluir ficha…</button>}
     </div>
   </section>;
 }

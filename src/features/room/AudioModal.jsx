@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
+import Modal from '../../ui/Modal.jsx';
 import { updateBoard } from '../../lib/board.js';
 import { uploadMusic, removeMusicFile } from '../../lib/music.js';
 import { addSound, updateSound, deleteSound } from '../../lib/sounds.js';
@@ -14,11 +15,6 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
   const [busy, setBusy] = useState(false);
   const music = board.settings?.music;
 
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
 
   const run = async fn => {
     setBusy(true);
@@ -32,8 +28,8 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
     await updateBoard(board.id, { settings });
   };
 
-  return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-    <div className="modal master-module" role="dialog" aria-modal="true" aria-labelledby="audio-title">
+  return <Modal onClose={onClose} aria-labelledby="audio-title" busy={busy}>
+    <div className="modal master-module">
       <div className="row master-head">
         <h2 id="audio-title">{kind === 'music' ? 'Música da mesa' : 'Soundpad'}</h2>
         <button type="button" className="quiet" onClick={onClose}>Fechar</button>
@@ -75,5 +71,5 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
         </div>)}
       </section>}
     </div>
-  </div>;
+  </Modal>;
 }

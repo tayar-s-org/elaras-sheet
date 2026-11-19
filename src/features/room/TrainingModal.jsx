@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import Modal from '../../ui/Modal.jsx';
 import {
   loadRoutines, createRoutine, saveRoutine, submitRoutine, setRoutineStatus, deleteRoutine, TRAINING_STATUS,
 } from '../../lib/training.js';
@@ -71,12 +71,6 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
   const selectedRef = useRef(null);
   const dirtyId = useRef(null); // rotina minha com alteração ainda não salva
   const writes = useRef(0); // gravações do calendário em andamento (a leitura periódica não as atropela)
-
-  useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   // Primeira vez que o relógio chega: o calendário abre no mês da campanha.
   const tick = clock.tick;
@@ -237,8 +231,8 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
 
   const migrationHelp = <p className="callout">O novo sistema de rotinas e calendário ainda não está disponível neste servidor. O mestre da mesa precisa rodar a migration <code>0023_campaign_clock.sql</code> no Supabase.</p>;
 
-  return createPortal(<div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className="mod-editor training-modal" role="dialog" aria-modal="true" aria-labelledby="training-title">
+  return <Modal onClose={onClose} aria-labelledby="training-title">
+    <div className="mod-editor training-modal">
       <header className="mod-editor-head">
         <h2 id="training-title">{only === 'history' ? (isGm ? 'Treinamentos dos jogadores' : 'Ver Meus Treinamentos') : 'Rotina de Treino'}</h2>
         {clockReady && <span className="tr-clock" title="Data e hora da campanha, iguais para todos da mesa">{formatClock(tick)}</span>}
@@ -294,5 +288,5 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
         </>}
       </div>
     </div>
-  </div>, document.body);
+  </Modal>;
 }

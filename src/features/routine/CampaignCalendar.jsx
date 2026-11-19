@@ -40,7 +40,7 @@ export default function CampaignCalendar({ view, days, routines, tick, editable,
   };
   const toggle = dayNo => setSelected(prev => { const n = new Set(prev); if (n.has(dayNo)) n.delete(dayNo); else n.add(dayNo); return n; });
   const toggleWeek = week => {
-    const all = week.map(c => c.dayNo);
+    const all = week.map(c => c.dayNo).filter(canEdit);
     setSelected(prev => { const n = new Set(prev); const full = all.every(d => n.has(d)); all.forEach(d => (full ? n.delete(d) : n.add(d))); return n; });
   };
   const applyToSelected = id => { place([...selected], id); setSelected(new Set()); };
@@ -73,7 +73,7 @@ export default function CampaignCalendar({ view, days, routines, tick, editable,
 
     {editable && <div className="tc-palette" aria-label="Rotinas aprovadas">
       {approved.length ? <>
-        <p className="muted tc-hint">Arraste uma rotina até um dia, ou clique nela e depois clique (ou passe o mouse segurando) pelos dias. Para vários dias de uma vez, use <b>Selecionar dias</b>.</p>
+        <p className="muted tc-hint">Escolha uma rotina e use o número do dia para aplicá-la. Também vale arrastar ou passar o mouse segurando. Para vários dias de uma vez, use <b>Selecionar dias</b>.</p>
         <div className="tc-chips">
           {approved.map(r => <button key={r.id} type="button" draggable className={`tc-chip${activeBrush === r.id ? ' on' : ''}`} style={{ '--tc': colorOf(r.id) }}
             aria-pressed={activeBrush === r.id} title="Arraste para um dia ou clique para usar como pincel"
@@ -93,8 +93,8 @@ export default function CampaignCalendar({ view, days, routines, tick, editable,
       </> : <p className="muted tc-hint">Você ainda não tem rotinas aprovadas. Crie uma na aba <b>Rotinas</b>, envie para o mestre e, depois de aprovada, ela aparece aqui para ir aos dias.</p>}
     </div>}
 
-    <div className="tc-grid cc-grid" role="grid" aria-readonly={!editable}>
-      {WEEKDAY_LABELS.map(w => <div key={w} className="tc-wd" role="columnheader">{w}</div>)}
+    <div className="tc-grid cc-grid" role="group" aria-label="Dias do mês">
+      {WEEKDAY_LABELS.map(w => <div key={w} className="tc-wd">{w}</div>)}
       {grid.map((week, wi) => week.map(({ day, dayNo }, ci) => {
         const rid = days[dayNo];
         const r = rid ? byId[rid] : null;
@@ -102,21 +102,32 @@ export default function CampaignCalendar({ view, days, routines, tick, editable,
         const lock = locked(dayNo);
         const done = lock && dayNo < today ? (processed?.has?.(dayNo) ? 'done' : 'past') : '';
         const sel = selected.has(dayNo);
-        return <div key={dayNo} role="gridcell" aria-label={`Dia ${day}: ${STATE_TEXT[st]}${done ? ', já passou' : ''}`}
+        return <div key={dayNo} aria-label={`Dia ${day}: ${STATE_TEXT[st]}${done ? ', já passou' : ''}`}
           className={`tc-day s-${st}${dayNo === today ? ' today' : ''}${over === dayNo ? ' over' : ''}${editable && activeBrush && !lock ? ' paintable' : ''}${sel ? ' picked' : ''}${lock ? ' locked' : ''}${done ? ` ${done}` : ''}${highlight?.includes(dayNo) ? ' flag' : ''}`}
           onDragOver={e => { if (canEdit(dayNo)) { e.preventDefault(); setOver(dayNo); } }} onDragLeave={() => setOver(o => (o === dayNo ? null : o))} onDrop={e => drop(e, dayNo)}
           onMouseDown={e => {
-            if (e.button !== 0 || !editable || e.target.closest('button')) return;
+            if (e.button !== 0 || !canEdit(dayNo) || e.target.closest('button')) return;
             if (selecting) { toggle(dayNo); return; }
             if (activeBrush) { painting.current = true; place([dayNo], activeBrush); }
           }}
           onMouseEnter={() => { if (painting.current && activeBrush) place([dayNo], activeBrush); }}>
-          <span className="tc-num">{day}{ci === 0 && editable && selecting && <button type="button" className="cc-week" aria-label={`Selecionar a semana ${wi + 1}`} onClick={() => toggleWeek(week)}>sem. {wi + 1}</button>}</span>
+          <div className="cc-day-head">
+            {canEdit(dayNo) && (selecting || activeBrush) ? <button
+              type="button"
+              className="outline cc-day-action"
+              aria-pressed={selecting ? sel : undefined}
+              aria-label={selecting ? `Dia ${day}, ${STATE_TEXT[st]}` : `Aplicar ${label(byId[activeBrush])} no dia ${day}, ${STATE_TEXT[st]}`}
+              onClick={() => selecting ? toggle(dayNo) : place([dayNo], activeBrush)}
+            >{day}</button> : <span className="tc-num">{day}</span>}
+            {ci === 0 && editable && selecting && <button type="button" className="cc-week"
+              aria-label={`Selecionar a semana ${wi + 1}`} disabled={!week.some(c => canEdit(c.dayNo))}
+              onClick={() => toggleWeek(week)}>Sem. {wi + 1}</button>}
+          </div>
           {rid && <div className={`tc-slot${r ? '' : ' stale'}${r && !activeBrush && !selecting ? ' openable' : ''}`} style={{ '--tc': colorOf(rid) }}
-            role={r ? 'button' : undefined} tabIndex={r ? 0 : undefined}
+            role={r && !activeBrush && !selecting ? 'button' : undefined} tabIndex={r && !activeBrush && !selecting ? 0 : undefined}
             draggable={canEdit(dayNo) && r?.status === 'approved'} onDragStart={e => { e.dataTransfer.setData('text/plain', rid); e.dataTransfer.effectAllowed = 'copy'; }}
             onClick={() => { if (r && !activeBrush && !selecting && onOpen) onOpen(r.id); }}
-            onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && r && !activeBrush && !selecting && onOpen) { e.preventDefault(); onOpen(r.id); } }}
+            onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && r && !activeBrush && !selecting && onOpen) { e.preventDefault(); onOpen(r.id); } }}
             title={r ? `${label(r)} · ${STATE_TEXT[st]}${r.review_note && st === 'rejected' ? ` · ${r.review_note}` : ''} · clique para abrir a rotina` : 'Rotina removida'}>
             <span className="tc-slot-name">{r ? label(r) : 'Rotina removida'}</span>
             <small className={`cc-badge s-${st}`}>{STATE_TEXT[st]}</small>

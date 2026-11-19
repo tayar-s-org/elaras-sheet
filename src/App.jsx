@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
-import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, openCloudSheet, syncCloudSheets, sheetsLosingChanges, setSheetTable, applyTables } from "./sheets.js";
+import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, closeCloudTab, openCloudSheet, syncCloudSheets, sheetsLosingChanges, setSheetTable, applyTables } from "./sheets.js";
 import { fetchCloudRows } from "./features/library/syncCloud.js";
 import SheetTabs from "./SheetTabs.jsx";
 import MasterView from "./MasterView.jsx";
@@ -52,12 +52,18 @@ export default function App() {
     setSyncNote('');
     try {
       const rows = await fetchCloudRows();
-      const lost = sheetsLosingChanges(session, rows);
-      if (lost.length && !window.confirm(`${lost.length === 1 ? 'Uma ficha tem' : `${lost.length} fichas têm`} alterações que não foram salvas e a nuvem já tem uma versão mais nova. Descartar as alterações locais e usar a da nuvem?`)) return;
-      const result = syncCloudSheets(session, rows);
+      const current = sessionRef.current;
+      const conflicts = sheetsLosingChanges(current, rows);
+      if (conflicts.length && !window.confirm('A nuvem tem versões mais novas. Carregar essas versões e guardar as alterações locais em abas de cópia?')) return;
+      const result = syncCloudSheets(current, rows);
+      for (const sheet of conflicts) {
+        const copy = { ...sheet.character, name: sheet.character.name ? `${sheet.character.name.slice(0, 85)} (cópia local)` : 'Cópia local' };
+        result.session = { ...openSheet(result.session, copy), activeId: result.session.activeId };
+      }
       setSession(result.session);
       autosave.unblock();
-      setSyncNote(result.updated.length || result.added.length ? `Sincronizado: ${result.updated.length} atualizada(s), ${result.added.length} aberta(s).` : 'Tudo já está em dia com a nuvem.');
+      setSyncNote(conflicts.length ? 'Versões da nuvem carregadas. As alterações locais ficaram em abas de cópia.'
+        : result.updated.length || result.added.length ? `Sincronizado: ${result.updated.length} atualizada(s), ${result.added.length} aberta(s).` : 'Tudo já está em dia com a nuvem.');
     } catch (e) { setSyncNote(`Não foi possível sincronizar: ${e.message}`); } finally { setSyncing(false); }
   };
   const c = session.sheets.find(s => s.id === activeId).character;
@@ -131,10 +137,10 @@ export default function App() {
         if (alive) setSession(prev => applyTables(prev, mine)); // mesa de cada ficha segundo a nuvem
         for (const row of mine.slice(0, 30)) {
           if (!alive) return;
-          if (sessionRef.current.sheets.some(s => s.cloud?.id === row.id)) continue;
+          if (sessionRef.current.closedCloudIds?.includes(row.id) || sessionRef.current.sheets.some(s => s.cloud?.id === row.id)) continue;
           const full = await getCharacter(row.id);
           if (!alive) return;
-          setSession(prev => prev.sheets.some(s => s.cloud?.id === row.id) ? prev : { ...openCloudSheet(prev, full), activeId: prev.activeId });
+          setSession(prev => prev.closedCloudIds?.includes(row.id) || prev.sheets.some(s => s.cloud?.id === row.id) ? prev : { ...openCloudSheet(prev, full), activeId: prev.activeId });
         }
       } catch { /* a lista tenta de novo no proximo carregamento */ }
     })();
@@ -222,7 +228,7 @@ export default function App() {
     </main> : null)
     : route === "/entrar" ? <AuthPage auth={auth} />
     : route === "/mesas" ? <TablesPage auth={auth} />
-    : route.startsWith("/mesa/") ? <TablePage auth={auth} id={route.slice(6)} />
+    : route.startsWith("/mesa/") ? <TablePage key={route} auth={auth} id={route.slice(6)} />
     : route.startsWith("/sala/") ? <RoomPage auth={auth} id={route.slice(6)} />
     : route.startsWith("/convite/") ? <InvitePage auth={auth} code={route.slice(9)} />
     : <HomePage auth={auth} />;
@@ -230,18 +236,38 @@ export default function App() {
   return (
     <>
       {topbar}
-      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} onSync={auth.user ? syncNow : undefined} syncing={syncing} />
+      <CloudSheets status={autosave} auth={auth} sheet={session.sheets.find(s=>s.id===activeId)} onSync={auth.user ? syncNow : undefined} syncing={syncing}
+        onDelete={activeSheet?.cloud ? () => setConfirm({
+          title: 'Excluir esta ficha da conta?',
+          text: 'A exclusão é permanente e remove o vínculo com a mesa.',
+          actionLabel: 'Excluir ficha',
+          danger: true,
+          action: async () => {
+            try {
+              await deleteCharacter(activeSheet.cloud.id);
+              setSession(prev => closeSheet(prev, activeSheet.id));
+            } catch (error) { setToast('Não foi possível excluir a ficha. ' + error.message); }
+          },
+        }) : undefined} />
       {syncNote && <p className="muted" role="status" style={{margin:'4px 16px'}}>{syncNote}</p>}
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}
         onNew={() => addCharacter(newCharacter())} master={master} onMaster={() => setMaster(value => !value)}
         onClose={id => {
           const sheet = session.sheets.find(s => s.id === id);
-          setConfirm(sheet?.cloud
-            ? {title:"Apagar esta ficha?",text:"A ficha será apagada da sua conta e não poderá ser recuperada. Se ela estiver vinculada a uma mesa, o vínculo some também.",action:async () => {
-              try { await deleteCharacter(sheet.cloud.id); setSession(prev => closeSheet(prev,id)); }
-              catch (error) { setToast("Não foi possível apagar a ficha. " + error.message); }
-            }}
-            : {title:"Fechar esta ficha?",text:"Ela ainda não foi salva na sua conta e será descartada.",action:() => setSession(prev => closeSheet(prev,id))});
+          if (!sheet) return;
+          if (sheet.cloud) {
+            if (JSON.stringify(sheet.character) !== sheet.cloud.base) {
+              setToast('Esta ficha tem alterações locais. Aguarde o salvamento ou use Sincronizar com a nuvem antes de fechar.');
+              return;
+            }
+            setSession(prev => closeCloudTab(prev, id));
+            return;
+          }
+          if (sheet.tableId && auth.user) {
+            setToast('Aguarde a ficha ser salva na conta antes de fechar a aba.');
+            return;
+          }
+          setConfirm({title:"Descartar esta ficha local?",text:"O rascunho será removido deste navegador.",actionLabel:"Descartar rascunho",danger:true,action:() => setSession(prev => closeSheet(prev,id))});
         }} />
       {master ? <MasterView sheets={session.sheets} onEdit={id => {setSession(prev => ({...prev,activeId:id}));setMaster(false);}} /> : <main className="layout">
         <aside className="sidebar">
@@ -282,11 +308,10 @@ export default function App() {
             >
               Usar exemplo da Elara
             </button>
-            <button className="text-button" onClick={() => addCharacter(newCharacter())}>Nova ficha em outra aba</button>
             <small>
               {storageError
                 ? "Rascunho local indisponível neste navegador."
-                : "As fichas ficam salvas na sua conta."}
+                : activeSheet?.cloud ? "Esta ficha está vinculada à sua conta." : "Rascunho salvo neste navegador."}
             </small>
           </div>
         </aside>

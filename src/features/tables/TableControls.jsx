@@ -31,12 +31,27 @@ function CharacterPicker({ table, me, reload, run }) {
   </>;
 }
 
-function GmPanel({ table, me, members, reload, run }) {
+export function JoinApprovals({ table, members, reload, run }) {
+  const pending = members.filter(m => m.status === 'pending');
+  const decide = (userId, status) => run(async () => { await decideMember(table.id, userId, status); await reload(); });
+  return <section className="item-card" aria-label="Pedidos de entrada">
+    <h3>Pedidos de entrada ({pending.length})</h3>
+    {!pending.length && <p className="muted">Nenhum pedido pendente.</p>}
+    {pending.map(m => <div className="row" key={m.user_id}>
+      <span><strong>{m.profiles?.display_name}</strong>{m.message ? ` — “${m.message}”` : ''}</span>
+      <span>
+        <button className="primary" onClick={() => decide(m.user_id, 'approved')}>Aprovar</button>{' '}
+        <button className="outline" onClick={() => decide(m.user_id, 'rejected')}>Recusar</button>
+      </span>
+    </div>)}
+  </section>;
+}
+
+function GmPanel({ table, me, members, reload, run, showJoinApprovals }) {
   const [deleting, setDeleting] = useState(false);
   const [code, setCode] = useState('');
   const [copied, setCopied] = useState(false);
   useEffect(() => { getInviteCode(table.id).then(setCode).catch(() => {}); }, [table.id]);
-  const pending = members.filter(m => m.status === 'pending');
   const players = members.filter(m => m.role === 'player' && m.status === 'approved');
   const patch = changes => run(async () => { await updateTable(table.id, changes); await reload(); });
   const decide = (userId, status) => run(async () => { await decideMember(table.id, userId, status); await reload(); });
@@ -68,17 +83,7 @@ function GmPanel({ table, me, members, reload, run }) {
         <button className="outline" onClick={() => run(async () => setCode(await rotateInvite(table.id)))}>Gerar novo código</button>
       </div>
     </section>
-    <section className="item-card">
-      <h3>Pedidos de entrada ({pending.length})</h3>
-      {!pending.length && <p className="muted">Nenhum pedido pendente.</p>}
-      {pending.map(m => <div className="row" key={m.user_id}>
-        <span><strong>{m.profiles?.display_name}</strong>{m.message ? ` — “${m.message}”` : ''}</span>
-        <span>
-          <button className="primary" onClick={() => decide(m.user_id, 'approved')}>Aprovar</button>{' '}
-          <button className="outline" onClick={() => decide(m.user_id, 'rejected')}>Recusar</button>
-        </span>
-      </div>)}
-    </section>
+    {showJoinApprovals && <JoinApprovals table={table} members={members} reload={reload} run={run} />}
     <section className="item-card">
       <h3>Jogadores ({players.length}/{table.max_players})</h3>
       {!players.length && <p className="muted">Ainda não há jogadores aprovados.</p>}
@@ -100,7 +105,6 @@ function GmPanel({ table, me, members, reload, run }) {
 function PlayerPanel({ table, me, members, reload, run }) {
   const roster = members.filter(m => m.status === 'approved');
   return <>
-    {me.status === 'pending' && <div className="callout"><b>Aguardando aprovação do mestre</b><p>Você será avisado aqui quando o pedido for decidido.</p></div>}
     {me.status === 'approved' && <>
       <CharacterPicker table={table} me={me} reload={reload} run={run} />
       <section className="item-card"><h3>Participantes</h3>
@@ -113,8 +117,8 @@ function PlayerPanel({ table, me, members, reload, run }) {
 
 
 // Controles da mesa (mestre ou jogador); usados na pagina da mesa e na aba "Mesa" da sala.
-export default function TableControls({ table, me, members, reload, run, isGm }) {
-  if (isGm) return <GmPanel table={table} me={me} members={members} reload={reload} run={run} />;
+export default function TableControls({ table, me, members, reload, run, isGm, showJoinApprovals = true }) {
+  if (isGm) return <GmPanel showJoinApprovals={showJoinApprovals} table={table} me={me} members={members} reload={reload} run={run} />;
   if (me) return <PlayerPanel table={table} me={me} members={members} reload={reload} run={run} />;
   return null;
 }

@@ -50,6 +50,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   const ratioRef = useRef(0.6); // altura/largura do SVG na tela
   const [tool, setTool] = useState('move');
   const [selected, setSelected] = useState(null);
+  const [movingToken, setMovingToken] = useState(false);
+  const [moveNotice, setMoveNotice] = useState('');
   const [maker, setMaker] = useState(null); // { token } para um token existente, { token: null } para o meu token ainda sem lugar
   const [tokenOverride, setTokenOverride] = useState({}); // ficha -> imagem recém-salva, até a leitura periódica das fichas trazer a nova
   const [busy, setBusy] = useState(false);
@@ -169,7 +171,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   });
 
   function onPointerDown(e) {
-    if (e.button !== 0 || !view) return;
+    if (e.button !== 0 || !view || movingToken || gesture.current) return;
     const tokenEl = e.target.closest?.('[data-token]');
     const markEl = e.target.closest?.('[data-mark]');
     svgRef.current.setPointerCapture?.(e.pointerId);
@@ -179,10 +181,10 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         // Só um clique (sem arrastar) abre as informações do token; arrastar apenas move.
         const pt = toMap(e.clientX, e.clientY);
         local.beginDrag(t.id);
-        gesture.current = { type: 'token', id: t.id, dx: t.x - pt.x, dy: t.y - pt.y, half: tokenHalf(t), moved: false, sx: e.clientX, sy: e.clientY };
+        gesture.current = { type: 'token', pointerId: e.pointerId, id: t.id, start: { x: t.x, y: t.y }, dx: t.x - pt.x, dy: t.y - pt.y, half: tokenHalf(t), moved: false, sx: e.clientX, sy: e.clientY };
         return;
       }
-      if (tool === 'move' && t) { gesture.current = { type: 'tap', id: t.id }; return; }
+      if (tool === 'move' && t) { gesture.current = { type: 'tap', pointerId: e.pointerId, id: t.id }; return; }
       if (t) setSelected(t.id);
     }
     if (markEl && tool === 'marker') {
@@ -197,11 +199,11 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       return;
     }
     if (!tokenEl) setSelected(null);
-    gesture.current = { type: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
+    gesture.current = { type: 'pan', pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
   }
   function onPointerMove(e) {
     const g = gesture.current;
-    if (!g) return;
+    if (!g || g.pointerId !== e.pointerId) return;
     if (g.type === 'tap') return;
     if (g.type === 'pan') {
       const scale = view.w / svgRef.current.getBoundingClientRect().width;
@@ -223,12 +225,18 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   }
   async function onPointerUp(e) {
     const g = gesture.current;
+    if (!g || g.pointerId !== e.pointerId) return;
     gesture.current = null;
-    const cancelled = e?.type === 'pointercancel';
-    if (g?.type === 'tap') { if (!cancelled) setSelected(g.id); return; }
-    if (!g || g.type !== 'token') return;
+    const cancelled = e.type !== 'pointerup';
+    if (g.type === 'tap') { if (!cancelled) setSelected(g.id); return; }
+    if (g.type !== 'token') return;
     local.endDrag(g.id);
     if (!g.moved) { if (!cancelled) setSelected(g.id); return; }
+    if (cancelled) {
+      local.setTokens(prev => prev.map(t => t.id === g.id ? { ...t, ...g.start } : t));
+      room.sendBroadcast('drag', { id: g.id, done: true });
+      return;
+    }
     const final = grid.visible ? { x: keepIn(snapToGrid(g.x, gsize), g.half, W), y: keepIn(snapToGrid(g.y, gsize), g.half, H) } : { x: g.x, y: g.y };
     local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, ...final } : t)));
     room.sendBroadcast('drag', { id: g.id, ...final, done: true });
@@ -336,6 +344,36 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     }
   };
 
+  const tokenLabel = t => (t.character_id && characters[t.character_id]?.name) || displayName(t, isGm);
+
+  async function moveSelected(token, dx, dy, direction) {
+    if (movingToken || gesture.current || !canMove(token)) return;
+    const half = tokenHalf(token);
+    const x = grid.visible ? snapToGrid(token.x + dx * gsize, gsize) : token.x + dx * gsize;
+    const y = grid.visible ? snapToGrid(token.y + dy * gsize, gsize) : token.y + dy * gsize;
+    const next = {
+      x: dx ? keepIn(x, half, W) : token.x,
+      y: dy ? keepIn(y, half, H) : token.y,
+    };
+    if (next.x === token.x && next.y === token.y) {
+      setMoveNotice('O token chegou ao limite do mapa.');
+      return;
+    }
+    setMovingToken(true);
+    setError('');
+    setMoveNotice('');
+    try {
+      await updateToken(token.id, next);
+      local.setTokens(prev => prev.map(t => t.id === token.id ? { ...t, ...next } : t));
+      setMoveNotice(`${tokenLabel(token)}: movido para ${direction}.`);
+    } catch (err) {
+      setError(err.message);
+      local.reloadItems();
+    } finally {
+      setMovingToken(false);
+    }
+  }
+
   const visibleTokens = useMemo(() => tokens.filter(t => isGm || !t.hidden), [tokens, isGm]);
   const names = Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador']));
 
@@ -348,7 +386,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     for (let x = 0; x <= W; x += gsize) lines.push(<line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} />);
     for (let y = 0; y <= H; y += gsize) lines.push(<line key={`h${y}`} x1={0} y1={y} x2={W} y2={y} />);
   }
-  const sel = tokens.find(t => t.id === selected);
+  const sel = visibleTokens.find(t => t.id === selected);
   const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
 
   return <div className="board">
@@ -377,9 +415,24 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     {board.settings?.music && <MusicPlayer board={board} isGm={isGm} local={local} setError={setError} />}
     <SoundBar pad={pad} isGm={isGm} />
     <div className="board-wrap">
+    {visibleTokens.length > 0 && <div className="board-token-controls">
+      <label className="field">
+        <span>Selecionar token no mapa</span>
+        <select value={sel?.id || ''} onChange={e => { setSelected(e.target.value || null); setMoveNotice(''); }}>
+          <option value="">Nenhum token selecionado</option>
+          {visibleTokens.map(t => <option key={t.id} value={t.id}>{tokenLabel(t)}</option>)}
+        </select>
+      </label>
+      {sel && canMove(sel) && <div role="group" aria-label="Mover token uma célula" className="tabs-row">
+        {[['cima', 0, -1], ['esquerda', -1, 0], ['direita', 1, 0], ['baixo', 0, 1]].map(([direction, dx, dy]) =>
+          <button key={direction} type="button" className="outline" aria-disabled={movingToken}
+            onClick={() => moveSelected(sel, dx, dy, direction)}>Mover para {direction}</button>)}
+      </div>}
+      <span className="board-move-status muted" role="status">{movingToken ? 'Movendo token…' : moveNotice}</span>
+    </div>}
     <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img"
       aria-label="Tabuleiro compartilhado" onPointerDown={onPointerDown} onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+      onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onLostPointerCapture={onPointerUp}>
       <rect x="0" y="0" width={W} height={H} className="board-bg" />
       {mapSrc && <image href={mapSrc} x="0" y="0" width={W} height={H} preserveAspectRatio="none" />}
       <g className="board-grid">{lines}</g>
@@ -396,7 +449,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
         const badges = effectBadges(t.effects);
         const cr = creatureOf(t) || pcLife(t);
         // Token de personagem mostra o nome atual da ficha (o nome gravado no token é só o de quando foi colocado).
-        const label = (t.character_id && characters[t.character_id]?.name) || displayName(t, isGm);
+        const label = tokenLabel(t);
         return <g key={t.id} data-token={t.id} transform={`translate(${p.x} ${p.y})`}
           className={`board-token${canMove(t) ? ' movable' : ''}${selected === t.id ? ' selected' : ''}${t.hidden ? ' hidden-token' : ''}${cr && cr.hp === 0 ? ' defeated' : ''}`}>
           {src ? <>

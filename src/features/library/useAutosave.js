@@ -49,7 +49,7 @@ export function useAutosave(session, setSession, enabled) {
             setSession(prev => ({ ...prev, sheets: prev.sheets.map(s => (s.id === sheet.id && s.cloud?.revision === sheet.cloud.revision && JSON.stringify(s.character) === JSON.stringify(sheet.character) ? { ...s, character: fix.character, cloud: fix.cloud } : s)) }));
           } else if (error instanceof ConflictError) {
             blocked.current.add(sheet.id);
-            setStatus({ state: 'error', message: 'Esta ficha mudou em outro lugar. Feche esta aba da ficha e recarregue a página (F5): a versão da nuvem abre de novo como aba.' });
+            setStatus({ state: 'error', message: 'Esta ficha mudou em outro lugar. Use Sincronizar com a nuvem para carregar a versão atual e guardar suas alterações em uma cópia local.' });
           } else if (!sheet.cloud && sheet.tableId && /row-level security/i.test(error.message || '') && await lostTable(sheet.tableId)) {
             // A ficha foi criada para uma mesa da qual a pessoa não participa mais (saiu, foi removida, o pedido foi recusado ou a
             // mesa foi apagada): o banco recusa criá-la. Solta a ficha da mesa para ela poder ser ligada a outra, em vez de tentar para sempre.
