@@ -123,7 +123,7 @@ export default function HomePage({ auth }) {
   return <main className="home">
     <section className="hero">
       <div className="hero-copy">
-        <p className="eyebrow">CRÔNICAS DE MANRAKORA</p>
+        <p className="eyebrow">ASCENSIA RPG</p>
         <h1>Sua mesa de RPG, <em>onde você estiver</em></h1>
         <p className="lead">Fichas de Savage Worlds, salas em tempo real, dados que ninguém pode forjar e um tabuleiro para o grupo inteiro. Tudo no navegador, sem instalar nada.</p>
         <div className="cta-row">
@@ -180,6 +180,6 @@ export default function HomePage({ auth }) {
         <button className="outline big" onClick={goSheets}>Ver as fichas</button>
       </div>
     </Reveal>
-    <footer className="home-foot muted">Crônicas de Manrakora · ficha e mesa para Savage Worlds</footer>
+    <footer className="home-foot muted">Ascensia RPG · ficha e mesa para Savage Worlds</footer>
   </main>;
 }

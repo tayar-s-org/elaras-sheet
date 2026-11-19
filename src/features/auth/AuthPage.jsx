@@ -35,7 +35,7 @@ export default function AuthPage({ auth }) {
   }
   return <main className="auth-page">
     <form className="auth-card" onSubmit={submit}>
-      <p className="eyebrow">CRÔNICAS DE MANRAKORA</p>
+      <p className="eyebrow">ASCENSIA RPG</p>
       <h1>{register ? 'Criar conta' : 'Entrar'}</h1>
       <p className="muted">{register ? 'Guarde suas fichas na nuvem e jogue com seus amigos.' : 'Acesse suas fichas em qualquer dispositivo.'}</p>
       {register && <label className="field"><span>Nome de exibição</span>

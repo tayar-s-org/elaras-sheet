@@ -20,7 +20,7 @@ sudo tar -xzf "$archive" -C "$release" --no-same-owner
 sudo install -d -m 700 -o ubuntu -g ubuntu /var/lib/elara-fichas
 sudo tee "$service" >/dev/null <<EOF
 [Unit]
-Description=Fichas de Manrakora
+Description=Ascensia RPG
 After=network.target
 [Service]
 User=ubuntu

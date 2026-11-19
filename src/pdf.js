@@ -49,7 +49,7 @@ export function createPdfBlob(character) {
     pdf.setFontSize(8);
     pdf.setTextColor(100);
     pdf.text(
-      `Crônicas de Manrakora | Ficha editável no aplicativo | ${page}`,
+      `Ascensia RPG | Ficha editável no aplicativo | ${page}`,
       17,
       289,
     );

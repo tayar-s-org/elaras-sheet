@@ -13,11 +13,9 @@ export default function TopBar({ theme, setTheme, route = "/", auth, onSignOut }
   return (
     <header className="topbar">
       <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
-        <span className="brand-mark">✦</span>
+        <img className="brand-logo" src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="" width="60" height="60" />
         <span>
-          Crônicas de
-          <br />
-          <b>Manrakora</b>
+          <b>Ascensia</b> <span className="brand-sub">RPG</span>
         </span>
       </a>
       <nav className="nav-links" aria-label="Principal">

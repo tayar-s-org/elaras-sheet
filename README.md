@@ -1,4 +1,4 @@
-# Crônicas de Manrakora
+# Ascensia RPG
 
 ## Acesso de mestre e nomes repetidos
 
