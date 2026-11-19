@@ -113,10 +113,13 @@
 .mh-icon-opt.active { border-color: var(--accent); background: var(--selection); }
 
 /* Moedas e experiências em grupos separados, cada um com o seu rótulo */
-.holding-groups { @apply grid gap-[4px] mt-[4px]; }
-.holding-group { @apply flex flex-wrap items-center gap-[6px]; }
-.holding-label { @apply text-app-muted uppercase; font-size: .62rem; letter-spacing: .06em; min-width: 5.6em; }
-.holding-chips { @apply flex flex-wrap gap-[4px]; }
+/* Os rótulos formam uma coluna só (subgrade), então os selos das duas linhas começam alinhados; cada selo é ícone + valor centralizados */
+.holding-groups { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 6px 10px; @apply mt-[6px]; }
+.holding-group { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: center; }
+.holding-label { @apply text-app-muted uppercase; font-size: .62rem; letter-spacing: .06em; }
+.holding-chips { @apply flex flex-wrap gap-[6px]; }
+.holding-groups .holding-chips > * { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding-block: 2px; padding-inline: 10px; line-height: 1; font-variant-numeric: tabular-nums; }
+.holding-groups .holding-chips .xp-icon { width: 20px; height: 20px; flex: none; vertical-align: 0; }
 .summary-holding-group { @apply grid gap-[2px] m-[6px_0]; }
 .summary-holding-group .summary-holdings { margin: 0; }
 

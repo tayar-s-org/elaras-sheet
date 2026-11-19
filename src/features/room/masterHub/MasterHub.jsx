@@ -20,7 +20,7 @@ export default function MasterHub(props) {
   const [open, setOpen] = useState(null);
   const [shown, setShown] = useState(null);
   const [minimized, setMinimized] = useState(loadMin);
-  const [version, setVersion] = useState(null); // null: verificando · 0: falta a migração 0040 · 1: Central · 2: Central + Loja do Mestre
+  const [version, setVersion] = useState(null); // null: verificando · 0: falta a migração 0040 · 1: Central · 2: Central + Loja do Mestre · 3: + preço em $ (0043)
   const ready = version === null ? null : version >= 1;
   const regionId = useId();
   const [entry, setEntry] = useState(null); // pedido de abrir um módulo já numa seção (ex.: Itens › Loja do Mestre)
@@ -50,7 +50,7 @@ export default function MasterHub(props) {
   const module = MASTER_MODULES.find(m => m.key === (open || shown));
   const Body = module && MODULE_COMPONENTS[module.key];
   const openItemsShop = () => { setEntry({ view: 'shop' }); setOpen('items'); };
-  const ctx = { ...props, players, selectedPlayer, setSelectedPlayer, extras, shopReady: version >= 2, entry, openItemsShop };
+  const ctx = { ...props, players, selectedPlayer, setSelectedPlayer, extras, shopReady: version >= 2, moneyShop: version >= 3, entry, openItemsShop };
   const blocked = module?.needsHub && ready !== true;
   const pick = key => setOpen(prev => (prev === key ? null : key));
 

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CATEGORIES, MARKET_ITEMS } from '../../../../market/items.js';
 import CustomItemFields, { emptyItemForm, itemFromForm } from '../../../sheet/CustomItemFields.jsx';
 import { giveItems, upsertShopItem } from '../../../../lib/masterHub.js';
-import { saleOptions, priceText } from '../../../../market/shop.js';
+import { saleOptions, priceText, shopCurrency } from '../../../../market/shop.js';
 import ShopSaleOptions, { emptySale } from '../ShopSaleOptions.jsx';
 import ShopManager from './ShopManager.jsx';
 import ModuleTabs from '../ModuleTabs.jsx';
@@ -18,7 +18,7 @@ const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace('.', ',')} 
 // O item customizado usa o mesmo modelo dos itens da ficha (nome, peso, efeitos, descrição); imagem, categoria, valor e espaço de
 // equipamento não existem nesse modelo e por isso não são oferecidos.
 export default function ItemsModule({ ctx }) {
-  const { tableId, players, closed, extras, shopReady } = ctx;
+  const { tableId, players, closed, extras, shopReady, moneyShop } = ctx;
   const [sale, setSale] = useState(emptySale());
   const [view, setView] = useState(ctx.entry?.view === 'shop' ? 'shop' : 'deliver'); // deliver | shop
   const [tab, setTab] = useState('catalog');
@@ -55,11 +55,11 @@ export default function ItemsModule({ ctx }) {
     if (tab === 'create' && batch.results.every(r => r.ok)) setForm(emptyItemForm());
   }
 
-  const saleCheck = saleOptions(sale, extras.currencies);
+  const saleCheck = saleOptions(sale, extras.currencies, moneyShop);
   const canSell = tab === 'create' && sale.sell && Boolean(custom) && saleCheck.ok && saleCheck.sell && !closed;
   async function putOnSale() {
     if (!canSell || run.busy) return;
-    const currency = extras.currencies.find(c => c.id === saleCheck.currencyId);
+    const currency = shopCurrency({ currency_id: saleCheck.currencyId }, extras.currencies);
     const batch = await run.start({
       title: `Colocar ${custom.name} à venda`, actionLabel: 'Colocar à venda',
       text: previewText([`Colocar "${custom.name}" à venda na Loja do Mestre por ${priceText(saleCheck.price, currency)} ${currency?.name || ''}?`, 'Os jogadores poderão comprar na aba “Loja do Mestre” do Mercado.']),
@@ -77,7 +77,7 @@ export default function ItemsModule({ ctx }) {
   return <div className="mh-sections">
     {shopReady && <ModuleTabs label="Seções de itens" value={view} onChange={setView} tabs={[['deliver', 'Entregar'], ['shop', `Loja do Mestre (${extras.shop.length})`]]} />}
     {view === 'shop' && shopReady
-      ? <ShopManager tableId={tableId} extras={extras} closed={closed} />
+      ? <ShopManager tableId={tableId} extras={extras} closed={closed} allowMoney={moneyShop} />
       : <>
         <section className="mh-section">
           {source}
@@ -96,7 +96,7 @@ export default function ItemsModule({ ctx }) {
           </> : <form className="ci-form" onSubmit={e => e.preventDefault()}>
             <CustomItemFields form={form} set={set} />
             {shopReady
-              ? <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} disabled={closed} />
+              ? <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} allowMoney={moneyShop} disabled={closed} />
               : <p className="muted mh-hint">Atualização do banco pendente (0041): aplique-a no Supabase para vender itens na Loja do Mestre.</p>}
           </form>}
           <BatchResults run={run} />

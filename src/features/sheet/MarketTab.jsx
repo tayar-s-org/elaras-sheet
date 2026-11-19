@@ -94,7 +94,7 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
       <button type="button" role="tab" aria-selected={view === "bag"} className={view === "bag" ? "primary" : "outline"} onClick={() => setView("bag")}>Mochila ({c.inventory.reduce((n, e) => n + e.qty, 0)})</button>
     </div>
 
-    {view === "master" ? <MasterShop extras={extras} cloudId={cloudId} tableId={tableId} setToast={setToast} /> : view === "custom" ? <CustomItemForm cloudId={cloudId} tableId={tableId} /> : view === "shop" ? <>
+    {view === "master" ? <MasterShop extras={extras} cloudId={cloudId} tableId={tableId} money={money} setToast={setToast} /> : view === "custom" ? <CustomItemForm cloudId={cloudId} tableId={tableId} /> : view === "shop" ? <>
       <div className="mk-filters">
         <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar item em todo o mercado…" aria-label="Buscar item" />
       </div>

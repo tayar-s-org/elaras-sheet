@@ -79,8 +79,9 @@ export const setConditions = ({ tableId, characterId, conditions, note = '', req
   callIdempotent('gm_set_conditions', { ...base(tableId, requestId), p_character: characterId, p_conditions: conditions, p_note: note });
 
 // Loja do Mestre (migração 0041). `custom` = { name, weight, effects, description } (mesmo modelo dos itens customizados); nulo na edição mantém o item.
+// currencyId: id de uma moeda da mesa, ou nulo / 'money' para vender em $ (migração 0043).
 export const upsertShopItem = ({ tableId, id = null, custom = null, currencyId, price, active = true, requestId }) =>
-  callIdempotent('gm_shop_upsert', { ...base(tableId, requestId), p_id: id, p_custom: custom, p_currency: currencyId, p_price: price, p_active: active });
+  callIdempotent('gm_shop_upsert', { ...base(tableId, requestId), p_id: id, p_custom: custom, p_currency: currencyId === 'money' ? null : currencyId, p_price: price, p_active: active });
 export const deleteShopItem = ({ tableId, id, requestId }) => callIdempotent('gm_shop_delete', { ...base(tableId, requestId), p_id: id });
 // Jogador compra para o próprio personagem: debita a moeda e põe o item na mochila numa transação só.
 export const buyShopItem = ({ tableId, characterId, listingId, qty = 1, requestId }) =>

@@ -5,7 +5,7 @@ import { CATEGORIES, MARKET_ITEMS } from "../../market/items.js";
 import CustomItemFields, { emptyItemForm, itemFromForm } from "../sheet/CustomItemFields.jsx";
 import { giveItem } from "../../lib/items.js";
 import { masterHubReady, upsertShopItem, newRequestId } from "../../lib/masterHub.js";
-import { saleOptions, priceText } from "../../market/shop.js";
+import { saleOptions, priceText, shopCurrency } from "../../market/shop.js";
 import ShopSaleOptions, { emptySale } from "./masterHub/ShopSaleOptions.jsx";
 import { useExtras } from "./masterHub/extras.jsx";
 import "../sheet/market.css";
@@ -21,7 +21,13 @@ export default function GmItemsModal({ tableId, targets, initialTarget, onClose 
   const extras = useExtras();
   const [sale, setSale] = useState(emptySale());
   const [shopReady, setShopReady] = useState(false);
-  useEffect(() => { let alive = true; masterHubReady(false, 2).then(v => { if (alive) setShopReady(v === true); }); return () => { alive = false; }; }, []);
+  const [moneyShop, setMoneyShop] = useState(false); // o banco já aceita preço em $ (migração 0043)
+  useEffect(() => {
+    let alive = true;
+    masterHubReady(false, 2).then(v => { if (alive) setShopReady(v === true); });
+    masterHubReady(false, 3).then(v => { if (alive) setMoneyShop(v === true); });
+    return () => { alive = false; };
+  }, []);
   const [tab, setTab] = useState("catalog");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0].id);
@@ -55,11 +61,11 @@ export default function GmItemsModal({ tableId, targets, initialTarget, onClose 
     finally { setBusy(false); }
   }
 
-  const saleCheck = saleOptions(sale, extras.currencies);
+  const saleCheck = saleOptions(sale, extras.currencies, moneyShop);
   const canSell = tab === "create" && sale.sell && Boolean(custom) && saleCheck.ok && saleCheck.sell;
   async function putOnSale() {
     if (!canSell || busy) return;
-    const currency = extras.currencies.find(c => c.id === saleCheck.currencyId);
+    const currency = shopCurrency({ currency_id: saleCheck.currencyId }, extras.currencies);
     if (!(await askConfirm({ title: "Colocar à venda?", text: `Colocar "${custom.name}" à venda na Loja do Mestre por ${priceText(saleCheck.price, currency)} ${currency?.name || ""}? Os jogadores compram na aba "Loja do Mestre" do Mercado.`, actionLabel: "Colocar à venda" }))) return;
     setBusy(true);
     setMsg({ text: "", error: false });
@@ -93,7 +99,7 @@ export default function GmItemsModal({ tableId, targets, initialTarget, onClose 
         </div>
       </> : <form className="ci-form" onSubmit={e => e.preventDefault()}>
         <CustomItemFields form={form} set={set} />
-        {shopReady && <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} />}
+        {shopReady && <ShopSaleOptions value={sale} onChange={patch => setSale(v => ({ ...v, ...patch }))} currencies={extras.currencies} allowMoney={moneyShop} />}
       </form>}
 
       <div className="gm-footer">

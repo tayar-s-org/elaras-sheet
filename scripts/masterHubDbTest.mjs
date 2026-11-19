@@ -74,7 +74,7 @@ try {
     await u.sb.from('characters').update({ table_id: t }).eq('id', ch);
   }
   const ver = await ok('master_hub_version', rpc(gm, 'master_hub_version', {}));
-  check('versão 2 (Central + Loja do Mestre)', ver.data === 2);
+  check('versão 3 (Central + Loja do Mestre + preço em $)', ver.data === 3);
 
   console.log('— permissões —');
   const mon = (u, ch, mode, amount, req = rid(), t = T1) => rpc(u, 'gm_adjust_money', { p_table: t, p_character: ch, p_mode: mode, p_amount: amount, p_note: '', p_request_id: req });
@@ -406,6 +406,51 @@ try {
   const shopLog = (await gm.sb.from('master_audit_log').select('kind,actor_id,character_id,summary').eq('table_id', T1).like('kind', 'shop_%')).data || [];
   check('histórico: criação, edição, compras e remoção (o comprador aparece como responsável da compra)', ['shop_create', 'shop_update', 'shop_buy', 'shop_delete'].every(k => shopLog.some(x => x.kind === k)) && shopLog.filter(x => x.kind === 'shop_buy').every(x => x.actor_id === a.id && x.character_id === chA), JSON.stringify(shopLog.slice(0, 3)));
   check('jogador não lê o histórico da loja', ((await a.sb.from('master_audit_log').select('id').eq('table_id', T1).like('kind', 'shop_%')).data || []).length === 0);
+
+  console.log('— Loja do Mestre: preço em dinheiro ($) —');
+  const moneyA = async () => (await row(a, chA)).data.money;
+  const upMoney = (extra = {}) => up(gm, { p_currency: null, p_price: 10, p_custom: { ...item, name: 'Mapa Antigo' }, ...extra });
+  await denied('jogador não põe item à venda em $', up(a, { p_currency: null }), /Apenas o mestre/);
+  await denied('preço zero em $', upMoney({ p_price: 0 }), /preço/);
+  r = await ok('mestre põe o mapa à venda em $ (sem moeda)', upMoney());
+  const M1 = r.data?.id;
+  check('anúncio em $: currency_id nulo e histórico com símbolo $', Boolean(M1) && r.data?.after?.symbol === '$' && r.data?.after?.currency_name === 'Dinheiro' && r.data?.after?.currency === null, JSON.stringify(r.data));
+  check('o jogador lê o anúncio em $', ((await a.sb.from('table_shop_items').select('id,currency_id').eq('id', M1)).data || []).length === 1);
+  await denied('moeda de outra mesa continua recusada', up(gm, { p_currency: otherCur }), /moeda desta mesa/);
+  const buyM = (u, ch, qty = 1, req = rid()) => rpc(u, 'shop_buy', { p_table: T1, p_character: ch, p_listing: M1, p_qty: qty, p_request_id: req });
+  const awards = async () => ((await gm.sb.from('money_awards').select('amount,note,claimed_at').eq('character_id', chA).like('note', 'Loja do Mestre%')).data || []);
+  await ok('A: dinheiro 25', mon(gm, chA, 'set', 25));
+  await denied('B não compra em $ para A', buyM(b, chA), /próprio personagem/);
+  check('tentativa negada não cobrou', await moneyA() === 25);
+  const rqM = rid();
+  r = await ok('A compra o mapa com $', buyM(a, chA, 1, rqM));
+  check('dinheiro 25 → 15, retorno antes/depois do servidor e item na mochila', await moneyA() === 15 && r.data?.before?.wallet === 25 && r.data?.after?.wallet === 15 && r.data?.after?.symbol === '$' && r.data?.replayed === false);
+  const awM = await awards();
+  check('compra em $ grava a linha em money_awards (negativa, já resgatada) como o grant_money', awM.length === 1 && awM[0].amount === -10 && Boolean(awM[0].claimed_at), JSON.stringify(awM));
+  check('o mapa foi para a mochila', (await row(a, chA)).data.inventory.some(e => e.id === `custom-${M1}` && e.qty === 1));
+  r = await ok('reenvio com o mesmo request_id', buyM(a, chA, 1, rqM));
+  check('reenvio em $ não cobra de novo', r.data?.replayed === true && await moneyA() === 15 && (await awards()).length === 1);
+  await denied('saldo em $ insuficiente', buyM(a, chA, 2), /Saldo insuficiente: você tem 15 \$/);
+  check('compra recusada em $ não mudou nada', await moneyA() === 15);
+  await ok('A: dinheiro 25', mon(gm, chA, 'set', 25));
+  const raceM = await Promise.all(Array.from({ length: 10 }, () => buyM(a, chA)));
+  check('10 compras simultâneas em $ com dinheiro para 2: exatamente 2 passam', raceM.filter(x => !x.error).length === 2 && raceM.filter(x => x.error && /Saldo insuficiente/.test(x.error.message)).length === 8, JSON.stringify(raceM.map(x => x.error?.message)));
+  check('dinheiro 5 (nunca fica negativo) e 3 mapas na mochila', await moneyA() === 5 && (await row(a, chA)).data.inventory.find(e => e.id === `custom-${M1}`)?.qty === 3);
+  // compra simultânea com ajuste do mestre: o dinheiro nunca se perde nem fica negativo
+  await ok('A: dinheiro 100', mon(gm, chA, 'set', 100));
+  const mixM = await Promise.all([buyM(a, chA), mon(gm, chA, 'add', 7), buyM(a, chA), mon(gm, chA, 'add', 3)]);
+  check('compras e ajustes simultâneos: 100 − 20 + 10 = 90', mixM.every(x => !x.error) && await moneyA() === 90, JSON.stringify(mixM.map(x => x.error?.message)));
+  // edição troca entre $ e moeda da mesa
+  const coin2 = (await cur(gm, 'Prata Loja')).data?.id;
+  r = await ok('mestre passa o anúncio de $ para a moeda Prata', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: M1, p_custom: null, p_currency: coin2, p_price: 4, p_active: true, p_request_id: rid() }));
+  check('histórico da edição: antes em $ → depois em moeda', r.data?.before?.symbol === '$' && r.data?.after?.currency_name === 'Prata Loja', JSON.stringify(r.data));
+  await denied('agora o anúncio cobra a moeda (sem saldo)', buyM(a, chA), /Saldo insuficiente/);
+  check('o dinheiro $ não foi tocado ao falhar a compra em moeda', await moneyA() === 90);
+  r = await ok('mestre volta o anúncio para $', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: M1, p_custom: null, p_currency: null, p_price: 15, p_active: true, p_request_id: rid() }));
+  check('volta para $ (currency_id nulo)', ((await gm.sb.from('table_shop_items').select('currency_id').eq('id', M1).single()).data || {}).currency_id === null);
+  await ok('compra pelo novo preço em $', buyM(a, chA)); check('90 − 15 = 75', await moneyA() === 75);
+  await ok('mestre remove o anúncio em $', rpc(gm, 'gm_shop_delete', { p_table: T1, p_id: M1, p_request_id: rid() }));
+  await ok('apaga a moeda Prata (sem anúncio nela)', rpc(gm, 'gm_delete_currency', { p_table: T1, p_id: coin2, p_force: true, p_request_id: rid() }));
 
   console.log('— histórico —');
   const all = (await gm.sb.from('master_audit_log').select('*').eq('table_id', T1)).data;

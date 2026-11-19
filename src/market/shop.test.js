@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { shopEntry, priceText, canAfford, parsePrice, saleOptions, visibleListings, MAX_PRICE } from './shop.js';
+import { shopEntry, priceText, canAfford, parsePrice, saleOptions, visibleListings, shopCurrency, saleCurrencies, MONEY_CURRENCY, MAX_PRICE } from './shop.js';
 import { resolveItem } from './items.js';
 import { validateCharacter, newCharacter } from '../rules.js';
 
@@ -44,9 +44,20 @@ test('opções de venda do formulário do mestre', () => {
   const cur = [{ id: 'c1', name: 'Ouro' }, { id: 'c2', name: 'Prata' }];
   assert.deepEqual(saleOptions({ sell: false }, cur), { ok: true, sell: false });
   assert.deepEqual(saleOptions({ sell: true, currencyId: 'c2', price: '5' }, cur), { ok: true, sell: true, currencyId: 'c2', price: 5 });
-  assert.equal(saleOptions({ sell: true, currencyId: 'zz', price: '5' }, cur).currencyId, 'c1'); // moeda inexistente: cai na primeira
-  assert.match(saleOptions({ sell: true, currencyId: 'c1', price: '5' }, []).error, /Crie uma moeda/);
+  assert.equal(saleOptions({ sell: true, currencyId: 'zz', price: '5' }, cur, false).currencyId, 'c1'); // moeda inexistente: cai na primeira
+  assert.match(saleOptions({ sell: true, currencyId: 'c1', price: '5' }, [], false).error, /Crie uma moeda/); // sem $ e sem moedas
   assert.equal(saleOptions({ sell: true, currencyId: 'c1', price: '0' }, cur).ok, false);
+});
+
+test('vender em dinheiro ($): a moeda padrão da mesa, sem precisar criar moeda', () => {
+  assert.deepEqual(saleCurrencies([{ id: 'c1' }]).map(c => c.id), ['money', 'c1']);
+  assert.deepEqual(saleCurrencies([{ id: 'c1' }], false).map(c => c.id), ['c1']); // banco sem a 0043
+  assert.deepEqual(saleOptions({ sell: true, currencyId: 'money', price: '30' }, []), { ok: true, sell: true, currencyId: null, price: 30 }); // null = $ no banco
+  assert.equal(saleOptions({ sell: true, currencyId: '', price: '30' }, [{ id: 'c1' }]).currencyId, null); // padrão: $
+  assert.equal(saleOptions({ sell: true, currencyId: 'c1', price: '30' }, [{ id: 'c1' }]).currencyId, 'c1');
+  assert.equal(shopCurrency({ currency_id: null }, []), MONEY_CURRENCY);
+  assert.equal(shopCurrency({ currency_id: 'c1' }, [{ id: 'c1', name: 'Ouro' }]).name, 'Ouro');
+  assert.equal(priceText(25, MONEY_CURRENCY), '$ 25');
 });
 
 test('o jogador só vê anúncios ativos; o mestre vê todos', () => {
@@ -66,5 +77,16 @@ test('a migração 0041 existe, é do mestre/dono e não reescreve funções em 
   assert.match(sql, /pg_advisory_xact_lock/);
   assert.match(sql, /for update/);
   for (const fn of ['gm_shop_upsert', 'gm_shop_delete', 'shop_buy']) assert.match(sql, new RegExp(`public\\.${fn}\\([^)]*\\)[^;]*to authenticated`, 's'), fn);
+  assert.doesNotMatch(sql, /create or replace function public\.(grant_money|grant_xp|gm_give_item|gm_adjust_money|gm_wallet_adjust|gm_delete_currency)\(/);
+});
+
+test('a migração 0043 aceita preço em $: debita a ficha, registra em money_awards e sobe a versão', () => {
+  const sql = readFileSync(new URL('../../supabase/migrations/0043_shop_money_price.sql', import.meta.url), 'utf8');
+  assert.match(sql, /alter column currency_id drop not null/);
+  assert.match(sql, /if r\.currency_id is null then/);
+  assert.match(sql, /insert into public\.money_awards/);
+  assert.match(sql, /claimed_at|now\(\)\)/);
+  assert.match(sql, /jsonb_set\(jsonb_set\(d, '\{inventory\}', new_inv\), '\{money\}'/);
+  assert.match(sql, /select 3;/);
   assert.doesNotMatch(sql, /create or replace function public\.(grant_money|grant_xp|gm_give_item|gm_adjust_money|gm_wallet_adjust|gm_delete_currency)\(/);
 });
