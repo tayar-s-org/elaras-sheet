@@ -40,6 +40,7 @@ export function useRewardSync(session, setSession, user, notify) {
             const up = after > before ? ` Subiu para o nível ${after}: +${(after - before) * 2} pontos de progressão!` : '';
             notifyRef.current?.(`${g.name || 'Sua ficha'} recebeu ${g.xp} XP do mestre.${up}`);
           }
+          if (g.xp < 0) notifyRef.current?.(`${g.name || 'Sua ficha'} perdeu ${-g.xp} XP (removido pelo mestre).`);
           if (g.money > 0) notifyRef.current?.(`💰 Você recebeu $${formatMoney(g.money)} do mestre${who}.`);
           if (g.money < 0) notifyRef.current?.(`💸 O mestre removeu $${formatMoney(-g.money)}${who}. Saldo: $${formatMoney(addMoney(g.before?.money, g.money))}.`);
         }

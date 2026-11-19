@@ -50,7 +50,7 @@ export function applyRewardSync(session, rows) {
     const fix = row && rebaseSheet(s, row);
     if (!fix) return s;
     changed = true;
-    if (fix.gained.xp > 0 || fix.gained.money !== 0) gains.push({ sheetId: s.id, name: s.character?.name || '', before: s.character, ...fix.gained });
+    if (fix.gained.xp !== 0 || fix.gained.money !== 0) gains.push({ sheetId: s.id, name: s.character?.name || '', before: s.character, ...fix.gained });
     return { ...s, character: fix.character, cloud: fix.cloud };
   });
   return { session: changed ? { ...session, sheets } : session, gains };

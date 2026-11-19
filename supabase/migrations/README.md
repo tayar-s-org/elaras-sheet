@@ -25,3 +25,7 @@ Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replac
   e a tabela `board_token_secrets`, que só o mestre da mesa lê. Com o nome oculto, o gatilho `tokens_hidden_name` guarda o nome e a imagem
   reais nessa tabela e deixa `name = ''` e `image_path = null` na linha que os jogadores leem (nem o Realtime os entrega); ao desocultar, os
   valores voltam. Jogadores não alteram `name_hidden` nem `effects`. Aditiva; pode ser repetida. Não reescreve `tokens_before_insert/update`.
+- `0035_grant_applies_to_sheet.sql`: `grant_xp` e `grant_money` gravam o XP/dinheiro direto na ficha (`characters.data`) e marcam a concessão como
+  recebida, então entram mesmo com o app do jogador fechado. O app do jogador (`useRewardSync` + `sheetRebase.js`) só atualiza a ficha aberta.
+  **Publique o app novo antes de rodar**, senão um app antigo aberto acusa "ficha mudou em outro lugar". Pode ser repetida.
+- `0036_xp_remove.sql`: o mestre pode remover XP (valor negativo em `grant_xp`; a ficha nunca fica abaixo de 0). Depende da 0035; pode ser repetida.

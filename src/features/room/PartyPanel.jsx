@@ -80,14 +80,16 @@ function XpGrant({ tableId, targets, label }) {
   const [msg, setMsg] = useState('');
   const amount = Math.trunc(Number(text));
   const valid = amount >= 1 && amount <= 10000;
-  async function give(e) {
-    e.preventDefault();
+  async function give(e, sign = 1) {
+    e?.preventDefault();
     if (!valid || busy || !targets.length) return;
+    const who = targets.length === 1 ? (targets[0].name || 'um personagem') : 'todos os jogadores';
+    if (sign < 0 && !window.confirm(`Remover ${amount} XP de ${who}?`)) return;
     setBusy(true);
     setMsg('');
     try {
-      const res = await grantEach(targets, t => grantXp(tableId, t.id, amount));
-      setMsg(grantSummary(res, `+${amount} XP enviado${targets.length > 1 ? ' a todos' : ''}.`));
+      const res = await grantEach(targets, t => grantXp(tableId, t.id, sign * amount));
+      setMsg(grantSummary(res, sign > 0 ? `+${amount} XP enviado${targets.length > 1 ? ' a todos' : ''}.` : `${amount} XP removido${targets.length > 1 ? ' de todos' : ''}.`));
     } catch (err) { setMsg(err.message); }
     finally { setBusy(false); }
   }
@@ -95,6 +97,7 @@ function XpGrant({ tableId, targets, label }) {
     <label><span>{label}</span>
       <input type="number" min="1" max="10000" value={text} aria-label={label} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()} /></label>
     <button className="outline" disabled={busy || !valid || !targets.length}>{busy ? 'Enviando…' : 'Dar XP'}</button>
+    <button type="button" className="outline danger" disabled={busy || !valid || !targets.length} onClick={() => give(null, -1)}>Remover XP</button>
     {msg && <small role="status" className="muted">{msg}</small>}
   </form>;
 }

@@ -62,3 +62,11 @@ test('conceder a vários: uma falha não impede os outros e a mensagem diz quem 
   assert.equal(grantSummary({ ok: 3, failed: [] }, '+5 XP enviado a todos.'), '+5 XP enviado a todos.');
   assert.match(grantSummary({ ok: 0, failed: [{ name: 'Ana', message: 'x' }] }, 'ok'), /Não foi enviado: Ana/);
 });
+
+test('XP removido pelo mestre diminui a ficha local e nunca fica abaixo de 0', () => {
+  assert.equal(mergeRewards(base, { ...base, xp: 12 }, { ...base, xp: 6 }).xp, 8);
+  assert.equal(mergeRewards(base, { ...base, xp: 1 }, { ...base, xp: 0 }).xp, 0);
+  const r = applyRewardSync({ sheets: [sheet(base)] }, [cloudRow({ xp: 4 })]);
+  assert.equal(r.session.sheets[0].character.xp, 4);
+  assert.deepEqual([r.gains[0].xp, r.gains[0].money], [-6, 0]);
+});
