@@ -1,14 +1,15 @@
-.incap { display: grid; gap: 4px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius, 10px); background: var(--field); }
+@reference "../../tailwind.css";
+.incap { @apply grid gap-[4px] mt-[10px] p-[10px_12px]; border: 1px solid var(--border); border-radius: var(--radius, 10px); background: var(--field); }
 .incap-s1, .incap-s2 { border-color: var(--warning); }
 .incap-s3, .incap-s4, .incap-s5 { border-color: var(--danger); background: var(--danger-bg); }
-.incap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.incap-head { @apply flex items-center justify-between gap-[8px] flex-wrap; }
 .incap-head strong { font-family: var(--font-display); }
-.incap p { margin: 0; font-size: 0.86rem; }
-.incap-cause, .incap-ok { color: var(--muted); }
-.incap-effects { margin: 2px 0 0; padding-left: 18px; font-size: 0.88rem; }
-.incap-move { font-weight: 700; }
-.incap-faint { display: grid; gap: 6px; margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--border); }
-.incap-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
-.incap-controls label { display: grid; gap: 2px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.incap-controls input { width: 6.5ch; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; }
-.incap.compact { margin-top: 8px; padding: 8px 10px; }
+.incap p { @apply m-0; font-size: 0.86rem; }
+.incap-cause, .incap-ok { @apply text-app-muted; }
+.incap-effects { @apply m-[2px_0_0] pl-[18px]; font-size: 0.88rem; }
+.incap-move { @apply font-bold; }
+.incap-faint { @apply grid gap-[6px] mt-[4px] pt-[6px]; border-top: 1px dashed var(--border); }
+.incap-controls { @apply flex flex-wrap items-end gap-[8px]; }
+.incap-controls label { @apply grid gap-[2px]; font-size: 0.75rem; @apply uppercase; letter-spacing: 0.05em; @apply text-app-muted; }
+.incap-controls input { @apply w-[6.5ch]; }
+.incap.compact { @apply mt-[8px] p-[8px_10px]; }

@@ -1,24 +1,25 @@
-.table-log-box { height: 190px; overflow: auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); display: grid; gap: 6px; align-content: start; font-size: .92rem; }
-.log-line { margin: 0; padding: 6px 10px; line-height: 1.35; overflow-wrap: anywhere; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
-.log-line.mine strong { color: var(--accent); }
+@reference "../../tailwind.css";
+.table-log-box { @apply h-[190px] overflow-auto p-[10px_12px]; border: 1px solid var(--border); @apply rounded-[8px]; background: var(--surface-soft); @apply grid gap-[6px]; align-content: start; font-size: .92rem; }
+.log-line { @apply m-0 p-[6px_10px]; line-height: 1.35; @apply wrap-anywhere; border: 1px solid var(--border); @apply rounded-[6px]; background: var(--surface); }
+.log-line.mine strong { @apply text-app-accent; }
 .log-line.whisper { font-style: italic; border-left: 3px solid var(--gold); }
-.log-time { color: var(--muted); font-size: .78rem; margin-right: 8px; }
-.log-roll { display: block; border-left: 3px solid var(--border); }
+.log-time { @apply text-app-muted; font-size: .78rem; @apply mr-[8px]; }
+.log-roll { @apply block; border-left: 3px solid var(--border); }
 .log-roll.good { border-left-color: var(--success); }
 .log-roll.bad { border-left-color: var(--danger); }
-.log-total { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; line-height: 1; vertical-align: -2px; color: var(--accent); }
+.log-total { font-family: var(--font-display); font-size: 1.55rem; @apply font-bold; line-height: 1; vertical-align: -2px; @apply text-app-accent; }
 .log-roll.good .log-total { color: var(--success); }
 .log-roll.bad .log-total { color: var(--danger); }
-.log-outcome { font-weight: 600; }
-.log-detail { color: var(--muted); font-size: .82rem; }
-.log-tabs { margin-bottom: 8px; }
-.log-vital { display: block; border-left: 3px solid var(--border); }
+.log-outcome { @apply font-semibold; }
+.log-detail { @apply text-app-muted; font-size: .82rem; }
+.log-tabs { @apply mb-[8px]; }
+.log-vital { @apply block; border-left: 3px solid var(--border); }
 .log-vital.up { border-left-color: var(--success); }
 .log-vital.down { border-left-color: var(--danger); }
 .log-delta { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; vertical-align: -2px; }
 .log-vital.up .log-delta { color: var(--success); }
 .log-vital.down .log-delta { color: var(--danger); }
-.log-reward { display: block; border-left: 3px solid var(--border); }
+.log-reward { @apply block; border-left: 3px solid var(--border); }
 .log-reward.up { border-left-color: var(--success); }
 .log-reward.down { border-left-color: var(--danger); }
 .log-reward.xp.up { border-left-color: var(--gold); }
@@ -26,5 +27,5 @@
 .log-reward.xp.up .log-delta { color: var(--gold); }
 .log-reward.down .log-delta { color: var(--danger); }
 
-.log-steps { display: grid; gap: 1px; margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--border); color: var(--muted); font-size: .82rem; }
-.log-step:last-child { font-weight: 600; }
+.log-steps { @apply grid gap-[1px] mt-[4px] pl-[8px]; border-left: 2px solid var(--border); @apply text-app-muted; font-size: .82rem; }
+.log-step:last-child { @apply font-semibold; }

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { loadRuns, spendProgress } from '../../lib/engine.js';
 import { loadAttempts } from '../../lib/requests.js';
 import { ACT, ACTIVITY_LABEL } from '../../rpg/activities.js';
@@ -27,6 +28,7 @@ function Stat({ label, value, hint }) {
 // "Ver Meus Treinamentos": o que o personagem está treinando, quanto já treinou, quanta XP ganhou e o que pode evoluir.
 // Registros já processados são só leitura (nem o jogador nem o mestre editam o que já foi processado).
 export default function TrainingHistory({ tableId, characterId, owner, closed, stats, character, tick, progress, training, spellProgress, requests, allocation, onGo, refresh }) {
+  const askConfirm = useConfirm();
   const [runs, setRuns] = useState(null);
   const [attempts, setAttempts] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -57,7 +59,7 @@ export default function TrainingHistory({ tableId, characterId, owner, closed, s
 
   const evolve = async (g, modality) => {
     const die = readDie(character, g.kind, g.name);
-    if (!window.confirm(`Evoluir ${g.name} de ${describeDie(die)} usando ${evolutionCost(die)} XP do acumulador ${MODALITY_LABEL[modality]}? Isso não pode ser desfeito.`)) return;
+    if (!(await askConfirm({ title: 'Confirmar evolução?', text: `Evoluir ${g.name} de ${describeDie(die)} usando ${evolutionCost(die)} XP do acumulador ${MODALITY_LABEL[modality]}? Isso não pode ser desfeito.`, actionLabel: 'Evoluir' }))) return;
     setBusy(`${g.kind}${g.name}${modality}`); setMessage('');
     try {
       const r = await spendProgress(tableId, characterId, g.kind, g.name, modality);

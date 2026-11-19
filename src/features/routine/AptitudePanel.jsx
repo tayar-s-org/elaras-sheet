@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { grantAptitude, saveAptitude } from '../../lib/aptitude.js';
 import {
   aptitudeBonus, accumulationCap, aptitudeSummary, validateAllocation, cleanAllocation, aptitudeKey, pointsOf, pointsForMax, APTITUDE_STEP,
@@ -34,6 +35,7 @@ function Row({ kind, name, points, locked, editable, available, onStep, onType, 
 
 // Aptidão do personagem: o jogador distribui os pontos recebidos e o mestre concede novas rolagens de 1d100.
 export default function AptitudePanel({ tableId, characterId, owner, isGm, closed, character, aptitude, progress, refresh }) {
+  const askConfirm = useConfirm();
   const grants = aptitude?.grants?.[characterId] || [];
   const saved = aptitude?.allocation?.[characterId] || {};
   const log = aptitude?.log?.[characterId] || [];
@@ -70,12 +72,19 @@ export default function AptitudePanel({ tableId, characterId, owner, isGm, close
   });
 
   const run = async fn => { setBusy(true); setMessage(''); try { await fn(); await refresh?.(); } catch (e) { setMessage(e.message); } finally { setBusy(false); } };
-  const confirm = () => run(async () => {
-    if (!window.confirm('Depois de confirmados, os pontos distribuídos não podem ser removidos nem trocados de lugar. Confirmar a distribuição?')) return;
-    const r = await saveAptitude(tableId, characterId, cleanAllocation(current));
-    setDraft(null);
-    setMessage(`Distribuição confirmada: ${r.distributed} ponto(s) distribuído(s), ${r.available} disponível(is).`);
-  });
+  const confirm = async () => {
+    const accepted = await askConfirm({
+      title: 'Confirmar distribuição?',
+      text: 'Os pontos confirmados são permanentes e ficam vinculados aos atributos e perícias escolhidos.',
+      actionLabel: 'Confirmar distribuição',
+    });
+    if (!accepted) return;
+    return run(async () => {
+      const r = await saveAptitude(tableId, characterId, cleanAllocation(current));
+      setDraft(null);
+      setMessage(`Distribuição confirmada: ${r.distributed} ponto(s) distribuído(s), ${r.available} disponível(is).`);
+    });
+  };
   const grant = () => run(async () => {
     const r = await grantAptitude(tableId, characterId, requestId.current);
     setRoll(r);

@@ -1,10 +1,9 @@
-.delete-table { max-width: 520px; }
-.delete-table .delete-table-text { margin: 12px 0 14px; font-size: .92rem; }
-.delete-table .delete-table-text p { margin: 8px 0; font-size: inherit; color: var(--text); }
-.delete-table .delete-table-text ul { margin: 8px 0; padding-left: 20px; display: grid; gap: 3px; }
-.delete-table-error { color: var(--danger); margin: 6px 0 0; font-size: .88rem; }
-.danger-zone { margin-top: 28px; padding: 14px 16px; border: 1px solid var(--danger); border-radius: 10px; display: grid; gap: 8px; }
-.danger-zone h3 { margin: 0; color: var(--danger); font-size: 1.05rem; }
-.danger-zone p { margin: 0; font-size: .85rem; color: var(--muted); }
-.danger-solid { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--danger); background: var(--danger); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-.danger-solid:disabled { opacity: .4; cursor: not-allowed; }
+@reference "../../tailwind.css";
+.confirmation-panel.delete-table { @apply max-w-[520px]; }
+.delete-table .delete-table-text { @apply m-[12px_0_14px]; font-size: .92rem; }
+.delete-table .delete-table-text p { @apply m-[8px_0]; font-size: inherit; @apply text-app-text; }
+.delete-table .delete-table-text ul { @apply m-[8px_0] pl-[20px] grid gap-[3px]; }
+.confirmation-panel .delete-table-error { color: var(--danger); @apply m-[6px_0_0]; font-size: .88rem; }
+.danger-zone { @apply mt-[28px] p-[14px_16px]; border: 1px solid var(--danger); @apply rounded-[10px] grid gap-[8px]; }
+.danger-zone h3 { @apply m-0; color: var(--danger); font-size: 1.05rem; }
+.danger-zone p { @apply m-0; font-size: .85rem; @apply text-app-muted; }

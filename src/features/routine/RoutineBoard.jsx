@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { HOURS } from '../../training/routine.js';
 import { ACTIVITIES, ACT, ACTIVITY_LABEL, fieldsFor, rowIssue } from '../../rpg/activities.js';
 import { routineHue } from '../../training/calendar.js';
@@ -122,6 +123,7 @@ function Slot({ index, row, e, stats, canEdit, brushRow, painting, onApply, onCl
 
 // A rotina em duas planilhas de 12 horas (06:00–17:00 e 18:00–05:00): arraste as ações para as horas.
 export default function RoutineBoard({ data, sim, stats, canEdit, storageKey, onRow, onClearAll }) {
+  const askConfirm = useConfirm();
   const [brush, setBrush] = useState(null);
   const painting = useRef(false);
   const rows = data.rows;
@@ -131,7 +133,7 @@ export default function RoutineBoard({ data, sim, stats, canEdit, storageKey, on
   const boards = [['Primeiras 12 horas', 0], ['Últimas 12 horas', 12]];
   return <div onMouseUp={() => { painting.current = false; }} onMouseLeave={() => { painting.current = false; }}>
     {canEdit && <ActionPalette rows={rows} stats={stats} storageKey={storageKey} brush={brush} setBrush={setBrush} />}
-    {canEdit && rows.some(r => r.a) && <div className="rb-tools"><button type="button" className="text-button danger" onClick={() => { if (window.confirm('Limpar todas as 24 horas desta rotina?')) onClearAll(); }}>Limpar todas as horas</button></div>}
+    {canEdit && rows.some(r => r.a) && <div className="rb-tools"><button type="button" className="text-button danger" onClick={async () => { if (await askConfirm({ title: 'Limpar rotina?', text: 'Limpar todas as 24 horas desta rotina?', actionLabel: 'Limpar todas as horas', danger: true })) onClearAll(); }}>Limpar todas as horas</button></div>}
     <div className="rb-boards">
       {boards.map(([title, start]) => <section key={start} className="rb-board" aria-label={title}>
         <h4>{title} <small className="muted">{HOURS[start]} – {HOURS[start + 11]}</small></h4>

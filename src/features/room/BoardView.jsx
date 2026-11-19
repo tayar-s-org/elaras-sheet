@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { updateToken, removeToken, addToken, loadCreatureDetails, saveCreatureToken, addMark, removeMark } from '../../lib/board.js';
 import { uploadTokenImage, tokenUrl, saveTokenArtwork } from '../../lib/tokens.js';
 import { setCharacterTokenImage } from '../../lib/cloud.js';
@@ -47,6 +48,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initials = name => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
 export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false }) {
+  const askConfirm = useConfirm();
   const { board, tokens, marks, mapSrc, drags, error, setError, local } = boardState;
   const svgRef = useRef(null);
   const [view, setViewRaw] = useState(null); // { x, y, w } em unidades do mapa
@@ -329,7 +331,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
   };
   // Apaga o token da criatura (so o mestre); pede confirmacao porque nao tem volta.
   const removeCreature = async token => {
-    if (!window.confirm(`Apagar o token "${token.name || 'da criatura'}" do tabuleiro? Isso não pode ser desfeito.`)) return;
+    if (!(await askConfirm({ title: 'Apagar token?', text: `Apagar o token "${token.name || 'da criatura'}" do tabuleiro? Isso não pode ser desfeito.`, actionLabel: 'Apagar token', danger: true }))) return;
     try {
       await removeToken(token.id);
       local.setTokens(prev => prev.filter(t => t.id !== token.id));

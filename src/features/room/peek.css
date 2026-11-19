@@ -1,39 +1,40 @@
-.sheet-peek { position: absolute; top: 8px; right: 8px; z-index: 5; width: 300px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: auto; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); box-shadow: 0 12px 40px var(--shadow, rgba(0,0,0,.4)); font-size: .9rem; }
-.peek-close { position: absolute; top: 6px; right: 8px; width: 28px; height: 28px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
-.sheet-peek h4 { margin: 0; font-family: var(--font-display); font-size: 1.25rem; }
-.sheet-peek h5 { margin: 12px 0 4px; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.sheet-peek p { margin: 4px 0 0; overflow-wrap: anywhere; }
-.peek-stats { display: flex; gap: 8px; margin-top: 10px; }
-.peek-stats span { flex: 1; display: grid; justify-items: center; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
-.peek-stats small { color: var(--muted); font-size: .72rem; }
-.peek-stats b { font-size: 1.3rem; font-family: var(--font-display); color: var(--accent); }
-.peek-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 14px; }
-.peek-grid b { color: var(--accent); margin-left: 2px; }
-.peek-vitals { display: grid; gap: 8px; margin-top: 12px; }
-.peek-vital-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-.peek-vital-head strong { margin-left: auto; }
-.peek-vital-head small { font-weight: 400; color: var(--muted); }
+@reference "../../tailwind.css";
+.sheet-peek { @apply absolute top-[8px] right-[8px] z-[5] w-[300px]; max-width: calc(100% - 16px); max-height: calc(100% - 16px); @apply overflow-auto p-[14px_16px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface); @apply text-app-text; box-shadow: 0 12px 40px var(--shadow, rgba(0,0,0,.4)); font-size: .9rem; }
+.peek-close { @apply absolute top-[6px] right-[8px] w-[28px] h-[28px] p-0; border: 0; background: none; @apply text-app-muted; font-size: 22px; line-height: 1; @apply cursor-pointer; }
+.sheet-peek h4 { @apply m-0; font-family: var(--font-display); font-size: 1.25rem; }
+.sheet-peek h5 { @apply m-[12px_0_4px]; font-size: .75rem; letter-spacing: .06em; @apply uppercase text-app-muted; }
+.sheet-peek p { @apply m-[4px_0_0] wrap-anywhere; }
+.peek-stats { @apply flex gap-[8px] mt-[10px]; }
+.peek-stats span { flex: 1; @apply grid; justify-items: center; @apply p-[6px]; border: 1px solid var(--border); @apply rounded-[8px]; background: var(--surface-soft); }
+.peek-stats small { @apply text-app-muted; font-size: .72rem; }
+.peek-stats b { font-size: 1.3rem; font-family: var(--font-display); @apply text-app-accent; }
+.peek-grid { @apply grid; grid-template-columns: repeat(2, 1fr); @apply gap-[2px_14px]; }
+.peek-grid b { @apply text-app-accent ml-[2px]; }
+.peek-vitals { @apply grid gap-[8px] mt-[12px]; }
+.peek-vital-head { @apply flex items-center gap-[8px] mb-[3px]; }
+.peek-vital-head strong { @apply ml-auto; }
+.peek-vital-head small { @apply font-normal text-app-muted; }
 
-.peek-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.peek-pill { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-soft); font-size: .85rem; }
-.peek-pill b { color: var(--accent); }
-.peek-pill.power { border-color: var(--accent); background: var(--selection); }
+.peek-pills { @apply flex flex-wrap gap-[6px] mt-[4px]; }
+.peek-pill { @apply inline-flex items-baseline gap-[6px] p-[3px_10px] rounded-[999px]; border: 1px solid var(--border); background: var(--surface-soft); font-size: .85rem; }
+.peek-pill b { @apply text-app-accent; }
+.peek-pill.power { @apply border-app-accent; background: var(--selection); }
 .peek-pill.major b { color: var(--danger); }
 .peek-pill.minor b { color: var(--warning); }
-.peek-load { font-size: .78rem; margin: 6px 0 0; }
-.peek-bonus { color: var(--gold); font-weight: 700; }
+.peek-load { font-size: .78rem; @apply m-[6px_0_0]; }
+.peek-bonus { color: var(--gold); @apply font-bold; }
 
-.live-vitals { display: grid; gap: 4px; margin-top: 4px; }
-.live-vitals .incap { margin-top: 8px; }
+.live-vitals { @apply grid gap-[4px] mt-[4px]; }
+.live-vitals .incap { @apply mt-[8px]; }
 
 /* Itens que abrem ao clicar (vantagens, complicacoes, equipamento, mochila e poderes) */
-.peek-details { display: grid; gap: 4px; }
-.peek-detail summary { cursor: pointer; list-style: none; display: block; }
-.peek-detail summary::-webkit-details-marker { display: none; }
-.peek-detail summary .peek-pill { cursor: pointer; }
+.peek-details { @apply grid gap-[4px]; }
+.peek-detail summary { @apply cursor-pointer; list-style: none; @apply block; }
+.peek-detail summary::-webkit-details-marker { @apply hidden; }
+.peek-detail summary .peek-pill { @apply cursor-pointer; }
 .peek-detail[open] summary .peek-pill { outline: 1px solid var(--accent); }
-.peek-detail-body { margin: 4px 0 2px 6px; padding: 6px 10px; border-left: 3px solid var(--border); background: var(--surface-soft); border-radius: 0 6px 6px 0; font-size: .78rem; display: grid; gap: 4px; }
-.peek-detail-body p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.peek-detail-body ul { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
-.peek-detail-body .peek-facts { list-style: none; padding: 0; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
-.peek-facts i { display: block; font-style: normal; font-size: .62rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.peek-detail-body { @apply m-[4px_0_2px_6px] p-[6px_10px]; border-left: 3px solid var(--border); background: var(--surface-soft); @apply rounded-[0_6px_6px_0]; font-size: .78rem; @apply grid gap-[4px]; }
+.peek-detail-body p { @apply m-0 whitespace-pre-wrap wrap-anywhere; }
+.peek-detail-body ul { @apply m-0 pl-[16px] grid gap-[2px]; }
+.peek-detail-body .peek-facts { list-style: none; @apply p-0; grid-template-columns: 1fr 1fr; @apply gap-[2px_10px]; }
+.peek-facts i { @apply block; font-style: normal; font-size: .62rem; letter-spacing: .05em; @apply uppercase text-app-muted; }

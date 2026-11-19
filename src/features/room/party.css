@@ -1,13 +1,14 @@
-.amount-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 2px; font-size: .85rem; color: var(--muted); }
-.amount-field input { width: 72px; text-align: center; padding: 4px 6px; }
-.xp-grant { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
-.xp-grant label { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
-.xp-grant input { width: 80px; text-align: center; padding: 4px 6px; }
+@reference "../../tailwind.css";
+.amount-field { @apply flex items-center justify-between gap-[10px] m-[8px_0_2px]; font-size: .85rem; @apply text-app-muted; }
+.amount-field input { @apply w-[72px] text-center p-[4px_6px]; }
+.xp-grant { @apply flex flex-wrap items-center gap-[8px] mt-[10px] pt-[10px]; border-top: 1px dashed var(--border); }
+.xp-grant label { @apply flex items-center gap-[8px]; font-size: .85rem; @apply text-app-muted; }
+.xp-grant input { @apply w-[80px] text-center p-[4px_6px]; }
 .xp-grant small { flex-basis: 100%; }
-.party-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.party-head h4 { min-width: 0; overflow-wrap: anywhere; }
-.view-sheet-btn { flex: none; padding: 4px 12px; font-size: .85rem; }
-.view-owner { font-family: var(--font-body); font-size: .9rem; font-weight: 400; color: var(--muted); }
+.party-head { @apply flex items-center justify-between gap-[10px]; }
+.party-head h4 { @apply min-w-0 wrap-anywhere; }
+.view-sheet-btn { @apply flex-none p-[4px_12px]; font-size: .85rem; }
+.view-owner { font-family: var(--font-body); font-size: .9rem; @apply font-normal text-app-muted; }
 
-.party-tabs { margin-bottom: 4px; }
-.party-tabs button { padding: 5px 12px; font-size: .88rem; }
+.party-tabs { @apply mb-[4px]; }
+.party-tabs button { @apply p-[5px_12px]; font-size: .88rem; }

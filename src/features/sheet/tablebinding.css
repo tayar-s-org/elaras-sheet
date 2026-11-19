@@ -1,6 +1,7 @@
-.tb { margin-bottom: 14px; }
-.tb-bound { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
-.tb-bound small { color: var(--muted); }
-.tb-pick p { margin: 6px 0 10px; font-size: .9rem; }
-.tb-row { justify-content: flex-start; flex-wrap: wrap; }
-.tb-row select { min-width: 220px; }
+@reference "../../tailwind.css";
+.tb { @apply mb-[14px]; }
+.tb-bound { @apply flex flex-wrap items-baseline gap-[10px] p-[8px_14px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface-soft); }
+.tb-bound small { @apply text-app-muted; }
+.tb-pick p { @apply m-[6px_0_10px]; font-size: .9rem; }
+.tb-row { @apply justify-start flex-wrap; }
+.tb-row select { @apply min-w-[220px]; }

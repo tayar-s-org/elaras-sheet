@@ -7,6 +7,8 @@ import "@fontsource/alegreya-sans/500.css";
 import "@fontsource/alegreya-sans/700.css";
 import "./style.css";
 import "./theme.css";
+import "./tailwind.css";
 import App from "./App.jsx";
+import { ConfirmProvider } from "./ui/ConfirmProvider.jsx";
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(<ConfirmProvider><App /></ConfirmProvider>);

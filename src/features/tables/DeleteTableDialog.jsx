@@ -21,7 +21,7 @@ export default function DeleteTableDialog({ table, onConfirm, onCancel }) {
   }
 
   return <Modal onClose={onCancel} aria-labelledby="del-title" busy={busy} role="alertdialog" aria-describedby="del-text">
-    <form className="modal delete-table" onSubmit={confirm}>
+    <form className="confirmation-panel delete-table" onSubmit={confirm}>
       <h2 id="del-title">Apagar a mesa “{table.name}”?</h2>
       <div id="del-text" className="delete-table-text">
         <p><b>Isso não pode ser desfeito.</b> Ao apagar a mesa, somem para todos os participantes:</p>
@@ -36,8 +36,8 @@ export default function DeleteTableDialog({ table, onConfirm, onCancel }) {
       <label className="field"><span>Digite <b>{table.name}</b> para confirmar</span>
         <input value={typed} data-modal-focus autoComplete="off" onChange={e => setTyped(e.target.value)} placeholder={table.name} aria-label="Nome da mesa para confirmar" /></label>
       {error && <p role="alert" className="delete-table-error">{error}</p>}
-      <div className="row">
-        <button type="button" className="quiet" disabled={busy} onClick={onCancel}>Cancelar</button>
+      <div className="confirmation-actions">
+        <button type="button" className="outline" disabled={busy} onClick={onCancel}>Cancelar</button>
         <button type="submit" className="danger-solid" disabled={!match || busy}>{busy ? 'Apagando…' : 'Apagar mesa para sempre'}</button>
       </div>
     </form>

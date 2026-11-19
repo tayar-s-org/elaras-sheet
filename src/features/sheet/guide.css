@@ -1,13 +1,14 @@
-.guide-steps { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 12px; }
-.guide-steps li { display: flex; gap: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
-.guide-num { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--surface); font-family: var(--font-display); font-weight: 700; }
-.guide-steps h3 { margin: 2px 0 6px; font-size: 1.1rem; }
-.guide-steps p { margin: 0 0 6px; font-size: .92rem; line-height: 1.45; color: var(--text); }
-.guide-steps p:last-child { margin-bottom: 0; }
-.guide-costs { margin: 20px 0 6px; border-collapse: collapse; width: 100%; max-width: 460px; font-size: .9rem; }
-.guide-costs caption { text-align: left; font-family: var(--font-display); font-weight: 700; margin-bottom: 6px; }
-.guide-costs th, .guide-costs td { padding: 6px 12px; border: 1px solid var(--border); text-align: center; }
-.guide-costs thead th { background: var(--surface-soft); font-size: .78rem; color: var(--muted); }
-.guide-costs tbody th { color: var(--accent); }
+@reference "../../tailwind.css";
+.guide-steps { list-style: none; @apply m-[18px_0_0] p-0 grid gap-[12px]; }
+.guide-steps li { @apply flex gap-[14px] p-[14px_16px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface-soft); }
+.guide-num { @apply flex-none w-[32px] h-[32px] rounded-[50%] grid place-items-center; background: var(--accent); @apply text-app-surface; font-family: var(--font-display); @apply font-bold; }
+.guide-steps h3 { @apply m-[2px_0_6px]; font-size: 1.1rem; }
+.guide-steps p { @apply m-[0_0_6px]; font-size: .92rem; line-height: 1.45; @apply text-app-text; }
+.guide-steps p:last-child { @apply mb-0; }
+.guide-costs { @apply m-[20px_0_6px]; border-collapse: collapse; @apply w-full max-w-[460px]; font-size: .9rem; }
+.guide-costs caption { @apply text-left; font-family: var(--font-display); @apply font-bold mb-[6px]; }
+.guide-costs th, .guide-costs td { @apply p-[6px_12px]; border: 1px solid var(--border); @apply text-center; }
+.guide-costs thead th { background: var(--surface-soft); font-size: .78rem; @apply text-app-muted; }
+.guide-costs tbody th { @apply text-app-accent; }
 .guide-note { font-size: .82rem; }
-.guide-shortcuts { margin: 28px 0 8px; padding-top: 18px; border-top: 1px solid var(--border); }
+.guide-shortcuts { @apply m-[28px_0_8px] pt-[18px]; border-top: 1px solid var(--border); }

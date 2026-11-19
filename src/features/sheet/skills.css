@@ -1,34 +1,35 @@
-.skills2-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
-.skills2-stat { display: grid; justify-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
-.skills2-stat b { font-family: var(--font-display); font-size: 1.6rem; color: var(--accent); line-height: 1.1; }
-.skills2-stat span { font-size: .75rem; color: var(--muted); text-align: center; }
+@reference "../../tailwind.css";
+.skills2-bar { @apply grid; grid-template-columns: repeat(3, 1fr); @apply gap-[10px] m-[14px_0]; }
+.skills2-stat { @apply grid; justify-items: center; @apply p-[8px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface-soft); }
+.skills2-stat b { font-family: var(--font-display); font-size: 1.6rem; @apply text-app-accent; line-height: 1.1; }
+.skills2-stat span { font-size: .75rem; @apply text-app-muted text-center; }
 .skills2-stat.bad b { color: var(--danger); }
-.skills2-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 8px; }
-.skills2-filters input[type="search"] { flex: 1; min-width: 180px; }
-.skills2-group { margin-top: 18px; }
-.skills2-group h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1.05rem; }
-.skills2-attr { font-family: var(--font-body); font-size: .8rem; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); }
-.skills2-list { display: grid; gap: 6px; }
-.skills2-row { display: grid; grid-template-columns: minmax(110px, 1fr) auto 46px; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
-.skills2-row.on { border-color: var(--accent); background: var(--selection); }
-.skills2-name { display: grid; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
-.skills2-name small { font-weight: 400; color: var(--gold); font-size: .72rem; }
-.die-picker { display: inline-flex; border: 1px solid var(--control-border); border-radius: 8px; overflow: hidden; }
-.die-picker button { min-width: 38px; padding: 5px 7px; border: 0; border-right: 1px solid var(--control-border); background: var(--surface); color: var(--muted); font: inherit; font-size: .85rem; cursor: pointer; }
+.skills2-filters { @apply flex flex-wrap items-center gap-[14px] mb-[8px]; }
+.skills2-filters input[type="search"] { flex: 1; @apply min-w-[180px]; }
+.skills2-group { @apply mt-[18px]; }
+.skills2-group h3 { @apply flex items-center gap-[8px] m-[0_0_8px]; font-size: 1.05rem; }
+.skills2-attr { font-family: var(--font-body); font-size: .8rem; @apply p-[1px_9px] rounded-[999px]; border: 1px solid var(--gold); color: var(--gold); }
+.skills2-list { @apply grid gap-[6px]; }
+.skills2-row { @apply grid; grid-template-columns: minmax(110px, 1fr) auto 46px; @apply items-center gap-[10px] p-[7px_10px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface); }
+.skills2-row.on { @apply border-app-accent; background: var(--selection); }
+.skills2-name { @apply grid font-bold; line-height: 1.2; @apply wrap-anywhere; }
+.skills2-name small { @apply font-normal; color: var(--gold); font-size: .72rem; }
+.die-picker { @apply inline-flex; border: 1px solid var(--control-border); @apply rounded-[8px] overflow-hidden; }
+.die-picker button { @apply min-w-[38px] p-[5px_7px]; border: 0; border-right: 1px solid var(--control-border); background: var(--surface); @apply text-app-muted; font: inherit; font-size: .85rem; @apply cursor-pointer; }
 .die-picker button:last-child { border-right: 0; }
-.die-picker button:hover:not(:disabled):not(.sel) { background: var(--selection); color: var(--accent); }
-.die-picker button.sel { background: var(--accent); color: var(--surface); font-weight: 700; }
-.die-picker button:disabled { opacity: .3; cursor: default; }
-.skills2-cost { text-align: right; font-size: .8rem; color: var(--gold); font-weight: 700; }
-.skills2-note { margin-top: 18px; font-size: .85rem; }
+.die-picker button:hover:not(:disabled):not(.sel) { background: var(--selection); @apply text-app-accent; }
+.die-picker button.sel { background: var(--accent); @apply text-app-surface font-bold; }
+.die-picker button:disabled { opacity: .3; @apply cursor-default; }
+.skills2-cost { @apply text-right; font-size: .8rem; color: var(--gold); @apply font-bold; }
+.skills2-note { @apply mt-[18px]; font-size: .85rem; }
 @media (max-width: 560px) {
   .skills2-row { grid-template-columns: 1fr auto; }
-  .skills2-cost { display: none; }
+  .skills2-cost { @apply hidden; }
 }
-.skills2-tabs { margin: 6px 0 4px; }
-.skills2-count { font-size: .75rem; opacity: .75; margin-left: 2px; }
+.skills2-tabs { @apply m-[6px_0_4px]; }
+.skills2-count { font-size: .75rem; opacity: .75; @apply ml-[2px]; }
 
-.die-bonus { margin-left: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-size: .75rem; white-space: nowrap; align-self: center; }
+.die-bonus { @apply ml-[6px] p-[1px_8px] rounded-[999px]; border: 1px solid var(--gold); color: var(--gold); font-size: .75rem; @apply whitespace-nowrap; align-self: center; }
 
 .skills2-row:has(> .text-button) { grid-template-columns: minmax(110px, 1fr) auto 46px 28px; }
-.skills2-attr-pick { margin-top: 4px; font-size: .8rem; padding: 3px 6px; max-width: 100%; }
+.skills2-attr-pick { @apply mt-[4px]; font-size: .8rem; @apply p-[3px_6px] max-w-full; }

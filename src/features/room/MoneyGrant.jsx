@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { grantMoney } from '../../lib/money.js';
 import { grantEach, grantSummary } from '../../lib/grantEach.js';
 import { formatMoney } from '../../money.js';
@@ -6,6 +7,7 @@ import '../../ui/money.css';
 
 // Mestre: adiciona ou remove dinheiro de um jogador (ou de todos). O jogador recebe na ficha e a concessão fica no registro "XP e dinheiro" da mesa.
 export default function MoneyGrant({ tableId, targets, label = 'Dinheiro ($)', button = 'Dar dinheiro', removeButton = 'Remover dinheiro' }) {
+  const askConfirm = useConfirm();
   const [text, setText] = useState('100');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -15,7 +17,7 @@ export default function MoneyGrant({ tableId, targets, label = 'Dinheiro ($)', b
 
   async function apply(sign) {
     if (!valid || busy || !targets.length) return;
-    if (sign < 0 && !window.confirm(`Remover $${formatMoney(amount)} de ${who}?`)) return;
+    if (sign < 0 && !(await askConfirm({ title: 'Remover dinheiro?', text: `Remover $${formatMoney(amount)} de ${who}?`, actionLabel: 'Remover dinheiro', danger: true }))) return;
     setBusy(true);
     setMsg('');
     try {

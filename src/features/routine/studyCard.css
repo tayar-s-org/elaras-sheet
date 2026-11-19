@@ -1,37 +1,38 @@
+@reference "../../tailwind.css";
 /* Estudo Mágico: ocupa a linha inteira e mostra dados, melhorias e Pity em barras */
-.th-grid .ms-card { grid-column: 1 / -1; display: grid; gap: 14px; }
-.ms-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.ms-head h4 { margin: 0; }
-.ms-badge { padding: 3px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700; background: var(--surface-soft); border: 1px solid var(--border); color: var(--muted); }
+.th-grid .ms-card { grid-column: 1 / -1; @apply grid gap-[14px]; }
+.ms-head { @apply flex flex-wrap items-center justify-between gap-[8px]; }
+.ms-head h4 { @apply m-0; }
+.ms-badge { @apply p-[3px_12px] rounded-[999px]; font-size: .78rem; @apply font-bold; background: var(--surface-soft); border: 1px solid var(--border); @apply text-app-muted; }
 .ms-badge.ok { background: var(--success); border-color: var(--success); color: #fff; }
-.ms-badge.max { margin-left: 8px; background: var(--gold, #d9a21b); border-color: transparent; color: #231a00; }
+.ms-badge.max { @apply ml-[8px]; background: var(--gold, #d9a21b); border-color: transparent; color: #231a00; }
 
-.ms-dice { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
-.ms-dice-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; }
-.ms-dice-top b { font-size: 1.4rem; color: var(--accent); }
-.ms-dice-top small, .ms-next small { color: var(--muted); }
-.ms-pips { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px; }
-.ms-pips i { height: 14px; border-radius: 3px; background: var(--field, #1a1a24); border: 1px solid var(--border); }
-.ms-pips i.have { background: var(--accent); border-color: var(--accent); }
+.ms-dice { @apply grid gap-[8px] p-[12px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface-soft); }
+.ms-dice-top { @apply flex flex-wrap items-baseline justify-between gap-[6px]; }
+.ms-dice-top b { font-size: 1.4rem; @apply text-app-accent; }
+.ms-dice-top small, .ms-next small { @apply text-app-muted; }
+.ms-pips { @apply grid; grid-template-columns: repeat(24, minmax(0, 1fr)); @apply gap-[3px]; }
+.ms-pips i { @apply h-[14px] rounded-[3px]; background: var(--field, #1a1a24); border: 1px solid var(--border); }
+.ms-pips i.have { background: var(--accent); @apply border-app-accent; }
 .ms-pips i.spent { background: transparent; border-style: dashed; opacity: .6; }
-.ms-next { display: grid; gap: 4px; }
-.ms-bar { height: 6px; border-radius: 6px; background: var(--field, #1a1a24); overflow: hidden; }
-.ms-bar i { display: block; height: 100%; background: var(--gold, #d9a21b); }
+.ms-next { @apply grid gap-[4px]; }
+.ms-bar { @apply h-[6px] rounded-[6px]; background: var(--field, #1a1a24); @apply overflow-hidden; }
+.ms-bar i { @apply block h-full; background: var(--gold, #d9a21b); }
 
-.ms-spells { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
-.ms-spell { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
-.ms-spell-name { display: flex; align-items: center; }
-.ms-row { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 8px; font-size: .84rem; }
-.ms-row > span:first-child { color: var(--muted); }
-.ms-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; }
-.ms-seg i { height: 10px; border-radius: 3px; background: var(--field, #1a1a24); border: 1px solid var(--border); }
+.ms-spells { list-style: none; @apply m-0 p-0 grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); @apply gap-[10px]; }
+.ms-spell { @apply grid gap-[6px] p-[10px_12px]; border: 1px solid var(--border); @apply rounded-[10px]; }
+.ms-spell-name { @apply flex items-center; }
+.ms-row { @apply grid; grid-template-columns: 74px 1fr auto; @apply items-center gap-[8px]; font-size: .84rem; }
+.ms-row > span:first-child { @apply text-app-muted; }
+.ms-seg { @apply grid; grid-auto-flow: column; grid-auto-columns: 1fr; @apply gap-[3px]; }
+.ms-seg i { @apply h-[10px] rounded-[3px]; background: var(--field, #1a1a24); border: 1px solid var(--border); }
 .ms-seg i.on { background: var(--success); border-color: var(--success); }
 .ms-seg.pity i.on { background: var(--warning); border-color: var(--warning); }
-.ms-diff { margin: 0; font-size: .84rem; }
-.ms-diff b { color: var(--accent); }
-.ms-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.ms-actions button:disabled { cursor: not-allowed; }
-.ms-history summary { cursor: pointer; font-weight: 700; color: var(--accent); }
-.ms-ok { color: var(--success); font-weight: 700; }
-.ms-fail { color: var(--danger); font-weight: 700; }
+.ms-diff { @apply m-0; font-size: .84rem; }
+.ms-diff b { @apply text-app-accent; }
+.ms-actions { @apply flex flex-wrap items-center gap-[10px]; }
+.ms-actions button:disabled { @apply cursor-not-allowed; }
+.ms-history summary { @apply cursor-pointer font-bold text-app-accent; }
+.ms-ok { color: var(--success); @apply font-bold; }
+.ms-fail { color: var(--danger); @apply font-bold; }
 @media (max-width: 520px) { .ms-pips { grid-template-columns: repeat(12, minmax(0, 1fr)); } }

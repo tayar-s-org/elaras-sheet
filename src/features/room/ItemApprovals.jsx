@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { decideCustomItem, approveCustomItem, revokeCustomItem, ITEM_STATUS } from '../../lib/customItems.js';
 import { normalizeMoney, formatMoney } from '../../money.js';
 import { describeEffect } from '../../market/custom.js';
@@ -8,6 +9,7 @@ const fmtKg = n => `${(Math.round(n * 100) / 100).toString().replace('.', ',')} 
 
 // Aba do mestre: itens customizados que os jogadores enviaram para aprovação.
 export default function ItemApprovals({ items, available, refresh, members, characters }) {
+  const askConfirm = useConfirm();
   const [notes, setNotes] = useState({});
   const [prices, setPrices] = useState({});
   const [busy, setBusy] = useState('');
@@ -62,7 +64,7 @@ export default function ItemApprovals({ items, available, refresh, members, char
       <h3>Decididos</h3>
       <div className="mk-list">{decided.map(row => card(row, row.status === 'approved' ? <div className="approval-actions">
         <input aria-label={`Motivo para revogar ${row.name}`} maxLength={300} placeholder="Motivo da revogação (opcional)" value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} />
-        <button type="button" className="outline" disabled={busy === row.id} onClick={() => window.confirm(`Revogar a aprovação de ${row.name}? O item sai da mochila do jogador${row.price > 0 ? ` e os $ ${formatMoney(row.price)} voltam para ele` : ''}.`) && revoke(row)}>Revogar aprovação</button>
+        <button type="button" className="outline" disabled={busy === row.id} onClick={async () => await askConfirm({ title: 'Revogar aprovação?', text: `Revogar a aprovação de ${row.name}? O item sai da mochila do jogador${row.price > 0 ? ` e os $ ${formatMoney(row.price)} voltam para ele` : ''}.`, actionLabel: 'Revogar aprovação', danger: true }) && revoke(row)}>Revogar aprovação</button>
       </div> : null))}</div>
     </>}
   </div>;

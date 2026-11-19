@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { SKILLS } from '../../rules.js';
 import {
   createRequest, editRequest, deleteRequest, decideRequest, attemptUpgrade, REQUEST_STATUS, REQUEST_KIND,
@@ -73,6 +74,7 @@ function JobSummary({ cfg }) {
 }
 
 function AttemptPanel({ r, training, spellProgress, spellName, onDone }) {
+  const askConfirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -80,7 +82,7 @@ function AttemptPanel({ r, training, spellProgress, spellName, onDone }) {
   const sp = spellProgress?.[r.spell_id] || { pity: 0, improvements: 0 };
   const diff = attemptDifficulty(sp.improvements, sp.pity);
   const go = async () => {
-    if (!window.confirm(`Tentar aprimorar ${spellName}? A tentativa gasta ${ATTEMPT_DICE} dados de Astúcia, dê certo ou não.`)) return;
+    if (!(await askConfirm({ title: 'Tentar aprimoramento?', text: `Tentar aprimorar ${spellName}? A tentativa gasta ${ATTEMPT_DICE} dados de Astúcia, dê certo ou não.`, actionLabel: 'Tentar aprimorar' }))) return;
     setBusy(true); setError('');
     try { setResult(await attemptUpgrade(r.id)); onDone?.(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
@@ -101,6 +103,7 @@ function AttemptPanel({ r, training, spellProgress, spellName, onDone }) {
 }
 
 export function RequestCard({ r, isGm, owner, closed, who, spellName, training, spellProgress, refresh, onError }) {
+  const askConfirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ title: r.title, body: r.body });
@@ -129,7 +132,7 @@ export function RequestCard({ r, isGm, owner, closed, who, spellName, training, 
     {isGm && !closed && r.status !== 'done' && <details className="rq-gm" open={r.status === 'pending'}><summary>{r.status === 'approved' ? 'Ajustar configuração' : 'Decidir'}</summary><DecideForm r={r} busy={busy} onDecide={(status, o) => run(() => decideRequest(r.id, status, o))} /></details>}
     {canEditText && !editing && <div className="rq-actions">
       {r.status !== 'approved' || r.kind === 'work' ? <button type="button" className="outline" onClick={() => { setDraft({ title: r.title, body: r.body }); setEditing(true); }}>Editar sugestão</button> : null}
-      <button type="button" className="text-button danger" disabled={busy} onClick={() => { if (window.confirm('Apagar esta sugestão?')) run(() => deleteRequest(r.id)); }}>Apagar</button>
+      <button type="button" className="text-button danger" disabled={busy} onClick={async () => { if (await askConfirm({ title: 'Apagar sugestão?', text: 'Apagar esta sugestão?', actionLabel: 'Apagar sugestão', danger: true })) run(() => deleteRequest(r.id)); }}>Apagar</button>
     </div>}
   </article>;
 }

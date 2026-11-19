@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { DICE, SKILLS, ATTRIBUTES } from "../../rules.js";
 import { racialEffects } from "../../templates.js";
 import CustomSkillForm from "./CustomSkillForm.jsx";
@@ -10,6 +11,7 @@ const GROUPS = [...new Set(SKILLS.map(([, attr]) => attr))];
 
 /* eslint-disable-next-line no-unused-vars */
 export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage, cloudId, tableId }) {
+  const askConfirm = useConfirm();
   const [query, setQuery] = useState("");
   const [skillTab, setSkillTab] = useState(() => (Object.values(c.skills).some(v => v > 0) ? "trained" : GROUPS[0]));
   const racialSkill = racialEffects(c).skill;
@@ -81,7 +83,7 @@ export default function SkillsTab({ c, d, update, rule, setC, setConfirm, setToa
                 {DICE.map(v => <button key={v} type="button" role="radio" aria-checked={die === v} className={die === v ? "sel" : ""} onClick={() => setDie(s.name, v)}>d{v}</button>)}
               </div>
               <span className="skills2-cost" aria-label="Custo">{die ? `${cost(s.name, die)} pt` : ""}</span>
-              <button type="button" className="text-button danger" aria-label={`Tirar a perícia ${s.name} da ficha`} title="Tirar da ficha" onClick={() => window.confirm(`Tirar "${s.name}" da ficha? Para ter de novo, será preciso pedir ao mestre outra vez.`) && setC(prev => removeCustomSkill(prev, s.id))}>×</button>
+              <button type="button" className="text-button danger" aria-label={`Tirar a perícia ${s.name} da ficha`} title="Tirar da ficha" onClick={async () => await askConfirm({ title: 'Tirar perícia da ficha?', text: `Tirar "${s.name}" da ficha? Para ter de novo, será preciso pedir ao mestre outra vez.`, actionLabel: 'Tirar perícia', danger: true }) && setC(prev => removeCustomSkill(prev, s.id))}>×</button>
             </div>;
           })}
         </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../../ui/Modal.jsx';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { DEFAULT_SIZE, fitMapSize, putMapFile, switchBoardMap, saveBoardGrid, validateMapFile } from '../../lib/board.js';
 import { deleteSavedMap, listSavedMaps, readMapFile, readSavedMap, renameSavedMap, saveMap } from '../../lib/mapLibrary.js';
 import { boardGrid } from '../../boardGrid.js';
@@ -12,6 +13,7 @@ const generators = [
 ];
 
 export default function MapWorkspace({ board, marks, local, room, initial, onClose }) {
+  const askConfirm = useConfirm();
   const [view,setView] = useState(initial);
   const [generator,setGenerator] = useState(generators[0][1]);
   const [entries,setEntries] = useState(null);
@@ -21,12 +23,29 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
-  const [confirm,setConfirm] = useState(null);
   const [rename,setRename] = useState(null);
   const [pendingSuggestion,setPendingSuggestion] = useState(false);
+  const [invalidFields,setInvalidFields] = useState(false);
+  const [baseline,setBaseline] = useState(null);
+  const [draftVersion,setDraftVersion] = useState(0);
   const fileInput = useRef(null);
   const active = useRef(false);
   const draftUrl = useRef(null);
+  const snapshot = (label, values) => JSON.stringify([label.trim(), boardGrid(values)]);
+  const dirty = Boolean(draft && (baseline !== snapshot(name,grid) || pendingSuggestion || invalidFields));
+  async function protect(action) {
+    if (active.current) return;
+    if (dirty && !(await askConfirm({
+      title: 'Descartar ajustes da prévia?',
+      text: 'O mapa e os ajustes que ainda não foram gravados vão se perder.',
+      actionLabel: 'Descartar ajustes',
+      cancelLabel: 'Continuar editando',
+      danger: true,
+    }))) return;
+    return action();
+  }
+  const closeWorkspace = () => protect(onClose);
+
   const url = `https://watabou.github.io/${generator}/`;
 
   useEffect(() => {
@@ -59,35 +78,72 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
     if(draftUrl.current)URL.revokeObjectURL(draftUrl.current);
     draftUrl.current=image;
     setDraft({file,image,size,current,activeMap:board.map_path || null});
-    setGrid(boardGrid(entry?.grid || board.grid));
-    setName(entry?.name || (current ? board.name || 'Mapa da mesa' : file.name.replace(/\.[^.]+$/,'')));
+    const values = boardGrid(entry?.grid || board.grid);
+    const label = (entry?.name || (current ? board.name || 'Mapa da mesa' : file.name.replace(/\.[^.]+$/,''))).slice(0,100);
+    setGrid(values);
+    setName(label);
+    setBaseline(entry || current ? snapshot(label,values) : null);
+    setDraftVersion(version=>version+1);
     setView('calibrate');
   }
 
   function importFile(file) {
-    if(file)run(()=>prepare(file));
+    if(file)protect(()=>run(()=>prepare(file)));
   }
 
   async function apply(clearMarks, remove = false) {
     if(!remove && draft.current){
       const next=await saveBoardGrid({...board,map_path:draft.activeMap},grid);
       local.setBoard(next);
-      setNotice('Grade atualizada.');
+      room.sendBroadcast('board_refresh',{ configuration: true });
+      setBaseline(snapshot(name,next.grid));
+      setNotice('Grade aplicada ao tabuleiro e disponível para a mesa.');
       return;
     }
     const path=remove ? null : await putMapFile('maps',board.table_id,draft.file);
     const next=await switchBoardMap(board,path,remove ? DEFAULT_SIZE : draft.size,remove ? board.grid : grid,clearMarks);
     local.setBoard(next);
     local.setMarks([]);
+    room.sendBroadcast('board_refresh',{ configuration: true });
     await Promise.allSettled([local.reloadMap(),local.reloadItems()]);
-    room.sendBroadcast('board_refresh',{});
     onClose();
   }
 
-  function requestLoad(){
-    if(pendingSuggestion)return;
-    if(!draft.current && marks.length) { setConfirm('load'); return; }
-    run(()=>apply(false));
+  async function requestLoad() {
+    if (pendingSuggestion || invalidFields) return;
+    const clearMarks = !draft.current && marks.length > 0;
+    if (clearMarks && !(await askConfirm({
+      title: 'Trocar mapa do tabuleiro?',
+      text: 'A troca vai limpar os marcadores atuais. Os tokens serão mantidos.',
+      actionLabel: 'Trocar mapa',
+      danger: true,
+    }))) return;
+    return run(() => apply(clearMarks));
+  }
+
+  async function removeMap() {
+    if (!(await askConfirm({
+      title: 'Remover mapa do tabuleiro?',
+      text: dirty
+        ? 'Os marcadores atuais e os ajustes da prévia serão descartados. Os tokens serão mantidos.'
+        : 'Os marcadores atuais serão apagados. Os tokens serão mantidos.',
+      actionLabel: 'Remover mapa',
+      danger: true,
+    }))) return;
+    return run(() => apply(true, true));
+  }
+
+  async function deleteEntry(entry) {
+    if (!(await askConfirm({
+      title: 'Excluir mapa salvo?',
+      text: `“${entry.name}” será removido da biblioteca.`,
+      actionLabel: 'Excluir mapa salvo',
+      danger: true,
+    }))) return;
+    return run(async () => {
+      await deleteSavedMap(entry);
+      setEntries(previous => previous.filter(item => item.id !== entry.id));
+    });
   }
 
   async function saveDraft(){
@@ -95,16 +151,18 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
     if(!title)throw new Error('Informe um nome para salvar o mapa.');
     const entry=await saveMap(board.table_id,title,draft.file,draft.size,grid);
     setEntries(previous=>[entry,...(previous||[])]);
+    setBaseline(snapshot(entry.name,entry.grid));
     setNotice(`“${entry.name}” foi salvo na biblioteca. Você também pode carregá-lo agora.`);
   }
 
-  return <Modal onClose={onClose} busy={busy} aria-labelledby="map-workspace-title">
+  return <Modal onClose={closeWorkspace} busy={busy} aria-labelledby="map-workspace-title">
     <div className="modal map-workspace">
-      <header className="row"><h2 id="map-workspace-title">Mapas e grade</h2><button type="button" className="quiet" disabled={busy} onClick={onClose}>Fechar</button></header>
+      <header className="row"><h2 id="map-workspace-title">Mapas e grade</h2><button type="button" className="quiet" disabled={busy} onClick={closeWorkspace}>Fechar</button></header>
+      <div className="map-workspace-body">
       <nav className="tabs-row" aria-label="Ferramentas de mapa">
         <button type="button" className={view==='generate'?'primary':'outline'} disabled={busy} aria-pressed={view==='generate'} onClick={()=>setView('generate')}>Gerar mapa</button>
         <button type="button" className={view==='library'?'primary':'outline'} disabled={busy} aria-pressed={view==='library'} onClick={()=>setView('library')}>Biblioteca de mapas</button>
-        <button type="button" className="outline" disabled={busy} onClick={()=>run(async()=>prepare(board.map_path ? await readMapFile('maps',board.map_path) : null,null,true))}>Ajustar grade atual</button>
+        <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(board.map_path ? await readMapFile('maps',board.map_path) : null,null,true)))}>Ajustar grade atual</button>
         {draft && view!=='calibrate' && <button type="button" className="outline" disabled={busy} onClick={()=>setView('calibrate')}>Voltar à prévia</button>}
       </nav>
       {error && <p role="alert" className="callout">{error}</p>}
@@ -125,8 +183,8 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
       {view==='library' && <section className="map-library" aria-label="Mapas salvos">
         <div className="tabs-row">
           <button type="button" className="outline" disabled={busy} onClick={()=>setView('import')}>Importar para a biblioteca</button>
-          {board.map_path && <button type="button" className="outline" disabled={busy} onClick={()=>run(async()=>prepare(await readMapFile('maps',board.map_path),null,true))}>Salvar mapa atual</button>}
-          {board.map_path && <button type="button" className="text-button danger" disabled={busy} onClick={()=>setConfirm('remove')}>Remover mapa do tabuleiro</button>}
+          {board.map_path && <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(await readMapFile('maps',board.map_path),null,true)))}>Salvar mapa atual</button>}
+          {board.map_path && <button type="button" className="text-button danger" disabled={busy} onClick={removeMap}>Remover mapa do tabuleiro</button>}
         </div>
         {!entries && <p role="status">Carregando biblioteca…</p>}
         {entries?.length===0 && <p className="muted">Nenhum mapa salvo nesta mesa.</p>}
@@ -141,34 +199,28 @@ export default function MapWorkspace({ board, marks, local, room, initial, onClo
           </form> : <>
             <strong>{entry.name}</strong> <small className="muted">Célula de {Number(boardGrid(entry.grid).size.toFixed(1))}</small>
             <div className="tabs-row">
-              <button type="button" className="outline" disabled={busy} onClick={()=>run(async()=>prepare(await readSavedMap(entry.image_path),entry))}>Prévia e carregamento</button>
+              <button type="button" className="outline" disabled={busy} onClick={()=>protect(()=>run(async()=>prepare(await readSavedMap(entry.image_path),entry)))}>Prévia e carregamento</button>
               <button type="button" className="quiet" disabled={busy} onClick={()=>setRename({id:entry.id,name:entry.name})}>Renomear</button>
-              <button type="button" className="text-button danger" disabled={busy} onClick={()=>setConfirm(entry)}>Excluir</button>
+              <button type="button" className="text-button danger" disabled={busy} onClick={()=>deleteEntry(entry)}>Excluir</button>
             </div>
           </>}
         </article>)}
       </section>}
-      {view==='calibrate' && draft && <>
-        <fieldset disabled={busy||Boolean(confirm)} className="map-draft">
-          <MapCalibration image={draft.image} size={draft.size || DEFAULT_SIZE} grid={grid} setGrid={setGrid} onPendingSuggestion={setPendingSuggestion}/>
-          {draft.file && <label className="field">Nome na biblioteca <input value={name} maxLength={100} onChange={e=>setName(e.target.value)}/></label>}
-          <div className="tabs-row">
-            {draft.file && <button type="button" className="outline" disabled={!name.trim()||pendingSuggestion} onClick={()=>run(saveDraft)}>Salvar na biblioteca</button>}
-            <button type="button" className="primary" disabled={pendingSuggestion} onClick={requestLoad}>{draft.current ? 'Aplicar grade ao tabuleiro' : 'Carregar no tabuleiro'}</button>
-          </div>
-        </fieldset>
-      </>}
-      {confirm && <section className="callout" aria-label="Confirmação">
-        <p>{confirm==='load' ? 'Trocar o mapa vai limpar os marcadores atuais. Os tokens serão mantidos.' : confirm==='remove' ? 'Remover o mapa e limpar os marcadores atuais? Os tokens serão mantidos.' : `Excluir “${confirm.name}” da biblioteca?`}</p>
-        <button type="button" className="outline" disabled={busy} onClick={()=>setConfirm(null)}>Cancelar</button>{' '}
-        <button type="button" className="primary" disabled={busy} onClick={()=>run(async()=>{
-          if(confirm==='load') await apply(true);
-          else if(confirm==='remove') await apply(true,true);
-          else {await deleteSavedMap(confirm);setEntries(xs=>xs.filter(x=>x.id!==confirm.id));}
-          setConfirm(null);
-        })}>{confirm==='load' ? 'Trocar mapa' : confirm==='remove' ? 'Remover mapa' : 'Excluir mapa salvo'}</button>
-      </section>}
+      {draft && <fieldset key={draftVersion} hidden={view!=='calibrate'} disabled={busy} className="map-draft">
+        <MapCalibration image={draft.image} size={draft.size || DEFAULT_SIZE} grid={grid} setGrid={setGrid}
+          onPendingSuggestion={setPendingSuggestion} onInvalidFields={setInvalidFields}/>
+        {draft.file && <label className="field">Nome na biblioteca <input value={name} maxLength={100} onChange={e=>setName(e.target.value)}/></label>}
+      </fieldset>}
       {busy && <p role="status">Processando…</p>}
+      </div>
+      {view==='calibrate' && draft && <footer className="map-workspace-footer">
+        {pendingSuggestion && <p role="status">Aceite ou descarte a sugestão para gravar.</p>}
+        {!pendingSuggestion && invalidFields && <p role="status">Corrija os campos da grade antes de gravar.</p>}
+        <div className="tabs-row">
+          {draft.file && <button type="button" className="outline" disabled={busy||!name.trim()||pendingSuggestion||invalidFields} onClick={()=>run(saveDraft)}>Salvar na biblioteca</button>}
+          <button type="button" className="primary" disabled={busy||pendingSuggestion||invalidFields} onClick={requestLoad}>{draft.current ? 'Aplicar grade ao tabuleiro' : 'Carregar no tabuleiro'}</button>
+        </div>
+      </footer>}
     </div>
   </Modal>;
 }

@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import Modal from '../../ui/Modal.jsx';
 import { updateBoard } from '../../lib/board.js';
 import { uploadMusic, removeMusicFile } from '../../lib/music.js';
@@ -10,6 +11,7 @@ import './master.css';
 
 // Janelas do mestre para a música da mesa (botão verde) e para o soundpad (botão amarelo).
 export default function AudioModal({ kind, board, pad, local, setError, onClose }) {
+  const askConfirm = useConfirm();
   const musicRef = useRef(null);
   const soundRef = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -39,7 +41,7 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
         <h3 id="m-music">Música</h3>
         <div className="row master-actions">
           <button type="button" className="primary" disabled={busy} onClick={() => musicRef.current.click()}>{music ? 'Trocar música' : 'Enviar música'}</button>
-          {music && <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm('Remover a música da mesa?') && run(async () => { const path = music.path; await setMusic(null); await removeMusicFile(path); })}>Remover música</button>}
+          {music && <button type="button" className="text-button danger" disabled={busy} onClick={async () => await askConfirm({ title: 'Remover música?', text: 'Remover a música da mesa?', actionLabel: 'Remover música', danger: true }) && run(async () => { const path = music.path; await setMusic(null); await removeMusicFile(path); })}>Remover música</button>}
           <input ref={musicRef} type="file" hidden accept="video/mp4,audio/mp4,audio/x-m4a,audio/mpeg,.mp4,.m4a,.mp3"
             onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; const bad = musicFileError(f); if (bad) { setError(bad); return; }
               run(async () => { const path = await uploadMusic(board.table_id, f, music?.path); await setMusic(newMusic(path, musicTitle(f.name))); }); }} />
@@ -67,7 +69,7 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
             onBlur={e => { const v = e.target.value.trim(); if (v && v !== s.name) run(async () => { await updateSound(s.id, { name: v }); await pad.changed(); }); }} />
           <label className="check"><input type="checkbox" checked={s.loop} onChange={e => run(async () => { await updateSound(s.id, { loop: e.target.checked }); await pad.changed(); })} /> Repetir</label>
           <button type="button" className="outline" onClick={() => (pad.active.includes(s.id) ? pad.stop(s.id) : pad.play(s.id))}>{pad.active.includes(s.id) ? 'Parar' : 'Tocar'}</button>
-          <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm(`Apagar o som ${s.name}?`) && run(async () => { pad.stop(s.id); await deleteSound(s); await pad.changed(); })}>Apagar</button>
+          <button type="button" className="text-button danger" disabled={busy} onClick={async () => await askConfirm({ title: 'Apagar som?', text: `Apagar o som ${s.name}?`, actionLabel: 'Apagar som', danger: true }) && run(async () => { pad.stop(s.id); await deleteSound(s); await pad.changed(); })}>Apagar</button>
         </div>)}
       </section>}
     </div>

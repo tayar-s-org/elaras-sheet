@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { navigate } from '../../lib/router.js';
 import { listMine } from '../../lib/cloud.js';
 import { clearLastRoom } from '../../lib/lastRoom.js';
@@ -48,6 +49,7 @@ export function JoinApprovals({ table, members, reload, run }) {
 }
 
 function GmPanel({ table, me, members, reload, run, showJoinApprovals }) {
+  const askConfirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
   const [code, setCode] = useState('');
   const [copied, setCopied] = useState(false);
@@ -85,7 +87,7 @@ function GmPanel({ table, me, members, reload, run, showJoinApprovals }) {
       {!players.length && <p className="muted">Ainda não há jogadores aprovados.</p>}
       {players.map(m => <div className="row" key={m.user_id}>
         <span>{m.profiles?.display_name}</span>
-        <button className="text-button danger" onClick={() => window.confirm(`Remover ${m.profiles?.display_name} da mesa?`) && decide(m.user_id, 'kicked')}>Expulsar</button>
+        <button className="text-button danger" onClick={async () => await askConfirm({ title: 'Expulsar participante?', text: `Remover ${m.profiles?.display_name} da mesa?`, actionLabel: 'Expulsar', danger: true }) && decide(m.user_id, 'kicked')}>Expulsar</button>
       </div>)}
     </section>
     {me?.status === 'approved' && <section className="item-card">
@@ -104,6 +106,7 @@ function GmPanel({ table, me, members, reload, run, showJoinApprovals }) {
 }
 
 function PlayerPanel({ table, me, members, reload, run }) {
+  const askConfirm = useConfirm();
   const roster = members.filter(m => m.status === 'approved');
   return <>
     {me.status === 'approved' && <>
@@ -112,7 +115,7 @@ function PlayerPanel({ table, me, members, reload, run }) {
         {roster.map(m => <div className="row" key={m.user_id}><span>{m.profiles?.display_name}</span><span className="muted">{m.role === 'gm' ? 'Mestre' : 'Jogador'}</span></div>)}
       </section>
     </>}
-    <button className="text-button danger" onClick={() => window.confirm('Sair desta mesa?') && run(async () => { await leaveTable(table.id); clearLastRoom(table.id); navigate('/mesas'); })}>Sair da mesa</button>
+    <button className="text-button danger" onClick={async () => await askConfirm({ title: 'Sair da mesa?', text: 'Sair desta mesa?', actionLabel: 'Sair da mesa', danger: true }) && run(async () => { await leaveTable(table.id); clearLastRoom(table.id); navigate('/mesas'); })}>Sair da mesa</button>
   </>;
 }
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useConfirm } from './ui/ConfirmProvider.jsx';
 import { elaraCharacter, newCharacter, calculate } from "./rules.js";
 import { SHEETS_STORAGE, LEGACY_STORAGE, restoreSheets, openSheet, editSheet, closeSheet, closeCloudTab, openCloudSheet, syncCloudSheets, sheetsLosingChanges, setSheetTable, applyTables } from "./sheets.js";
 import { fetchCloudRows } from "./features/library/syncCloud.js";
@@ -28,10 +29,10 @@ import TopBar from "./features/sheet/TopBar.jsx";
 import SheetSummary from "./features/sheet/SheetSummary.jsx";
 import SheetModules from "./features/sheet/SheetModules.jsx";
 import Toast from "./ui/Toast.jsx";
-import ConfirmModal from "./ui/ConfirmModal.jsx";
 
 const OWNER_KEY = "manrakora-sheets-owner";
 export default function App() {
+  const askConfirm = useConfirm();
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'light');
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -52,9 +53,10 @@ export default function App() {
     setSyncNote('');
     try {
       const rows = await fetchCloudRows();
+      const conflictsBeforePrompt = sheetsLosingChanges(sessionRef.current, rows);
+      if (conflictsBeforePrompt.length && !(await askConfirm({ title: 'Sincronizar fichas?', text: 'A nuvem tem versões mais novas. Carregar essas versões e guardar as alterações locais em abas de cópia?', actionLabel: 'Sincronizar' }))) return;
       const current = sessionRef.current;
       const conflicts = sheetsLosingChanges(current, rows);
-      if (conflicts.length && !window.confirm('A nuvem tem versões mais novas. Carregar essas versões e guardar as alterações locais em abas de cópia?')) return;
       const result = syncCloudSheets(current, rows);
       for (const sheet of conflicts) {
         const copy = { ...sheet.character, name: sheet.character.name ? `${sheet.character.name.slice(0, 85)} (cópia local)` : 'Cópia local' };
@@ -90,7 +92,9 @@ export default function App() {
   useEvolutionClaims(session, setSession, auth.user, setToast);
   useAptitudeNotice(auth.user, setToast);
   const [storageError, setStorageError] = useState(false);
-  const [confirm, setConfirm] = useState(null);
+  const setConfirm = async ({ action, ...options }) => {
+    if (await askConfirm(options)) await action();
+  };
   const [requestedPage, setRequestedPage] = useState(null);
   const d = calculate(c);
   const update = (key, value) => setC((prev) => ({ ...prev, [key]: value }));
@@ -249,7 +253,7 @@ export default function App() {
             } catch (error) { setToast('Não foi possível excluir a ficha. ' + error.message); }
           },
         }) : undefined} />
-      {syncNote && <p className="muted" role="status" style={{margin:'4px 16px'}}>{syncNote}</p>}
+      {syncNote && <p className="muted mx-[16px] my-[4px]" role="status">{syncNote}</p>}
       <SheetTabs session={session} onSelect={id => setSession(prev => ({...prev,activeId:id}))}
         onNew={() => addCharacter(newCharacter())} master={master} onMaster={() => setMaster(value => !value)}
         onClose={id => {
@@ -322,7 +326,6 @@ export default function App() {
         <SheetSummary c={c} d={d} tableId={activeSheet?.tableId} cloudId={activeSheet?.cloud?.id} />
       </main>}
       <Toast toast={toast} onClose={() => setToast("")} />
-      <ConfirmModal confirm={confirm} onClose={() => setConfirm(null)} />
     </>
   );
 }

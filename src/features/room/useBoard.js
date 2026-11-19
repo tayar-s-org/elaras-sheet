@@ -34,10 +34,34 @@ export function useBoard(tableId, user, room) {
     }
   }, []);
 
+  const syncBoard = useCallback(next => {
+    const previous = boardRef.current;
+    boardRef.current = next;
+    setBoard(next);
+    if (next.map_path !== previous?.map_path) {
+      refreshMap(next);
+      refreshItems(next.id).catch(e => setError(e.message));
+    }
+  }, [refreshItems, refreshMap]);
+
   useEffect(() => {
     if (!supabase || !user) return undefined;
     let alive = true;
     let channel;
+    let boardRequest = 0;
+    async function reloadBoard() {
+      const request = ++boardRequest;
+      const previous = boardRef.current;
+      try {
+        const next = await loadBoard(tableId);
+        if (alive && request === boardRequest && previous === boardRef.current && next) syncBoard(next);
+      } catch (e) {
+        if (alive && request === boardRequest) setError(e.message);
+      }
+    }
+    const stopRefresh = onBroadcast('board_refresh', payload => {
+      if (payload?.configuration) reloadBoard();
+    });
     (async () => {
       try {
         const b = await loadBoard(tableId);
@@ -50,12 +74,7 @@ export function useBoard(tableId, user, room) {
         channel = supabase.channel(`board:${tableId}`)
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'boards', filter: `table_id=eq.${tableId}` }, p => {
             const prev = boardRef.current;
-            boardRef.current = { ...prev, ...p.new };
-            setBoard(boardRef.current);
-            if (p.new.map_path !== prev?.map_path) {
-              refreshMap(p.new);
-              refreshItems(p.new.id).catch(e=>setError(e.message));
-            }
+            if (prev?.id === p.new.id) syncBoard({ ...prev, ...p.new });
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'board_tokens', filter: `table_id=eq.${tableId}` }, p => {
             if (p.eventType === 'DELETE') setTokens(prev => prev.filter(t => t.id !== p.old.id));
@@ -68,11 +87,11 @@ export function useBoard(tableId, user, room) {
             if (p.eventType === 'DELETE') setMarks(prev => prev.filter(m => m.id !== p.old.id));
             else setMarks(prev => upsert(prev, p.new));
           })
-          .subscribe();
+          .subscribe(status => { if (status === 'SUBSCRIBED') reloadBoard(); });
       } catch (e) { if (alive) { setError(e.message); setBoard(prev => (prev === undefined ? null : prev)); } }
     })();
-    return () => { alive = false; mapRequest.current += 1; if (channel) supabase.removeChannel(channel); };
-  }, [tableId, user?.id, refreshItems, refreshMap]);
+    return () => { alive = false; stopRefresh(); mapRequest.current += 1; if (channel) supabase.removeChannel(channel); };
+  }, [tableId, user?.id, onBroadcast, refreshItems, refreshMap, syncBoard]);
 
   // Posicoes provisorias vindas de outros jogadores durante o arraste.
   useEffect(() => onBroadcast('drag', p => {
@@ -80,7 +99,9 @@ export function useBoard(tableId, user, room) {
     setDrags(prev => (p.done ? (({ [p.id]: _, ...rest }) => rest)(prev) : { ...prev, [p.id]: { x: p.x, y: p.y } }));
   }), [onBroadcast]);
   // O mestre avisa quando algo mudou de forma que o Realtime nao entrega (ex.: token oculto).
-  useEffect(() => onBroadcast('board_refresh', () => { if (boardRef.current) refreshItems(boardRef.current.id).catch(() => {}); }), [onBroadcast, refreshItems]);
+  useEffect(() => onBroadcast('board_refresh', payload => {
+    if (!payload?.configuration && boardRef.current) refreshItems(boardRef.current.id).catch(() => {});
+  }), [onBroadcast, refreshItems]);
 
   const local = {
     setTokens, setMarks,

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import Modal from '../../ui/Modal.jsx';
 import {
   loadRoutines, createRoutine, saveRoutine, submitRoutine, setRoutineStatus, deleteRoutine, TRAINING_STATUS,
@@ -47,6 +48,7 @@ const whoColor = id => {
 
 // only="history": janela separada "Ver Meus Treinamentos" (só o histórico, sem a rotina); onGo(view) pede para abrir a Rotina de Treino naquela aba.
 export default function TrainingModal({ tableId, me, isGm, initial, initialRoutine, initialView, only, onGo, members, characters, closed, onClose }) {
+  const askConfirm = useConfirm();
   const roster = useMemo(() => members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id] && (only !== 'history' || isGm || m.user_id === me)), [members, characters, only, isGm, me]);
   const [selected, setSelected] = useState(() => (initial && roster.some(m => m.character_id === initial) ? initial : roster.find(m => m.user_id === me)?.character_id || roster[0]?.character_id));
   const [view, setView] = useState(only === 'history' ? 'history' : initialView || (initialRoutine ? 'routines' : 'calendar'));
@@ -171,8 +173,8 @@ export default function TrainingModal({ tableId, me, isGm, initial, initialRouti
     setRoutineId(row.id);
     setView('routines');
   });
-  const remove = () => {
-    if (!window.confirm(`Apagar a rotina "${label(current)}"? Os dias futuros que a usam ficam vazios.`)) return;
+  const remove = async () => {
+    if (!(await askConfirm({ title: 'Apagar rotina?', text: `Apagar a rotina "${label(current)}"? Os dias futuros que a usam ficam vazios.`, actionLabel: 'Apagar rotina', danger: true }))) return;
     act(async () => {
       await deleteRoutine(current.id);
       setRows(prev => prev.filter(r => r.id !== current.id));

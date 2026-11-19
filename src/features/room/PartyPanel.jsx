@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import { saveState, sendMessage } from '../../lib/room.js';
 import SheetViewModal from './SheetViewModal.jsx';
 import { AptitudeGrant } from '../routine/AptitudeSummary.jsx';
@@ -75,6 +76,7 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
 
 // Mestre: concede XP a uma ficha (ou a todas). O jogador recebe na ficha dele; a mesa ve um aviso no chat.
 function XpGrant({ tableId, targets, label }) {
+  const askConfirm = useConfirm();
   const [text, setText] = useState('1');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -84,7 +86,7 @@ function XpGrant({ tableId, targets, label }) {
     e?.preventDefault();
     if (!valid || busy || !targets.length) return;
     const who = targets.length === 1 ? (targets[0].name || 'um personagem') : 'todos os jogadores';
-    if (sign < 0 && !window.confirm(`Remover ${amount} XP de ${who}?`)) return;
+    if (sign < 0 && !(await askConfirm({ title: 'Remover XP?', text: `Remover ${amount} XP de ${who}?`, actionLabel: 'Remover XP', danger: true }))) return;
     setBusy(true);
     setMsg('');
     try {

@@ -1,0 +1,99 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source("./");
+
+@source not inline("outline");
+
+@theme inline {
+  --color-app-surface: var(--surface);
+  --color-app-field: var(--field);
+  --color-app-text: var(--text);
+  --color-app-muted: var(--muted);
+  --color-app-accent: var(--accent);
+  --color-app-control: var(--control-border);
+  --color-app-danger: var(--danger);
+  --color-app-on-danger: var(--on-danger);
+  --font-app-display: var(--font-display);
+}
+
+:where(input, select, textarea) {
+  @apply min-w-0 max-w-full;
+}
+
+:where(input:not([type=hidden], [hidden], [type=checkbox], [type=radio], [type=range], [type=file], [type=color], [type=button], [type=submit], [type=reset], [type=image]), select, textarea) {
+  @apply rounded-lg border border-solid border-app-control bg-app-field px-3 py-2 text-app-text caret-app-accent;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+:where(select:not([multiple], [size]), select[size="1"]) {
+  @apply appearance-none bg-no-repeat ps-3 pe-7;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: right 15px center, right 10px center;
+  background-size: 5px 5px;
+}
+
+:where(textarea) { @apply resize-y; }
+.field :where(input:not([type=checkbox], [type=radio], [type=range], [type=color], [type=file]), select, textarea) {
+  @apply w-full normal-case tracking-normal;
+}
+
+.tr-table td.tr-act .tr-act-row select {
+  appearance: auto;
+  background-image: none;
+}
+
+:where(input, textarea)::placeholder { @apply text-app-muted opacity-100; }
+:where(input, select, textarea):disabled { @apply cursor-not-allowed opacity-60; }
+:where(input, select, textarea):focus-visible {
+  @apply outline-2 outline-offset-1 outline-solid outline-app-accent;
+}
+
+:where(input[type=checkbox], input[type=radio]) {
+  @apply size-4 shrink-0 align-middle accent-app-accent;
+}
+
+:where(input[type=range]) { @apply accent-app-accent; }
+
+:where(input[type=color]) {
+  @apply cursor-pointer rounded-lg border border-solid border-app-control bg-app-field p-1;
+}
+
+@media (forced-colors: active) {
+  :where(select:not([multiple], [size]), select[size="1"]) {
+    appearance: auto;
+    background-image: none;
+  }
+}
+
+.confirmation-panel {
+  @apply w-full max-w-md rounded-2xl bg-app-surface p-5 sm:p-7;
+  box-shadow: 0 20px 80px var(--shadow);
+}
+
+.confirmation-panel h2 {
+  @apply m-0 font-app-display text-2xl leading-tight font-bold text-app-text wrap-anywhere;
+}
+
+.confirmation-panel p {
+  @apply mt-3 mb-0 text-base leading-relaxed text-app-muted;
+}
+
+.confirmation-actions {
+  @apply mt-6 flex flex-col flex-wrap gap-2 sm:flex-row sm:justify-end;
+}
+
+.confirmation-actions button { @apply min-h-10; }
+
+.danger-solid {
+  @apply cursor-pointer rounded-lg border border-solid border-app-danger bg-app-danger px-4 py-2 font-bold text-app-on-danger;
+}
+
+.danger-solid:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--danger) 90%, var(--on-danger));
+}
+
+.danger-solid:disabled { @apply cursor-not-allowed; }

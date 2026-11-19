@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import Modal from '../../ui/Modal.jsx';
 import { updateBoard, addToken, loadCreatureDetails, saveCreatureToken, updateToken, removeToken, clearMarks, applyMoves, gatherTokens } from '../../lib/board.js';
 import { creatureOf, metaWithHideHp, metaWithHp, metaWithMaxHp, parseHp, newCreatureMeta, uniqueName, CREATURE_COLOR, MAX_HP } from '../../creature.js';
@@ -9,6 +10,7 @@ import './master.css';
 const COLORS = ['#7a4dff', '#2e9e5b', '#d9a21b', '#2f7fd0', '#444444'];
 
 export default function MasterModule({ board, tokens, marks, members, characters, selected, onSelect, room, local, onClose, onCreateCreature, onEditImage, onEditPreset, mode = "map", onMapTools, onGoToToken, initialNotice = "" }) {
+  const askConfirm = useConfirm();
   const [presets, setPresets] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState(initialNotice);
@@ -101,7 +103,7 @@ export default function MasterModule({ board, tokens, marks, members, characters
               setNotice(`${t.name} foi colocado no mapa.`);
             })}>Colocar no mapa</button>
             <button type="button" className="outline" disabled={busy} onClick={() => onEditPreset(p)}>Editar predefinição</button>
-            <button type="button" className="text-button danger" disabled={busy} onClick={() => window.confirm(`Apagar a predefinição ${p.name}?`) && run(async () => { await deletePreset(p.id); setPresets(prev => prev.filter(x => x.id !== p.id)); })}>Apagar</button>
+            <button type="button" className="text-button danger" disabled={busy} onClick={async () => await askConfirm({ title: 'Apagar predefinição?', text: `Apagar a predefinição ${p.name}?`, actionLabel: 'Apagar predefinição', danger: true }) && run(async () => { await deletePreset(p.id); setPresets(prev => prev.filter(x => x.id !== p.id)); })}>Apagar</button>
             </div>
             {placed?.presetId === p.id && <div className="preset-feedback">
               <p role="status">{notice}</p>
@@ -154,7 +156,7 @@ export default function MasterModule({ board, tokens, marks, members, characters
               onClick={() => run(async () => { const hidden = !selected.hidden; await updateToken(selected.id, { hidden }); local.setTokens(prev => prev.map(t => (t.id === selected.id ? { ...t, hidden } : t))); room.sendBroadcast('board_refresh', {}); })}>
               {selected.hidden ? 'Revelar aos jogadores' : 'Ocultar dos jogadores'}</button>
             <button type="button" className="text-button danger" disabled={busy}
-              onClick={() => window.confirm(`Remover o token ${selected.name}?`) && run(async () => { await removeToken(selected.id); local.setTokens(prev => prev.filter(t => t.id !== selected.id)); onSelect(null); })}>Remover token</button>
+              onClick={async () => await askConfirm({ title: 'Remover token?', text: `Remover o token ${selected.name}?`, actionLabel: 'Remover token', danger: true }) && run(async () => { await removeToken(selected.id); local.setTokens(prev => prev.filter(t => t.id !== selected.id)); onSelect(null); })}>Remover token</button>
           </div>
         </div>}
       </section>
@@ -162,7 +164,7 @@ export default function MasterModule({ board, tokens, marks, members, characters
       <section className="master-section" aria-labelledby="m-marks">
         <h3 id="m-marks">Marcadores</h3>
         <button type="button" className="text-button danger" disabled={busy || !marks.length}
-          onClick={() => window.confirm('Apagar todos os marcadores?') && run(async () => { await clearMarks(board.id); local.setMarks([]); })}>Limpar marcadores ({marks.length})</button>
+          onClick={async () => await askConfirm({ title: 'Limpar marcadores?', text: 'Apagar todos os marcadores?', actionLabel: 'Limpar marcadores', danger: true }) && run(async () => { await clearMarks(board.id); local.setMarks([]); })}>Limpar marcadores ({marks.length})</button>
       </section>
       {notice && <p role="status">{notice}</p>}
       </>}

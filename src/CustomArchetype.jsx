@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useConfirm } from './ui/ConfirmProvider.jsx';
 import { ATTRIBUTES, SKILLS, DICE, calculate } from './rules.js';
 import { loadCustomArchetype, advantageNames } from './templates.js';
 import './custom-archetype.css';
@@ -11,6 +12,7 @@ const fromSheet = c => ({ id: '', name: c.concept || '', attributes: { ...c.attr
 
 // Aba "Criar o meu": monta um arquétipo próprio, aplica na ficha e guarda como modelo reutilizável neste navegador.
 export default function CustomArchetype({ character: c, onChange, onLoad }) {
+  const askConfirm = useConfirm();
   const [draft, setDraft] = useState(blank);
   const [saved, setSaved] = useState(load);
   const [skillPick, setSkillPick] = useState('');
@@ -93,7 +95,7 @@ export default function CustomArchetype({ character: c, onChange, onLoad }) {
         <div className="row token-row">
           <button type="button" className="primary" onClick={() => apply(t)}>Usar {t.name}</button>
           <button type="button" className="outline" onClick={() => setDraft({ ...t })}>Editar</button>
-          <button type="button" className="text-button danger" onClick={() => window.confirm(`Apagar o modelo "${t.name}"?`) && remove(t.id)}>Apagar</button>
+          <button type="button" className="text-button danger" onClick={async () => await askConfirm({ title: 'Apagar modelo?', text: `Apagar o modelo "${t.name}"?`, actionLabel: 'Apagar modelo', danger: true }) && remove(t.id)}>Apagar</button>
         </div>
       </article>)}</div>
     </>}

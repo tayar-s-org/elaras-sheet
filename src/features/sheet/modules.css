@@ -1,54 +1,55 @@
-.sheet-modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-.mod-card { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); scroll-margin-top: 84px; min-width: 0; }
+@reference "../../tailwind.css";
+.sheet-modules { @apply grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); @apply gap-[14px]; }
+.mod-card { @apply flex flex-col gap-[12px] p-[16px_18px]; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); scroll-margin-top: 84px; @apply min-w-0; }
 .mod-card.wide { grid-column: 1 / -1; }
-.mod-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.mod-head h2 { margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: baseline; gap: 10px; }
+.mod-head { @apply flex items-center justify-between gap-[10px]; }
+.mod-head h2 { @apply m-0; font-size: 1.15rem; @apply font-bold flex items-baseline gap-[10px]; }
 .mod-num { font-size: .8rem; color: var(--gold); font-family: var(--font-display); }
-.mod-body { display: grid; gap: 8px; align-content: start; }
-.mod-sub { margin: 4px 0 0; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.mod-empty { margin: 0; color: var(--muted); font-size: .9rem; font-style: italic; }
-.mod-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.45; }
-.mod-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.mod-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: .88rem; }
-.mod-chip b { color: var(--accent); }
-.mod-chip.power { border-color: var(--accent); background: var(--selection); }
+.mod-body { @apply grid gap-[8px]; align-content: start; }
+.mod-sub { @apply m-[4px_0_0]; font-size: .72rem; letter-spacing: .08em; @apply uppercase text-app-muted; }
+.mod-empty { @apply m-0 text-app-muted; font-size: .9rem; font-style: italic; }
+.mod-text { @apply m-0; white-space: pre-line; @apply wrap-anywhere; line-height: 1.45; }
+.mod-chips { @apply flex flex-wrap gap-[6px]; }
+.mod-chip { @apply inline-flex items-baseline gap-[6px] p-[3px_10px] rounded-[999px]; border: 1px solid var(--border); background: var(--surface); font-size: .88rem; }
+.mod-chip b { @apply text-app-accent; }
+.mod-chip.power { @apply border-app-accent; background: var(--selection); }
 .mod-chip.major b { color: var(--danger); }
 .mod-chip.minor b { color: var(--warning); }
-.mod-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
-.mod-stat { display: grid; justify-items: center; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-.mod-stat b { font-family: var(--font-display); font-size: 1.35rem; color: var(--accent); line-height: 1.1; }
-.mod-stat span { font-size: .72rem; color: var(--muted); }
-.mod-list { margin: 0; padding-left: 18px; }
-.mod-identity { display: flex; align-items: center; gap: 18px; }
-.mod-token { flex: none; width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
-.mod-token.empty { display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); font-size: 2.6rem; }
-.mod-name { margin: 0; font-family: var(--font-display); font-size: 1.6rem; line-height: 1.1; }
-.mod-identity p { margin: 2px 0 0; }
-.mod-facts { color: var(--muted); font-size: .92rem; }
+.mod-stats { @apply grid; grid-template-columns: repeat(3, 1fr); @apply gap-[8px] mt-[4px]; }
+.mod-stat { @apply grid; justify-items: center; @apply p-[6px]; border: 1px solid var(--border); @apply rounded-[8px]; background: var(--surface); }
+.mod-stat b { font-family: var(--font-display); font-size: 1.35rem; @apply text-app-accent; line-height: 1.1; }
+.mod-stat span { font-size: .72rem; @apply text-app-muted; }
+.mod-list { @apply m-0 pl-[18px]; }
+.mod-identity { @apply flex items-center gap-[18px]; }
+.mod-token { @apply flex-none w-[92px] h-[92px]; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+.mod-token.empty { @apply grid place-items-center rounded-[50%]; border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); font-size: 2.6rem; }
+.mod-name { @apply m-0; font-family: var(--font-display); font-size: 1.6rem; line-height: 1.1; }
+.mod-identity p { @apply m-[2px_0_0]; }
+.mod-facts { @apply text-app-muted; font-size: .92rem; }
 
-.mod-editor { width: min(980px, 100%); max-width: 980px; background: var(--surface); border-radius: 10px; box-shadow: 0 20px 80px var(--shadow); max-height: calc(100vh - 48px); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-.mod-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
-.mod-editor-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; }
-.mod-editor-body { overflow: auto; padding: 22px 24px 28px; }
+.mod-editor { width: min(980px, 100%); @apply max-w-[980px]; background: var(--surface); @apply rounded-[10px]; box-shadow: 0 20px 80px var(--shadow); max-height: calc(100vh - 48px); @apply flex flex-col p-0 overflow-hidden; }
+.mod-editor-head { @apply flex items-center justify-between gap-[12px] p-[16px_24px]; border-bottom: 1px solid var(--border); }
+.mod-editor-head h2 { @apply m-0; font-family: var(--font-display); font-size: 1.7rem; @apply font-bold; }
+.mod-editor-body { @apply overflow-auto p-[22px_24px_28px]; }
 
 /* Vantagens, complicacoes e itens: cada um abre para mostrar o efeito */
-.mod-details { display: grid; gap: 6px; }
-.mod-detail { border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.mod-details { @apply grid gap-[6px]; }
+.mod-detail { border: 1px solid var(--border); border-left: 4px solid var(--border); @apply rounded-[8px]; background: var(--surface-soft); }
 .mod-detail.power { border-left-color: var(--accent); }
 .mod-detail.major { border-left-color: var(--danger); }
 .mod-detail.minor { border-left-color: var(--warning); }
-.mod-detail summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 6px 10px; cursor: pointer; }
-.mod-detail summary small { color: var(--muted); font-size: .72rem; text-transform: uppercase; }
-.mod-detail-body { padding: 2px 12px 8px; display: grid; gap: 4px; font-size: .86rem; }
-.mod-detail-body p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.mod-detail-body ul { margin: 0; padding-left: 18px; }
+.mod-detail summary { @apply flex flex-wrap items-baseline gap-[8px] p-[6px_10px] cursor-pointer; }
+.mod-detail summary small { @apply text-app-muted; font-size: .72rem; @apply uppercase; }
+.mod-detail-body { @apply p-[2px_12px_8px] grid gap-[4px]; font-size: .86rem; }
+.mod-detail-body p { @apply m-0 whitespace-pre-wrap wrap-anywhere; }
+.mod-detail-body ul { @apply m-0 pl-[18px]; }
 
 /* Magias em linhas: nome e, abaixo, custo de mana, dano, distancia e duracao */
-.mod-spells { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.mod-spell { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; background: var(--surface-soft); }
-.mod-spell-name small { color: var(--muted); font-weight: 400; }
-.mod-spell-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px 12px; font-size: .84rem; }
-.mod-spell-facts span { display: grid; }
-.mod-spell-facts i { font-style: normal; font-size: .66rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
-.mod-spell-desc summary { cursor: pointer; font-size: .8rem; color: var(--accent); }
-.mod-spell-desc p { margin: 4px 0 0; font-size: .84rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mod-spells { list-style: none; @apply m-0 p-0 grid gap-[6px]; }
+.mod-spell { @apply grid gap-[4px] p-[8px_10px]; border: 1px solid var(--border); border-left: 4px solid var(--accent); @apply rounded-[8px]; background: var(--surface-soft); }
+.mod-spell-name small { @apply text-app-muted font-normal; }
+.mod-spell-facts { @apply grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); @apply gap-[4px_12px]; font-size: .84rem; }
+.mod-spell-facts span { @apply grid; }
+.mod-spell-facts i { font-style: normal; font-size: .66rem; letter-spacing: .05em; @apply uppercase text-app-muted; }
+.mod-spell-desc summary { @apply cursor-pointer; font-size: .8rem; @apply text-app-accent; }
+.mod-spell-desc p { @apply m-[4px_0_0]; font-size: .84rem; @apply whitespace-pre-wrap wrap-anywhere; }
