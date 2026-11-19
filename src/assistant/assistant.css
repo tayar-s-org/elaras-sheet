@@ -8,7 +8,13 @@
   box-shadow: 0 6px 22px rgba(0, 0, 0, .35); overflow: hidden; cursor: pointer;
   transition: transform .18s ease, box-shadow .18s ease;
 }
-.as-fab img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.as-fab { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.as-fab img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
+.as-fab.is-dragging { cursor: grabbing; transition: none; transform: scale(1.08); box-shadow: 0 14px 34px rgba(0, 0, 0, .5); }
+.as-head.is-movable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.as-head.is-movable.is-dragging { cursor: grabbing; }
+.as-head.is-movable button { cursor: pointer; }
+.as-head img { pointer-events: none; }
 .as-fab:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 10px 28px rgba(0, 0, 0, .4); }
 .as-fab.is-open { box-shadow: 0 0 0 4px color-mix(in srgb, var(--as-gold) 35%, transparent), 0 6px 22px rgba(0, 0, 0, .35); }
 .as-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
