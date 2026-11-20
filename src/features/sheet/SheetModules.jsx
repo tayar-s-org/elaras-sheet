@@ -1,18 +1,11 @@
-import React from "react";
+import React, { lazy, Suspense, useRef } from "react";
 import Modal from '../../ui/Modal.jsx';
 import { stageForXP } from "../../catalogRules.js";
 import { formatMoney } from "../../money.js";
 import "../../ui/money.css";
 import { tokenUrl } from "../../lib/tokens.js";
-import IdentityTab from "./IdentityTab.jsx";
-import AttributesTab from "./AttributesTab.jsx";
-import SkillsTab from "./SkillsTab.jsx";
-import EdgesTab from "./EdgesTab.jsx";
-import MagicGearTab from "./MagicGearTab.jsx";
-import HistoryTab from "./HistoryTab.jsx";
-import BookTab from "./BookTab.jsx";
-import GuideTab from "./GuideTab.jsx";
-import MarketTab from "./MarketTab.jsx";
+import { useConfirm } from "../../ui/ConfirmProvider.jsx";
+import { UnsavedChangesContext } from "../../unsavedChanges.js";
 import { resolveItem } from "../../market/items.js";
 import { itemEffects } from "../../market/effects.js";
 import "./modules.css";
@@ -20,6 +13,17 @@ import AptitudeSummary, { useAptitudeFor } from "../routine/AptitudeSummary.jsx"
 import SheetAptitude from "../routine/SheetAptitude.jsx";
 import PointsStrip from "./PointsStrip.jsx";
 import { charismaTitle, signed } from "../../rpg/charisma.js";
+
+// Cada editor carrega sob demanda: o resumo da ficha (e a sala, que so usa os resumos) nao paga pelos formularios, pelo livro e pelo criador de token.
+const IdentityTab = lazy(() => import("./IdentityTab.jsx"));
+const AttributesTab = lazy(() => import("./AttributesTab.jsx"));
+const SkillsTab = lazy(() => import("./SkillsTab.jsx"));
+const EdgesTab = lazy(() => import("./EdgesTab.jsx"));
+const MagicGearTab = lazy(() => import("./MagicGearTab.jsx"));
+const HistoryTab = lazy(() => import("./HistoryTab.jsx"));
+const BookTab = lazy(() => import("./BookTab.jsx"));
+const GuideTab = lazy(() => import("./GuideTab.jsx"));
+const MarketTab = lazy(() => import("./MarketTab.jsx"));
 
 export const MODULES = [
   "Identidade",
@@ -151,7 +155,7 @@ export function Summary({ index, c, d, bagActions }) {
   }
 }
 
-export function renderEditor(index, ctx) {
+const editorFor = (index, ctx) => {
   switch (index) {
     case 0: return <IdentityTab {...ctx} />;
     case 1: return <AttributesTab {...ctx} />;
@@ -166,7 +170,9 @@ export function renderEditor(index, ctx) {
     case "market": return <MarketTab {...ctx} />;
     default: return null;
   }
-}
+};
+
+export const renderEditor = (index, ctx) => <Suspense fallback={<p className="muted" role="status">Carregando…</p>}>{editorFor(index, ctx)}</Suspense>;
 
 // Ficha completa só para leitura (usada na sala para ver a ficha de outro jogador): todos os módulos, sem editar.
 export function SheetOverview({ c, d, apt }) {
@@ -185,6 +191,13 @@ export function SheetOverview({ c, d, apt }) {
 export default function SheetModules({ ctx, editing, setEditing }) {
   const { c, d } = ctx;
   const apt = useAptitudeFor({ characterId: ctx.cloudId, tableId: ctx.tableId || null });
+  const askConfirm = useConfirm();
+  const unsavedChanges = useRef(false);
+  // Escape, clique no fundo e "Concluir" passam por aqui: um formulario com edicao nao salva pede confirmacao antes de sumir.
+  const closeEditor = async () => {
+    const discard = !unsavedChanges.current || await askConfirm({ title: 'Descartar o que você montou?', text: 'Há alterações que ainda não foram salvas nem aplicadas. Se fechar agora, elas serão perdidas.', actionLabel: 'Descartar', danger: true });
+    if (discard) setEditing(null);
+  };
 
   return <>
     <div className="sheet-modules">
@@ -215,15 +228,15 @@ export default function SheetModules({ ctx, editing, setEditing }) {
         ];
       })}
     </div>
-    {editing != null && <Modal onClose={() => setEditing(null)} aria-labelledby="mod-editor-title">
-      <div className="mod-editor">
+    {editing != null && <Modal onClose={closeEditor} aria-labelledby="mod-editor-title">
+      <UnsavedChangesContext.Provider value={unsavedChanges}><div className="mod-editor">
         <header className="mod-editor-head">
           <h2 id="mod-editor-title">{editing === "guide" ? "Guia de criação" : editing === "market" ? "Mercado" : editing === "aptitude" ? "Aptidão" : MODULES[editing]}</h2>
-          <button type="button" className="primary" onClick={() => setEditing(null)}>Concluir</button>
+          <button type="button" className="primary" onClick={closeEditor}>Concluir</button>
         </header>
         {POINT_EDITORS.includes(editing) && <PointsStrip d={d} />}
         <div className="mod-editor-body">{renderEditor(editing, ctx)}</div>
-      </div>
+      </div></UnsavedChangesContext.Provider>
     </Modal>}
   </>;
 }
