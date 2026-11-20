@@ -126,7 +126,7 @@ test('falha com pelo menos 50% do valor da tabela dá +1 de Pity (máx. 5); abai
   assert.equal(judgeAttempt(260, 3, 2).pityAfter, 3);
 });
 
-test('dados de Astúcia: 25 h = 1, máximo 24; precisa de 16 para tentar e cada tentativa gasta 16', () => {
+test('dados de Astúcia: 25 h = 1, sem teto; precisa de 16 para tentar e cada tentativa gasta 16', () => {
   assert.equal(ATTEMPT_DICE, 16);
   assert.equal(astuciaDice(24).available, 0);
   assert.equal(astuciaDice(25).available, 1);
@@ -134,10 +134,19 @@ test('dados de Astúcia: 25 h = 1, máximo 24; precisa de 16 para tentar e cada 
   assert.equal(astuciaDice(399).canAttempt, false);
   assert.equal(astuciaDice(400).canAttempt, true, '16 dados = 400 h');
   assert.equal(astuciaDice(400, 16).available, 0, 'tentativa gasta 16');
-  assert.equal(astuciaDice(5000).earned, 24);
-  assert.equal(astuciaDice(5000, 16).available, 8);
+  assert.equal(astuciaDice(5000).earned, 200, 'sem teto no total ganho');
+  assert.equal(astuciaDice(5000, 16).available, 184);
   assert.equal(astuciaDice(425, 0).hoursToNext, 25);
   assert.equal(astuciaDice(410, 0).hoursToNext, 15);
+});
+
+test('depois de uma tentativa o saldo se recompõe e permite a próxima (sem teto de 24)', () => {
+  assert.deepEqual(
+    (({ available, canAttempt }) => ({ available, canAttempt }))(astuciaDice(100000, 16)),
+    { available: 3984, canAttempt: true });
+  const afterFirstAttempt = astuciaDice(600, ATTEMPT_DICE);
+  assert.equal(afterFirstAttempt.canAttempt, false, '24 ganhos - 16 gastos = 8');
+  assert.equal(astuciaDice(1000, ATTEMPT_DICE).canAttempt, true, '40 ganhos - 16 gastos = 24');
 });
 
 test('o custo de XP da melhoria ainda não é cobrado (decisão pendente)', () => {

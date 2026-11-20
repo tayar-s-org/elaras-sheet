@@ -5,7 +5,7 @@ import {
   MASTER_MODULES, MODULE_GROUPS, LIMITS, previewAdjust, makePendingStore, runBatch, retryFailed, summarizeBatch,
   AUDIT_CATEGORIES, categoryLabel, auditDetails, auditTitle, experienceChips, walletChips,
 } from './core.js';
-import { IMAGE_ICONS, CURRENCY_ICONS, ALL_ICONS, isImageIcon, imageIconUrl, iconText, cleanIconKeys, DEFAULT_ICON } from './experienceIcons.js';
+import { IMAGE_ICONS, CURRENCY_ICONS, ALL_ICONS, isImageIcon, imageIconUrl, iconText, cleanIconKeys, DEFAULT_ICON } from '../../../market/experienceIcons.js';
 
 const memory = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: k => m.delete(k), size: () => m.size }; };
 const seq = () => { let n = 0; return () => `id-${++n}`; };

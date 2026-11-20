@@ -151,3 +151,31 @@ test('fechar uma aba da nuvem preserva a ficha e a sincronização pode reabri-l
   assert.equal(reopened.sheets.find(sheet=>sheet.id===reopened.activeId).character.name,row.character.name);
   assert.deepEqual(reopened.closedCloudIds,[]);
 });
+
+test('uma aba inválida não derruba as outras e fica guardada para recuperação',async()=>{
+  const {readStoredSheets,keepRejectedSheets,REJECTED_STORAGE}=await import('./sheets.js');
+  const valid=openSheet({sheets:[],activeId:''},{...newCharacter(),name:'Válida'},'ok');
+  const broken={id:'ruim',character:{...newCharacter(),schemaVersion:0}};
+  const duplicate={...valid.sheets[0]};
+  const stored={...valid,sheets:[broken,valid.sheets[0],duplicate]};
+  const {session,rejected}=readStoredSheets({getItem:k=>k===SHEETS_STORAGE?JSON.stringify(stored):null});
+  assert.deepEqual(session.sheets.map(s=>s.id),['ok']);
+  assert.equal(session.sheets[0].character.name,'Válida');
+  assert.equal(session.activeId,'ok');
+  assert.deepEqual(rejected,[broken,duplicate]);
+
+  const data=new Map();
+  const storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};
+  keepRejectedSheets(storage,rejected);
+  keepRejectedSheets(storage,rejected);
+  assert.deepEqual(JSON.parse(data.get(REJECTED_STORAGE)),[broken,duplicate],'repetir não duplica o que já foi guardado');
+});
+
+test('se nenhuma aba é válida, cai no rascunho antigo e ainda informa as recusadas',async()=>{
+  const {readStoredSheets}=await import('./sheets.js');
+  const broken={id:'ruim',character:{...newCharacter(),schemaVersion:0}};
+  const data=new Map([[SHEETS_STORAGE,JSON.stringify({sheets:[broken],activeId:'ruim'})],[LEGACY_STORAGE,JSON.stringify(elaraCharacter())]]);
+  const {session,rejected}=readStoredSheets({getItem:k=>data.get(k)??null});
+  assert.equal(session.sheets[0].character.name,'Elara Windrunner');
+  assert.deepEqual(rejected,[broken]);
+});

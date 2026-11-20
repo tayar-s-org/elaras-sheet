@@ -25,7 +25,7 @@ const args = process.argv.slice(2);
 const dry = args.includes('--dry');
 const qIndex = args.indexOf('--query');
 const fIndex = args.indexOf('--file');
-const filePath = fIndex >= 0 ? args[fIndex + 1] : args.find(a => !a.startsWith('--') && a !== args[qIndex + 1]);
+const filePath = fIndex >= 0 ? args[fIndex + 1] : args.find((a, i) => !a.startsWith('--') && (qIndex < 0 || i !== qIndex + 1));
 const sql = qIndex >= 0 ? args[qIndex + 1] : filePath ? readFileSync(filePath, 'utf8') : '';
 if (!sql.trim()) { console.error('Uso: node scripts/db.mjs <arquivo.sql> | --query "sql" [--dry]'); process.exit(2); }
 

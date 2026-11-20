@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { previewAdjust, LIMITS } from './core.js';
+import { previewAdjust, parseWholeNumber, LIMITS } from './core.js';
 import { TargetChips, BatchResults, useMasterRun, targetsFor, defaultTarget, previewText, usePersistedState } from './ui.jsx';
 
 const MODES = [['add', 'Somar'], ['subtract', 'Retirar'], ['set', 'Definir valor']];
@@ -19,19 +19,20 @@ export default function AdjustForm({ kind, storageKey, players, closed, blocked 
   const run = useMasterRun({ onDone });
   const value = (target === 'all' && players.length > 1) || players.some(p => p.id === target) ? target : defaultTarget(players);
   const targets = targetsFor(players, value);
-  const api = apiOf(mode, Math.trunc(Number(text)));
-  const previews = targets.map(p => ({ p, v: previewAdjust(kind, currentOf(p), api.mode, api.amount) }));
+  const parsed = parseWholeNumber(text);
+  const api = parsed.ok ? apiOf(mode, parsed.value) : null;
+  const previews = api ? targets.map(p => ({ p, v: previewAdjust(kind, currentOf(p), api.mode, api.amount) })) : [];
   const bad = previews.find(x => !x.v.ok);
   const line = ({ p, v }) => `${p.name}: ${format(v.current)} → ${format(v.next)}`;
   const modeName = key => labels[key] || MODES.find(m => m[0] === key)[1];
   // O botão diz exatamente o que vai acontecer: "Somar 50 a Aria", "Retirar 10 de Todos (3)", "Definir Aria em 200".
   const who = targets.length === 1 ? targets[0].name : `${targets.length} jogadores`;
-  const n = Number.isFinite(api.amount) && !bad ? format(Math.abs(api.amount)) : '';
+  const n = api && !bad ? format(Math.abs(api.amount)) : '';
   const applyLabel = !n || !targets.length ? modeName(mode) : mode === 'add' ? `${modeName(mode)} ${n} a ${who}` : mode === 'subtract' ? `${modeName(mode)} ${n} de ${who}` : `Definir ${who} em ${n}`;
 
   async function submit(e) {
     e.preventDefault();
-    if (bad || closed || blocked || !targets.length) return;
+    if (!api || bad || closed || blocked || !targets.length) return;
     await run.start({
       title: confirmTitle(modeName(mode)), actionLabel: modeName(mode), danger: mode !== 'add', skipConfirm: mode === 'add',
       text: previewText([`${targets.length === 1 ? targets[0].name : `${targets.length} jogadores`}:`, ...previews.map(line)]),
@@ -52,18 +53,19 @@ export default function AdjustForm({ kind, storageKey, players, closed, blocked 
       <div className="mh-amount">
         <label className="field"><span>{amountLabel(mode)}</span>
           <input type="number" inputMode="numeric" value={text} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()}
-            aria-invalid={Boolean(bad)} aria-describedby={`${uid}-preview`} /></label>
+            aria-invalid={!parsed.ok || Boolean(bad)} aria-describedby={`${uid}-${parsed.ok ? 'preview' : 'amount-error'}`} /></label>
         {mode !== 'set' && quick.length > 0 && <div className="mh-quick" role="group" aria-label="Valores rápidos">
           {quick.map(q => <button key={q} type="button" className="outline" onClick={() => setText(String(q))}>{mode === 'subtract' ? '−' : '+'}{q}</button>)}
         </div>}
+        {!parsed.ok && <small id={`${uid}-amount-error`} className="mh-field-error" role="alert">{parsed.error}</small>}
       </div>
       <ul className="mh-preview" id={`${uid}-preview`} aria-label="Prévia do resultado">
         {previews.map(({ p, v }) => <li key={p.id}>{v.ok ? <><b>{p.name}</b> {format(v.current)} → <b>{format(v.next)}</b>{api.mode === 'add' && v.delta !== api.amount ? <small> (limitado)</small> : null}</> : <><b>{p.name}</b> <small className="muted">{v.error}</small></>}</li>)}
-        {!previews.length && <li className="muted">Sem jogadores com ficha.</li>}
+        {!targets.length && <li className="muted">Sem jogadores com ficha.</li>}
       </ul>
       <details className="mh-note"><summary>Observação{note ? ' ✓' : ''}</summary>
         <input maxLength={200} value={note} onChange={e => setNote(e.target.value)} aria-label="Observação (opcional)" placeholder="Opcional: fica no histórico" /></details>
-      <button className="primary mh-apply" disabled={Boolean(bad) || closed || blocked || run.busy || !targets.length}>{applyLabel}</button>
+      <button className="primary mh-apply" disabled={!api || Boolean(bad) || closed || blocked || run.busy || !targets.length}>{applyLabel}</button>
     </form>
     <BatchResults run={run} />
   </>;

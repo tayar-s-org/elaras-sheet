@@ -1,6 +1,37 @@
 # Migracoes
 
-Rode os arquivos em ordem no SQL Editor do Supabase.
+Rode os arquivos de avanço em ordem no SQL Editor do Supabase (ou `node scripts/db.mjs <arquivo>`).
+
+## Ordem e numeração
+
+- A ordem é a do nome do arquivo (`ls` em ordem alfabética). **Rollbacks não são migrações de avanço**: ficam em `rollbacks/`
+  (`0023_rollback.sql`, `0024_rollback.sql`, `0026_rollback.sql`) e nunca entram na sequência. Rode um só quando quiser desfazer aquela migração.
+- Números repetidos, todos com ordem definida:
+  - `0020_training_calendar.sql` e depois `0020_training_gm_self.sql` (a `0022_training_guard_merge.sql` junta as duas regras de aprovação);
+  - `0023_campaign_clock.sql`, `0024_time_engine.sql` e `0026_aptitude.sql` têm o rollback do mesmo número em `rollbacks/`.
+- Arquivos novos usam o próximo número livre (hoje, `0052`).
+- `0018_custom_items.sql` ficou vazio no histórico; foi reconstruída a partir do banco publicado (ver o cabeçalho dela). A `0021` assume a tabela dela
+  e **não pode ser repetida** (`alter table ... add column` e `create function` sem `if not exists`/`or replace`). A `0050` a substitui nas funções.
+
+## Como saber o que já foi aplicado
+
+Não há tabela de controle: confira o efeito da migração no banco (somente leitura):
+
+```bash
+node scripts/db.mjs --query "select to_regclass('public.table_custom_items') is not null as m0018, exists (select 1 from information_schema.columns where table_name='table_custom_items' and column_name='price') as m0021, to_regclass('public.inventory_log') is not null as m0039, to_regclass('public.master_audit_log') is not null as m0040, to_regclass('public.table_shop_items') is not null as m0041, exists (select 1 from information_schema.columns where table_name='table_shop_items' and column_name='source_id') as m0044, exists (select 1 from pg_policies where policyname='master_audit_select_own') as m0045, to_regproc('public.lock_custom_item_request') is not null as m0050, exists (select 1 from pg_proc where proname='_join_table' and prosrc like '%for no key update%') as m0051"
+```
+
+Para outra migração, procure um objeto que só ela cria (tabela, coluna, função em `pg_proc`, política em `pg_policies`) ou que só ela muda
+(trecho em `pg_get_functiondef`). Ao escrever uma migração nova, deixe esse marcador no cabeçalho e prefira `if not exists` / `create or replace`.
+
+## Modelo de confiança da ficha
+
+A ficha é **intencionalmente livre**: o dono do personagem pode gravar qualquer valor em `characters.data` (dinheiro, XP, inventário, perícias) pela API,
+com a política de `0001_profiles_characters.sql`. Os gatilhos protegem só metadados (dono, mesa, revisão). Por isso nenhuma regra de economia ou progressão
+é garantida contra o próprio dono; o histórico de concessões e compras (`money_awards`, `xp_awards`, `inventory_log`, `master_audit_log`) é um registro, não
+uma trava. As funções (`grant_money`, `gm_give_item`, `shop_buy`, `approve_custom_item`...) conferem permissão **entre pessoas** (só o mestre concede; ninguém altera a ficha
+de outro jogador direto pela API) e fazem as mudanças de forma atômica, mas não impedem o dono de editar a própria ficha.
+Mudar isso exigiria separar dados autoritativos (dinheiro, XP, mochila) de `characters.data` e restringir a escrita a RPCs validadas.
 
 **Realtime:** so assine `postgres_changes` de tabelas que estao em `supabase_realtime`
 (`table_messages`, `table_rolls`, `table_character_state`, `table_members`, `boards`,
@@ -13,8 +44,8 @@ descartar, sem erro, todos os eventos daquele canal.
 Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replace`, `if not exists`).
 
 - `0023_campaign_clock.sql`: relogio da mesa, agenda por dia, rotinas presas a ficha, migracao das rotinas antigas
-  (backup em `*_backup_0023`). Desfazer: `0023_rollback.sql`.
-- `0024_time_engine.sql`: ledger, acumuladores de XP, `advance_time`, evolucao. Desfazer: `0024_rollback.sql`.
+  (backup em `*_backup_0023`). Desfazer: `rollbacks/0023_rollback.sql`.
+- `0024_time_engine.sql`: ledger, acumuladores de XP, `advance_time`, evolucao. Desfazer: `rollbacks/0024_rollback.sql`.
 - `0025_work_and_study.sql`: solicitacoes (trabalho e melhoria de feitiço), salario, tentativa de aprimorar.
 - `0029_aptitude_permanent.sql`: Aptidão (0026): pontos confirmados passam a ser permanentes (só dá para acrescentar).
   Atenção: os arquivos `0027_custom_skills.sql` e `0028_character_table.sql` são de outra frente (perícias personalizadas e vínculo ficha-mesa).
@@ -51,3 +82,12 @@ Rode nesta ordem. Todas podem ser repetidas sem estragar nada (`create or replac
 - `0043_shop_money_price.sql`: a Loja do Mestre também vende em **dinheiro ($)**, a moeda padrão da mesa. `table_shop_items.currency_id` passa a aceitar NULL (NULL = pago em $); `gm_shop_upsert` aceita `p_currency` nulo; `shop_buy` debita `characters.data.money` (ficha travada) e grava a linha negativa em `money_awards` no formato de `gm_adjust_money`, para a ficha aberta reconciliar sem conflito; `mh_shop_json` mostra `$`/Dinheiro no histórico; `master_hub_version()` passa a **3**. Reescreve funções da 0041 (`create or replace`, comportamento com moedas da mesa igual); depende da 0040/0041; pode ser repetida.
 - `0044_approved_shop.sql`: **Loja aprovada**. Todo item customizado aprovado pelo mestre vira anúncio em `table_shop_items` (coluna nova `source_id` → `table_custom_items`, mesmo id do pedido, pago em `$`) por um gatilho em `table_custom_items`; revogar tira o anúncio, quem já comprou fica com o item. Preço 0 (grátis) só nos anúncios aprovados. Reescreve `gm_shop_upsert` e `shop_buy` (mesma assinatura, comportamento antigo preservado) e troca o `check` de preço; `master_hub_version()` passa a devolver 4. Preenche a loja com os itens já aprovados. Depende da 0041/0043. Pode ser repetida. **Aplique e valide (`node scripts/masterHubDbTest.mjs`) antes de publicar o app.**
 - `0045_audit_own_rewards.sql`: o dono do personagem passa a ler, em `master_audit_log`, as linhas de categoria `wallet` e `experience` do **próprio** personagem (política `master_audit_select_own`), para o registro da mesa sob o tabuleiro (aba "XP e dinheiro") mostrar moedas e experiências personalizadas. O mestre continua lendo tudo. Só cria uma política; pode ser repetida.
+- `0046_conditions_delta_and_state_guard.sql`: `table_character_state.state` só aceita objeto JSON (linhas antigas fora do formato viram `{}`; restrição `check`) e o gatilho `state_keep_conditions` recusa estado que não seja objeto, então um jogador não apaga as condições do mestre escrevendo `[]` e depois `{}`. Cria `gm_conditions_delta` (mestre acrescenta/remove condições por id sob trava da linha, via `gm_set_conditions`) para duas abas não sobrescreverem uma à outra. Aditiva. Depende da 0040; pode ser repetida.
+- `0047_idempotent_claims.sql`: entrega de benefícios em duas fases. `peek_pending_benefits` lista evoluções, melhorias de feitiço e perícias aprovadas **sem marcar entrega**; `confirm_benefits` marca por id depois que o app aplicou e a ficha foi salva. As funções `claim_*` antigas continuam como estão. **Aplique antes de publicar o app novo.** Aditiva; pode ser repetida.
+- `0048_magic_study_dice_cap.sql`: `attempt_spell_upgrade` deixa de limitar o total de dados de Astúcia a 24 (cada tentativa gasta 16; a regra vem do dono, ver `docs/`). Só remove o teto; pode ser repetida.
+- `0049_party_resource_update.sql`: `set_state_resource` e `set_state_faint` gravam **um** recurso (vida, estamina, mana...) ou o desmaio sob trava da linha, em vez de regravar o estado inteiro. **Aplique antes de publicar o app novo.** Aditiva; pode ser repetida.
+- `0050_custom_item_money_safe.sql`: `approve_custom_item` e `revoke_custom_item` passam a travar a ficha e o pedido na mesma transação e a **debitar/reembolsar `characters.data.money`
+  na hora** (linha já resgatada em `money_awards`, como `grant_money`), então o saldo nunca fica furado e aprovar/revogar ao mesmo tempo só movimenta o dinheiro uma vez. Cria `lock_custom_item_request` (interno).
+  Reescreve duas funções da 0021 (`create or replace`, mesmas assinaturas e mensagens); pode ser repetida. Teste de banco: `node scripts/concurrencyDbTest.mjs`.
+- `0051_table_capacity_lock.sql`: o limite de jogadores é serializado: `_join_table` (0028) e `decide_member` (0002) travam a linha da mesa antes de contar as vagas.
+  Reescreve duas funções em uso (`create or replace`); pode ser repetida. Teste de banco: `node scripts/concurrencyDbTest.mjs`.

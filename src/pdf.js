@@ -2,6 +2,14 @@ import { equipmentText } from "./market/inventory.js";
 import { racialSummary } from "./templates.js";
 import { jsPDF } from "jspdf";
 import { ATTRIBUTES, calculate, validateCharacter } from "./rules.js";
+import { describeDie, readDie } from "./rpg/dice.js";
+
+// Dados impressos com o bônus de d12+N (ex.: "Astúcia d12+2").
+export const attributesLine = c => ATTRIBUTES.map(name => `${name} ${describeDie(readDie(c, "attribute", name))}`).join(" | ");
+export const skillsLine = c => Object.keys(c.skills)
+  .filter(name => c.skills[name])
+  .map(name => `${name} ${describeDie(readDie(c, "skill", name))}`)
+  .join(" | ");
 
 function encode(text) {
   const bytes = new TextEncoder().encode(text);
@@ -86,7 +94,7 @@ export function createPdfBlob(character) {
     line(`Carisma racial ${d.charisma} | Benes raciais extras ${d.racial.benes} | Bônus racial Perceber +${d.racial.notice} | Escalar +${d.racial.climb}`);
   }
   section("Atributos");
-  line(ATTRIBUTES.map((name) => `${name} d${c.attributes[name]}`).join(" | ") + ` | Carisma ${d.charismaTotal > 0 ? "+" : ""}${d.charismaTotal}`);
+  line(attributesLine(c) + ` | Carisma ${d.charismaTotal > 0 ? "+" : ""}${d.charismaTotal}`);
   section("Valores derivados");
   line(
     `Vida ${d.life} | Stamina ${d.stamina} | Mana ${d.mana} | Movimentação ${d.movement}`,
@@ -96,12 +104,7 @@ export function createPdfBlob(character) {
   );
   section("Perícias");
   if (c.dice.weaponDie) line(`Arma para comandos Discord: ${c.dice.weaponName || '-'} | ${c.dice.weaponCount}d${c.dice.weaponDie} | Modificador fixo: ${c.dice.damageBonus}`);
-  line(
-    Object.entries(c.skills)
-      .filter(([, die]) => die)
-      .map(([name, die]) => `${name} d${die}`)
-      .join(" | ") || "Nenhuma perícia escolhida.",
-  );
+  line(skillsLine(c) || "Nenhuma perícia escolhida.");
   section("Vantagens");
   for (const x of c.advantages)
     line(

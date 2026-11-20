@@ -114,9 +114,11 @@ export function meditationSessions(runs) {
   let cur = null;
   for (const r of [...runs].sort((a, b) => a.tick - b.tick)) {
     const med = r.detail?.meditation;
-    if (r.activity === ACT.MEDITATE && r.ok && med?.started) { cur = { startTick: r.tick, face: med.face, sides: med.sides, roll: med.roll, rate: med.rate, hours: 0, closed: false }; sessions.push(cur); }
-    if (r.activity === ACT.MEDITATE && r.ok && cur && !cur.closed) cur.hours += 1;
+    const meditating = r.activity === ACT.MEDITATE && r.ok;
+    // O fechamento vem antes do início: na virada do dia a mesma hora encerra a sessão antiga e abre a nova.
     if (med?.closed && cur) { cur.closed = true; cur.hours = med.hours || cur.hours; cur = null; }
+    if (meditating && med?.started) { cur = { startTick: r.tick, face: med.face, sides: med.sides, roll: med.roll, rate: med.rate, hours: 0, closed: false }; sessions.push(cur); }
+    if (meditating && cur) cur.hours += 1;
   }
   return sessions.reverse();
 }

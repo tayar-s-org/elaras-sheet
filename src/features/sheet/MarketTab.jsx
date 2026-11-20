@@ -4,7 +4,7 @@ import { CATEGORIES, MARKET_ITEMS, SLOTS, resolveItem } from "../../market/items
 import { describeEffect } from "../../market/custom.js";
 import { markCustomDiscarded } from "../../lib/customItems.js";
 import CustomItemForm from "./CustomItemForm.jsx";
-import { buyItem, sellItem, toggleEquip, sellPrice, discardItem, consumeItem, setFill } from "../../market/inventory.js";
+import { buyItem, buyBlockedReason, sellItem, toggleEquip, sellPrice, discardItem, consumeItem, setFill } from "../../market/inventory.js";
 import { entryWeight } from "../../market/items.js";
 import { QtyMinus, LiquidUnits, SendMenu } from "./ItemControls.jsx";
 import TransferModal from "./TransferModal.jsx";
@@ -60,7 +60,7 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
     .sort((a, b) => Number(b.equipped) - Number(a.equipped) || a.item.category.localeCompare(b.item.category) || a.item.name.localeCompare(b.item.name, "pt-BR"));
 
   const buy = item => {
-    if (item.cost > money) return;
+    if (buyBlockedReason(c, item)) return;
     setC(prev => buyItem(prev, item.id, 1) || prev);
     setToast(`${item.name} comprado por $ ${formatMoney(item.cost)}.`);
   };
@@ -108,7 +108,7 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
         <h3>{group}</h3>
         <div className="mk-list">
           {shopItems.filter(i => i.group === group).map(item => {
-            const can = item.cost <= money;
+            const blockedReason = buyBlockedReason(c, item);
             return <article className="mk-item" key={item.id}>
               <div className="mk-main">
                 <h4>{item.name}{owned[item.id] ? <span className="mk-owned">×{owned[item.id]} na mochila</span> : null}</h4>
@@ -117,7 +117,7 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
               </div>
               <div className="mk-buy">
                 <b className="mk-price">$ {formatMoney(item.cost)}</b>
-                <button type="button" className="primary" disabled={!can} onClick={() => buy(item)}>{can ? "Comprar" : "Sem dinheiro"}</button>
+                <button type="button" className="primary" disabled={Boolean(blockedReason)} onClick={() => buy(item)}>{blockedReason || "Comprar"}</button>
               </div>
             </article>;
           })}

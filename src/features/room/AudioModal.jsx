@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useConfirm } from '../../ui/ConfirmProvider.jsx';
 import Modal from '../../ui/Modal.jsx';
 import { updateBoard } from '../../lib/board.js';
-import { uploadMusic, removeMusicFile } from '../../lib/music.js';
+import { replaceMusic, removeMusicFile } from '../../lib/music.js';
 import { addSound, updateSound, deleteSound } from '../../lib/sounds.js';
 import { newMusic, musicTitle, musicFileError } from '../../music.js';
 import { DEFAULT_SOUNDS } from '../../defaultSounds.js';
@@ -27,7 +27,7 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
     const settings = { ...(board.settings || {}) };
     if (next) settings.music = next; else delete settings.music;
     local.setBoard({ ...board, settings });
-    await updateBoard(board.id, { settings });
+    try { await updateBoard(board.id, { settings }); } catch (e) { local.setBoard(board); throw e; }
   };
 
   return <Modal onClose={onClose} aria-labelledby="audio-title" busy={busy}>
@@ -44,7 +44,7 @@ export default function AudioModal({ kind, board, pad, local, setError, onClose 
           {music && <button type="button" className="text-button danger" disabled={busy} onClick={async () => await askConfirm({ title: 'Remover música?', text: 'Remover a música da mesa?', actionLabel: 'Remover música', danger: true }) && run(async () => { const path = music.path; await setMusic(null); await removeMusicFile(path); })}>Remover música</button>}
           <input ref={musicRef} type="file" hidden accept="video/mp4,audio/mp4,audio/x-m4a,audio/mpeg,.mp4,.m4a,.mp3"
             onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; const bad = musicFileError(f); if (bad) { setError(bad); return; }
-              run(async () => { const path = await uploadMusic(board.table_id, f, music?.path); await setMusic(newMusic(path, musicTitle(f.name))); }); }} />
+              run(() => replaceMusic(board.table_id, f, music?.path, path => setMusic(newMusic(path, musicTitle(f.name))))); }} />
         </div>
         <p className="muted">{music ? `Carregada: ${music.name}. Use a barra de música acima do tabuleiro para tocar, pausar e parar.` : 'MP4, M4A ou MP3 até 30 MB. Toca para todos na mesa ao mesmo tempo; cada um ajusta o próprio volume.'}</p>
       </section>}

@@ -2,32 +2,22 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { describeRoll } from '../../diceRoll.js';
 import { formatMoney } from '../../money.js';
 import { mergeRewards, rewardAmount } from './rewardsLog.js';
+import { LOG_LIMIT, latestDiceEntries, latestVitalEntries } from './tableLogEntries.js';
 import ExperienceIcon from './masterHub/ExperienceIcon.jsx';
 import './tablelog.css';
 
 const time = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const LIMIT = 80;
 const RESOURCE_LABEL = { life: 'Vida', stamina: 'Stamina', mana: 'Mana' };
-// Avisos de XP e dinheiro que o app antigo postava no chat: agora ficam na aba propria.
-const OLD_REWARD_LINE = /^(✨ O mestre concedeu \+\d+ XP a |💰 O mestre deu \$|💸 O mestre removeu \$)/;
 
 // Registro da mesa sob o tabuleiro, em abas: dados/chat, vida/stamina/mana e concessoes de XP e dinheiro.
 export default function TableLog({ messages, rolls, stateLog, rewards, hidden, members, characters, me, isGm }) {
   const [tab, setTab] = useState('dice');
   const boxRef = useRef(null);
   const names = useMemo(() => Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador'])), [members]);
-  const diceEntries = useMemo(() => {
-    const list = [
-      ...messages.filter(m => !OLD_REWARD_LINE.test(m.body || '')).map(m => ({ key: `m${m.id}`, at: m.created_at, type: 'msg', m })),
-      ...rolls.filter(r => !hidden?.has(r.id)).map(r => ({ key: `r${r.id}`, at: r.created_at, type: 'roll', r })),
-    ];
-    // Mais recente primeiro: a ultima acao fica no topo e as anteriores embaixo.
-    return list.sort((a, b) => new Date(b.at) - new Date(a.at) || String(b.key).localeCompare(String(a.key))).slice(0, LIMIT);
-  }, [messages, rolls, hidden]);
-  // Jogadores não veem as mudanças de mana dos outros (só as da própria ficha); o mestre vê tudo.
+  const diceEntries = useMemo(() => latestDiceEntries(messages, rolls, hidden), [messages, rolls, hidden]);
   const myCharacter = members.find(m => m.user_id === me)?.character_id;
-  const vitalEntries = useMemo(() => [...(stateLog || [])].filter(v => isGm || v.resource !== 'mana' || v.character_id === myCharacter).sort((a, b) => b.id - a.id).slice(0, LIMIT), [stateLog, isGm, myCharacter]);
-  const rewardEntries = useMemo(() => mergeRewards(rewards?.xp, rewards?.money, LIMIT, rewards?.custom), [rewards]);
+  const vitalEntries = useMemo(() => latestVitalEntries(stateLog, { isGm, characterId: myCharacter }), [stateLog, isGm, myCharacter]);
+  const rewardEntries = useMemo(() => mergeRewards(rewards?.xp, rewards?.money, LOG_LIMIT, rewards?.custom), [rewards]);
   const newestKey = tab === 'dice' ? diceEntries[0]?.key : tab === 'vitals' ? vitalEntries[0]?.id : rewardEntries[0]?.key;
   // A novidade aparece no topo; volta o quadro (so ele, nao a pagina) para o inicio.
   useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = 0; }, [newestKey, tab]);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { imageIconUrl, iconText, isImageIcon } from './experienceIcons.js';
+import { imageIconUrl, iconText, isImageIcon } from '../../../market/experienceIcons.js';
 
 // Ícone de um tipo de experiência (ou o símbolo de uma moeda): imagem embutida quando a chave é de imagem, senão o texto/emoji.
 export default function ExperienceIcon({ icon }) {

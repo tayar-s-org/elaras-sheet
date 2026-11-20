@@ -5,8 +5,7 @@ import { MAX_MONEY } from "../../money.js";
 import TokenMaker from "../token/TokenMaker.jsx";
 import { uploadTokenImage, tokenUrl, saveTokenArtwork } from "../../lib/tokens.js";
 
-/* eslint-disable-next-line no-unused-vars */
-export default function IdentityTab({ auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage }) {
+export default function IdentityTab({ auth, c, d, update, rule, setC, setToast }) {
   const [maker, setMaker] = useState(false);
   const userId = auth?.user?.id;
   const tokenSrc = tokenUrl(c.tokenImage);

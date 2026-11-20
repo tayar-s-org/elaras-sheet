@@ -29,9 +29,3 @@ export async function deleteCustomSkill(id) {
   const { error } = await supabase.from('table_custom_skills').delete().eq('id', id);
   if (error) throw new Error(error.message || 'Não foi possível cancelar o pedido.');
 }
-// Dono da ficha: recolhe as pericias aprovadas ainda nao entregues.
-export async function claimCustomSkills(characterId) {
-  const { data, error } = await supabase.rpc('claim_custom_skills', { p_character: characterId });
-  if (error) throw new Error(error.message);
-  return data || [];
-}

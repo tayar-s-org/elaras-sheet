@@ -1,36 +1,46 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
-import { loadCharacters } from '../../lib/room.js';
+import { refreshCharacters } from '../../lib/room.js';
 import { INVENTORY_EVENT } from '../../lib/items.js';
+import { createCoalescedRunner, isTabHidden, pollWhileVisible } from './polling.js';
 
 const POLL_MS = 5000;
 
-// Mantém atualizadas as fichas dos jogadores vinculados à mesa (dinheiro, XP, dados...). Elas pertencem aos
-// jogadores e não têm tempo real próprio, então: relê a cada 10 s, ao voltar o foco da aba e logo depois que
-// um dinheiro é recolhido (o jogador salva a ficha ~1 s depois de receber) ou o mestre concede XP/dinheiro (a nuvem muda na hora). Devolve as fichas da sala já mescladas.
+// Única fonte de releitura periódica das fichas dos jogadores vinculados à mesa (dinheiro, XP, dados...); a useRoom só
+// as lê quando a lista de membros muda e entrega o resultado como `base`. Elas pertencem aos
+// jogadores e não têm tempo real próprio, então: relê a cada 5 s com a aba visível, ao voltar o foco da aba e logo depois que
+// um dinheiro é recolhido (o jogador salva a ficha ~1 s depois de receber) ou o mestre concede XP/dinheiro (a nuvem muda na hora).
+// Pedidos que chegam durante uma leitura viram uma única releitura ao terminar. Devolve as fichas da sala já mescladas.
 export function useLiveCharacters(tableId, members, base, enabled) {
   const [fresh, setFresh] = useState({});
+  const freshRef = useRef(fresh);
   const ids = useMemo(
     () => members.filter(m => m.status === 'approved' && m.character_id).map(m => m.character_id).sort().join(','),
     [members],
   );
 
+  const clearFresh = () => {
+    freshRef.current = {};
+    setFresh(prev => (Object.keys(prev).length ? {} : prev));
+  };
+  useEffect(clearFresh, [tableId]); // fichas de outra mesa nao valem
+  useEffect(() => { if (!ids) clearFresh(); }, [ids]);
+
   useEffect(() => {
     if (!supabase || !enabled || !ids) return undefined;
     let alive = true;
     const timers = new Set();
-    const refresh = async () => {
-      if (document.visibilityState === 'hidden') return;
+    const characterIds = ids.split(',');
+    const reload = createCoalescedRunner(async () => {
       try {
-        const rows = await loadCharacters(ids.split(','));
-        if (alive) setFresh(prev => (JSON.stringify(prev) === JSON.stringify(rows) ? prev : rows));
+        const rows = await refreshCharacters(characterIds, freshRef.current); // baixa só as fichas cuja revisão mudou
+        if (alive && rows !== freshRef.current) { freshRef.current = rows; setFresh(rows); }
       } catch { /* mantém o que já está na tela */ }
-    };
-    const later = ms => { const t = setTimeout(() => { timers.delete(t); refresh(); }, ms); timers.add(t); };
-    const first = setTimeout(refresh, 1500);
-    const poll = setInterval(refresh, POLL_MS);
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    document.addEventListener('visibilitychange', onVisible);
+    });
+    const reloadIfVisible = () => { if (!isTabHidden()) reload(); };
+    const later = ms => { const t = setTimeout(() => { timers.delete(t); reloadIfVisible(); }, ms); timers.add(t); };
+    const first = setTimeout(reloadIfVisible, 1500);
+    const stopPolling = pollWhileVisible(reload, POLL_MS);
     // Dinheiro recolhido pelo jogador (UPDATE em money_awards): relê depois que ele salvar a ficha.
     const channel = supabase.channel(`livechars:${tableId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'money_awards', filter: `table_id=eq.${tableId}` }, () => { later(2500); later(6000); })
@@ -43,9 +53,8 @@ export function useLiveCharacters(tableId, members, base, enabled) {
     return () => {
       alive = false;
       clearTimeout(first);
-      clearInterval(poll);
+      stopPolling();
       timers.forEach(clearTimeout);
-      document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener(INVENTORY_EVENT, onInventory);
       supabase.removeChannel(channel);
     };

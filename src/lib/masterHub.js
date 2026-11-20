@@ -11,6 +11,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 function friendly(error) {
   const msg = error?.message || 'Erro ao acessar a nuvem.';
+  if (SCHEMA.test(msg) && /gm_conditions_delta/.test(msg)) return new Error('O banco ainda não tem a atualização 0046 (condições do mestre). Aplique-a no Supabase e recarregue a página.');
   if (SCHEMA.test(msg)) return new Error('O banco ainda não tem a atualização 0040/0041 (Central e Loja do Mestre). Aplique-a no Supabase e recarregue a página.');
   if (/table_shop_items.*foreign key|foreign key.*table_shop_items/i.test(msg)) return new Error('Esta moeda é usada por itens da Loja do Mestre. Tire esses itens da loja antes de apagá-la.');
   return new Error(msg);
@@ -75,8 +76,10 @@ export const deleteExperienceType = ({ tableId, id, force = false, requestId }) 
   callIdempotent('gm_delete_experience_type', { ...base(tableId, requestId), p_id: id, p_force: force });
 export const adjustExperience = ({ tableId, characterId, typeId, mode, amount, note = '', requestId }) =>
   callIdempotent('gm_experience_adjust', { ...base(tableId, requestId), p_character: characterId, p_type: typeId, p_mode: mode, p_amount: amount, p_note: note });
-export const setConditions = ({ tableId, characterId, conditions, note = '', requestId }) =>
-  callIdempotent('gm_set_conditions', { ...base(tableId, requestId), p_character: characterId, p_conditions: conditions, p_note: note });
+// Condições por diferença (migração 0046): o servidor aplica add/remove sobre a lista que está no banco, sob trava, então duas abas do
+// mestre nunca apagam a condição uma da outra. `remove` leva ids de condições.
+export const changeConditions = ({ tableId, characterId, add = [], remove = [], note = '', requestId }) =>
+  callIdempotent('gm_conditions_delta', { ...base(tableId, requestId), p_character: characterId, p_add: add, p_remove: remove, p_note: note });
 
 // Loja do Mestre (migração 0041). `custom` = { name, weight, effects, description } (mesmo modelo dos itens customizados); nulo na edição mantém o item.
 // currencyId: id de uma moeda da mesa, ou nulo / 'money' para vender em $ (migração 0043).

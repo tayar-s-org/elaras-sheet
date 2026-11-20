@@ -50,10 +50,3 @@ export async function spendProgress(tableId, characterId, kind, name, modality) 
   fail(error, 'Não foi possível evoluir.');
   return data;
 }
-
-// Dono da ficha: recolhe as evoluções confirmadas ([{ kind, name }]) para aplicar na ficha.
-export async function claimEvolutions(characterId) {
-  const { data, error } = await supabase.rpc('claim_evolutions', { p_character: characterId });
-  fail(error, 'Não foi possível recolher as evoluções.');
-  return Array.isArray(data) ? data : [];
-}

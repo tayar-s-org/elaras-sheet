@@ -2,10 +2,13 @@ import {newCharacter, validateCharacter} from './rules.js';
 
 export const SHEETS_STORAGE = 'manrakora-sheets-v1';
 export const LEGACY_STORAGE = 'manrakora-ficha-v1';
+export const REJECTED_STORAGE = 'manrakora-sheets-rejected';
 export const sheetId = () => globalThis.crypto?.randomUUID?.() || `ficha-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+export const emptySession=()=>({sheets:[],activeId:''});
 export function openSheet(session, character=newCharacter(), id=sheetId()) {
   return {...session, sheets:[...session.sheets,{id,character}], activeId:id};
 }
+export const newSession=()=>openSheet(emptySession());
 export function editSheet(session,id,value) {
   return {...session,sheets:session.sheets.map(s=>s.id===id?{...s,character:typeof value==='function'?value(s.character):value}:s)};
 }
@@ -84,33 +87,59 @@ export function closeCloudTab(session,id) {
   if(!cloudId) return session;
   return closeSheet({...session,closedCloudIds:[...new Set([...(session.closedCloudIds||[]),cloudId])]},id);
 }
-export function restoreSheets(storage) {
+const UUID_LIKE=/^[a-f0-9-]{36}$/;
+// Reconstroi uma aba salva; lanca se a ficha dela for invalida.
+function restoreTab(stored) {
+  const remote = stored.remote && UUID_LIKE.test(stored.remote.id) && Number.isInteger(stored.remote.revision) && stored.remote.revision>0
+    ? {id:stored.remote.id,revision:stored.remote.revision,base:typeof stored.remote.base==='string'?stored.remote.base:JSON.stringify(validateCharacter(stored.character)),editToken:typeof stored.remote.editToken==='string'?stored.remote.editToken:''} : undefined;
+  const character=validateCharacter(stored.character);
+  const cloud = stored.cloud && UUID_LIKE.test(stored.cloud.id) && Number.isInteger(stored.cloud.revision) && stored.cloud.revision>0
+    ? {id:stored.cloud.id,revision:stored.cloud.revision,base:typeof stored.cloud.base==='string'?stored.cloud.base:JSON.stringify(character)} : undefined;
+  const tableId = typeof stored.tableId==='string' && UUID_LIKE.test(stored.tableId) ? stored.tableId : '';
+  return {id:stored.id,character,...(remote?{remote}:{}),...(cloud?{cloud}:{}),...(tableId?{tableId,tableName:typeof stored.tableName==='string'?stored.tableName.slice(0,100):''}:{})};
+}
+// Uma aba invalida nao derruba as outras: as recusadas voltam em `rejected`, no formato original.
+function restoreTabs(storedTabs) {
+  const sheets=[], rejected=[], seen=new Set();
+  for(const stored of storedTabs){
+    try {
+      if (typeof stored?.id!=='string' || seen.has(stored.id)) throw new Error('Aba inválida');
+      sheets.push(restoreTab(stored));
+      seen.add(stored.id);
+    } catch { rejected.push(stored); }
+  }
+  return {sheets,rejected};
+}
+function restoreSession(raw,sheets) {
+  const editKeys=Object.fromEntries(Object.entries(raw.editKeys||{}).filter(([id,key])=>UUID_LIKE.test(id) && typeof key==='string' && /^[a-f0-9]{64}$/.test(key)));
+  for(const s of sheets)if(s.remote?.editToken)editKeys[s.remote.id]=s.remote.editToken;
+  const closedCloudIds=Array.isArray(raw.closedCloudIds)
+    ? raw.closedCloudIds.filter(id=>typeof id==='string' && UUID_LIKE.test(id) && !sheets.some(s=>s.cloud?.id===id))
+    : [];
+  return {sheets,...(closedCloudIds.length?{closedCloudIds}:{}),activeId:sheets.some(s=>s.id===raw.activeId)?raw.activeId:sheets[0].id,...(Object.keys(editKeys).length?{editKeys}:{})};
+}
+export function readStoredSheets(storage) {
+  let rejected=[];
   try {
     const raw=JSON.parse(storage.getItem(SHEETS_STORAGE));
     if (Array.isArray(raw?.sheets) && raw.sheets.length) {
-      const seen=new Set();
-      const sheets=raw.sheets.map(s=>{
-        if (typeof s.id!=='string' || seen.has(s.id)) throw new Error('Abas inválidas');
-        seen.add(s.id);
-        const remote = s.remote && /^[a-f0-9-]{36}$/.test(s.remote.id) && Number.isInteger(s.remote.revision) && s.remote.revision>0
-          ? {id:s.remote.id,revision:s.remote.revision,base:typeof s.remote.base==='string'?s.remote.base:JSON.stringify(validateCharacter(s.character)),editToken:typeof s.remote.editToken==='string'?s.remote.editToken:''} : undefined;
-        const character=validateCharacter(s.character);
-        const cloud = s.cloud && /^[a-f0-9-]{36}$/.test(s.cloud.id) && Number.isInteger(s.cloud.revision) && s.cloud.revision>0
-          ? {id:s.cloud.id,revision:s.cloud.revision,base:typeof s.cloud.base==='string'?s.cloud.base:JSON.stringify(character)} : undefined;
-        const tableId = typeof s.tableId==='string' && /^[a-f0-9-]{36}$/.test(s.tableId) ? s.tableId : '';
-        return {id:s.id,character,...(remote?{remote}:{}),...(cloud?{cloud}:{}),...(tableId?{tableId,tableName:typeof s.tableName==='string'?s.tableName.slice(0,100):''}:{})};
-      });
-      const editKeys=Object.fromEntries(Object.entries(raw.editKeys||{}).filter(([id,key])=>/^[a-f0-9-]{36}$/.test(id) && typeof key==='string' && /^[a-f0-9]{64}$/.test(key)));
-      for(const s of sheets)if(s.remote?.editToken)editKeys[s.remote.id]=s.remote.editToken;
-      const closedCloudIds=Array.isArray(raw.closedCloudIds)
-        ? raw.closedCloudIds.filter(id=>typeof id==='string' && /^[a-f0-9-]{36}$/.test(id) && !sheets.some(s=>s.cloud?.id===id))
-        : [];
-      return {sheets,...(closedCloudIds.length?{closedCloudIds}:{}),activeId:sheets.some(s=>s.id===raw.activeId)?raw.activeId:sheets[0].id,...(Object.keys(editKeys).length?{editKeys}:{})};
+      const restored=restoreTabs(raw.sheets);
+      rejected=restored.rejected;
+      if (restored.sheets.length) return {session:restoreSession(raw,restored.sheets),rejected};
     }
   } catch { /* Fall back to the previous single-sheet draft, which stays untouched. */ }
   try {
     const old=storage.getItem(LEGACY_STORAGE);
-    if (old) return openSheet({sheets:[],activeId:''},validateCharacter(JSON.parse(old)));
+    if (old) return {session:openSheet({sheets:[],activeId:''},validateCharacter(JSON.parse(old))),rejected};
   } catch { /* No usable saved sheet. */ }
-  return openSheet({sheets:[],activeId:''});
+  return {session:newSession(),rejected};
+}
+export const restoreSheets=storage=>readStoredSheets(storage).session;
+// Guarda as abas recusadas para recuperacao manual: a sessao salva e regravada sem elas e as apagaria para sempre.
+export function keepRejectedSheets(storage,rejected) {
+  let kept=[];
+  try { const list=JSON.parse(storage.getItem(REJECTED_STORAGE)); if(Array.isArray(list)) kept=list; } catch { /* lista ilegivel: recomeca */ }
+  const known=new Set(kept.map(item=>JSON.stringify(item)));
+  const added=rejected.filter(item=>!known.has(JSON.stringify(item)));
+  if(added.length) storage.setItem(REJECTED_STORAGE,JSON.stringify([...kept,...added]));
 }

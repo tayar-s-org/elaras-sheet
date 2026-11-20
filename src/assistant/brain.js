@@ -3,12 +3,12 @@
 import catalog from '../catalog.json';
 import { buildKnowledge } from './knowledge.js';
 import { createAssistant } from './engine.js';
+import { fetchBookJson } from './bookAccess.js';
 
 let loading = null;
 export function loadBrain() {
   if (!loading) {
-    loading = fetch(`${import.meta.env.BASE_URL}assets/book.json`)
-      .then(response => { if (!response.ok) throw new Error('livro indisponível'); return response.json(); })
+    loading = fetchBookJson(`${import.meta.env.BASE_URL}assets/book.json`)
       .then(book => createAssistant(buildKnowledge(book.pages, catalog)))
       .catch(error => { loading = null; throw error; }); // tenta de novo na próxima pergunta
   }

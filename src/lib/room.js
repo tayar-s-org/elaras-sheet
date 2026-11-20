@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { staleCharacterIds, mergeCharacters } from './characterRefresh.js';
 
 const fail = error => { if (error) throw new Error(error.message || 'Erro ao acessar a nuvem.'); };
 
@@ -26,10 +27,19 @@ export async function loadCharacterState(tableId, characterId) {
   const { data, error } = await supabase.from('table_character_state').select('state').eq('table_id', tableId).eq('character_id', characterId).maybeSingle();
   return error ? null : data?.state ?? null;
 }
-export async function saveState(tableId, characterId, state) {
-  const { error } = await supabase.from('table_character_state')
-    .upsert({ table_id: tableId, character_id: characterId, state }, { onConflict: 'table_id,character_id' });
+// Grava um recurso (life, stamina ou mana) sob trava no servidor e devolve o estado resultante (migration 0049).
+export async function setStateResource(tableId, characterId, resource, value, max) {
+  const { data, error } = await supabase.rpc('set_state_resource', {
+    p_table: tableId, p_character: characterId, p_resource: resource, p_value: value, p_max: max,
+  });
   fail(error);
+  return data;
+}
+// Grava só o prazo/desmaio ({ hours, fainted }) e devolve o estado resultante (migration 0049).
+export async function setStateFaint(tableId, characterId, faint, max) {
+  const { data, error } = await supabase.rpc('set_state_faint', { p_table: tableId, p_character: characterId, p_faint: faint, p_max: max });
+  fail(error);
+  return data;
 }
 // Historico de vida/stamina/mana; devolve null se a tabela ainda nao existe (migration 0007 pendente).
 export async function recentStateLog(tableId, limit = 100) {
@@ -44,6 +54,17 @@ export async function loadCharacters(ids) {
   const { data, error } = await supabase.from('characters').select('id,name,data,revision').in('id', ids);
   fail(error);
   return Object.fromEntries(data.map(r => [r.id, r]));
+}
+// Como loadCharacters, mas consulta só as revisões e baixa o JSON das fichas que mudaram desde `known`. Devolve `known` se nada mudou.
+export async function refreshCharacters(ids, known) {
+  let revisions = [];
+  if (ids.length) {
+    const { data, error } = await supabase.from('characters').select('id,revision').in('id', ids);
+    fail(error);
+    revisions = data;
+  }
+  const stale = staleCharacterIds(known, revisions);
+  return mergeCharacters(known, revisions, stale.length ? await loadCharacters(stale) : {});
 }
 
 const ROLL_COLS = 'id,user_id,character_id,label,formula,spec,result,total,visibility,created_at';

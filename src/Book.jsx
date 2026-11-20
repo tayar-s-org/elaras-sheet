@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-
-export const normalize = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+import React, { useEffect, useMemo, useState } from 'react';
+import { buildBookIndex, searchBookIndex } from './bookSearch.js';
 
 export default function Book({ requestedPage }) {
   const [book, setBook] = useState(null);
@@ -18,10 +17,11 @@ export default function Book({ requestedPage }) {
     return () => controller.abort();
   }, []);
   useEffect(() => { if (requestedPage) setPage(requestedPage); }, [requestedPage]);
+  const index = useMemo(() => (book ? buildBookIndex(book.pages) : []), [book]);
+  const hits = useMemo(() => searchBookIndex(index, query), [index, query]);
   if (error) return <p role="alert">Não foi possível carregar o livro. Recarregue a página.</p>;
   if (!book) return <p role="status">Carregando livro…</p>;
   const current = book.pages[page - 1];
-  const hits = query.trim() ? book.pages.filter(p => normalize(p.text).includes(normalize(query.trim()))) : [];
   const go = (n) => setPage(Math.max(1, Math.min(book.pages.length, n)));
   return <section className="book-reader">
     <h3>Livro completo</h3>
@@ -29,7 +29,7 @@ export default function Book({ requestedPage }) {
     <label className="field"><span>Buscar no livro</span><input type="search" value={query} placeholder="Nome, regra ou expressão…" onChange={e => setQuery(e.target.value)} /></label>
     {query.trim() && <details className="book-search" open><summary>{hits.length} páginas encontradas</summary>
       <div className="book-results">{hits.map(p => <button key={p.page} onClick={() => go(p.page)} aria-pressed={page === p.page}>
-        <b>Página {p.page}</b><p>{p.text.slice(Math.max(0, normalize(p.text).indexOf(normalize(query.trim())) - 65), Math.max(0, normalize(p.text).indexOf(normalize(query.trim())) - 65) + 180)}</p>
+        <b>Página {p.page}</b><p>{p.excerpt}</p>
       </button>)}</div>
       {!hits.length && <p>Nenhum resultado. Páginas compostas só por imagens podem ser consultadas no modo original.</p>}
     </details>}

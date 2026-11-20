@@ -1,6 +1,6 @@
 import React from 'react';
 import { saleOptions, saleCurrencies } from '../../../market/shop.js';
-import { iconText, DEFAULT_CURRENCY_ICON } from './experienceIcons.js';
+import { iconText, DEFAULT_CURRENCY_ICON } from '../../../market/experienceIcons.js';
 
 // Opção "Vender na Loja do Mestre" do formulário de criação de itens do mestre: moeda (uma das já criadas na mesa) e preço.
 // Usada na Central (módulo Itens) e na janela "Entregar itens" do Grupo. value = { sell, currencyId, price }.

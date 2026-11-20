@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-export default function Modal({ children, onClose, busy = false, dismissOnBackdrop = true, ...labels }) {
+export default function Modal({ children, onClose, busy = false, dismissOnBackdrop = true, className, ...labels }) {
   const dialogRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -14,7 +14,7 @@ export default function Modal({ children, onClose, busy = false, dismissOnBackdr
   return createPortal(<dialog
     {...labels}
     ref={dialogRef}
-    className="modal-backdrop"
+    className={className ? `modal-backdrop ${className}` : 'modal-backdrop'}
     onCancel={event => {
       event.preventDefault();
       event.stopPropagation();

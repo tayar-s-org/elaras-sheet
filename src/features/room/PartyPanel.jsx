@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useConfirm } from '../../ui/ConfirmProvider.jsx';
-import { saveState, sendMessage } from '../../lib/room.js';
+import { setStateResource, setStateFaint, loadCharacterState, sendMessage } from '../../lib/room.js';
 import ActiveConditions from '../sheet/ActiveConditions.jsx';
 import { conditionsOf } from '../../tokenState.js';
 import { useExtras } from './masterHub/extras.jsx';
@@ -16,6 +16,8 @@ import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
 import MoneyGrant from './MoneyGrant.jsx';
 import GmItemsModal from './GmItemsModal.jsx';
+import { createOperationGuard } from '../../operationGuard.js';
+import { createSerialQueue } from '../../serialQueue.js';
 import './party.css';
 
 function Counter({ id, label, value, max, amount, canEdit, onChange }) {
@@ -38,6 +40,8 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   const [giving, setGiving] = useState(false);
   const [viewing, setViewing] = useState(false);
   const [amountText, setAmountText] = useState('1');
+  const [enqueueWrite] = useState(createSerialQueue);
+  const [writes] = useState(createOperationGuard);
   const extras = useExtras();
   // Experiências personalizadas: todos veem (como o XP). Carteira de moedas: só o dono e o mestre (a RLS só entrega a eles).
   const wallet = canEdit ? walletChips(extras, row.id) : [];
@@ -45,21 +49,36 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   const amount = Math.max(1, Math.min(999, Math.trunc(Number(amountText)) || 1));
   const max = safeMaxima(row.data);
   const value = k => currentValue(state, max, k);
-  async function persist(next) {
-    patchState(row.id, next);
+  // Mostra o valor na hora e grava em ordem. Só a gravação mais recente acerta a tela com o servidor (resposta ou, se recusada,
+  // o estado que ele tem); assim uma resposta lenta de um clique antigo não desfaz o clique seguinte. O erro sempre é repassado.
+  async function persist(optimisticState, saveOnServer) {
+    const previous = state;
+    const write = writes.begin(row.id);
+    patchState(row.id, optimisticState);
+    try {
+      const saved = await enqueueWrite(saveOnServer);
+      if (writes.isCurrent(write)) patchState(row.id, saved);
+    } catch (e) {
+      const serverState = (await loadCharacterState(tableId, row.id)) ?? previous;
+      if (writes.isCurrent(write)) patchState(row.id, serverState);
+      throw e;
+    }
+  }
+  async function showFailure(action) {
     setError('');
-    try { await saveState(tableId, row.id, next); } catch (e) { setError(e.message); }
+    try { await action(); } catch (e) { setError(e.message); }
   }
   async function change(k, v) {
     const { faint: _faint, ...rest } = state || {}; // o desmaio só continua se ainda valer (abaixo); o resto (condições) fica
-    const base = { ...rest, life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v, max }; // max permite ao servidor registrar a primeira alteracao; ...state mantém o resto (condições)
+    const base = { ...rest, life: value('life'), stamina: value('stamina'), mana: value('mana'), [k]: v, max }; // espelha o estado que o servidor grava; ...state mantém o resto (condições)
     // O prazo/desmaio do mestre so vale enquanto o personagem continua na Incapacitação 4.
     const keep = state?.faint && incapacitation({ ...base, faint: state.faint }, max).total === 4;
-    return persist(keep ? { ...base, faint: state.faint } : base);
+    return persist(keep ? { ...base, faint: state.faint } : base, () => setStateResource(tableId, row.id, k, v, max));
   }
   async function setFaint(faint) {
     const wasFainted = Boolean(state?.faint?.fainted);
-    await persist({ ...state, life: value('life'), stamina: value('stamina'), mana: value('mana'), max, faint });
+    await persist({ ...state, life: value('life'), stamina: value('stamina'), mana: value('mana'), max, faint },
+      () => setStateFaint(tableId, row.id, faint, max));
     const who = row.name || 'O personagem';
     const text = faint.fainted ? `💤 ${who} desmaiou (Incapacitação 5).`
       : wasFainted ? `✨ ${who} foi reanimado.`
@@ -79,8 +98,8 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
     {canEdit && !closed && <label className="amount-field"><span>Quantidade por clique</span>
       <input type="number" inputMode="numeric" min="1" max="999" value={amountText} aria-label={`Quantidade para tirar ou adicionar (${row.name || 'personagem'})`}
         onChange={e => setAmountText(e.target.value)} onBlur={() => setAmountText(String(amount))} onFocus={e => e.target.select()} /></label>}
-    {RESOURCES.filter(([k]) => k !== 'mana' || canEdit).map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} amount={amount} canEdit={canEdit && !closed} onChange={v => change(k, v)} />)}
-    <IncapPanel state={state} max={max} baseMovement={baseMovement(row.data)} isGm={isGm} closed={closed} onFaint={setFaint} />
+    {RESOURCES.filter(([k]) => k !== 'mana' || canEdit).map(([k, label]) => <Counter key={k} id={k} label={label} value={value(k)} max={max[k]} amount={amount} canEdit={canEdit && !closed} onChange={v => showFailure(() => change(k, v))} />)}
+    <IncapPanel state={state} max={max} baseMovement={baseMovement(row.data)} isGm={isGm} closed={closed} onFaint={faint => showFailure(() => setFaint(faint))} />
     {isGm && !closed && <MoneyGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} />}
     {isGm && !closed && <XpGrant tableId={tableId} targets={[{ id: row.id, name: row.name }]} label="Experiência (XP)" />}
     {isGm && !closed && <AptitudeGrant tableId={tableId} characterId={row.id} name={row.name} />}
@@ -124,18 +143,16 @@ export default function PartyPanel({ tableId, me, isGm, members, characters, sta
   const [picked, setPicked] = useState(null);
   const rows = members.filter(m => m.status === 'approved' && m.character_id && characters[m.character_id]);
   const mine = rows.filter(m => m.user_id === me);
-  const shown = isGm ? rows : rows;
-  if (!shown.length) return <p className="muted">Nenhuma ficha vinculada à mesa ainda. Escolha a sua em "Gerenciar mesa".</p>;
-  const playerTargets = shown.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
-  const moneyTargets = shown.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
+  if (!rows.length) return <p className="muted">Nenhuma ficha vinculada à mesa ainda. Escolha a sua em "Gerenciar mesa".</p>;
+  const playerTargets = rows.filter(m => m.role === 'player').map(m => ({ id: characters[m.character_id].id, name: characters[m.character_id].name }));
   return <div className="party">
-    {isGm && !closed && moneyTargets.length > 1 && <section className="party-card"><h4>Dinheiro para todos os jogadores</h4>
-      <MoneyGrant tableId={tableId} targets={moneyTargets} label="Dinheiro para cada um" button="Dar a todos" removeButton="Remover de todos" /></section>}
+    {isGm && !closed && playerTargets.length > 1 && <section className="party-card"><h4>Dinheiro para todos os jogadores</h4>
+      <MoneyGrant tableId={tableId} targets={playerTargets} label="Dinheiro para cada um" button="Dar a todos" removeButton="Remover de todos" /></section>}
     {isGm && !closed && playerTargets.length > 1 && <section className="party-card"><h4>XP para todos os jogadores</h4>
       <XpGrant tableId={tableId} targets={playerTargets} label="XP para cada um" /></section>}
     {(() => {
       // Uma aba por ficha da mesa (a sua primeiro), com o primeiro nome do personagem; só a ficha da aba escolhida aparece.
-      const ordered = [...mine, ...shown.filter(m => m.user_id !== me)];
+      const ordered = [...mine, ...rows.filter(m => m.user_id !== me)];
       const current = ordered.find(m => m.user_id === picked) || ordered[0];
       const firstName = m => (characters[m.character_id].name || '').trim().split(/\s+/)[0] || (m.profiles?.display_name || 'Jogador').split(/\s+/)[0];
       return <>

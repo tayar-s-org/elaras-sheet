@@ -3,7 +3,7 @@ import { upsertShopItem, deleteShopItem } from '../../../../lib/masterHub.js';
 import { parsePrice, saleCurrencies, shopCurrency, MONEY_ID } from '../../../../market/shop.js';
 import { formatMoney } from '../../../../money.js';
 import ExperienceIcon from '../ExperienceIcon.jsx';
-import { iconText, DEFAULT_CURRENCY_ICON } from '../experienceIcons.js';
+import { iconText, DEFAULT_CURRENCY_ICON } from '../../../../market/experienceIcons.js';
 import { BatchResults, useMasterRun, previewText } from '../ui.jsx';
 
 // Itens à venda na Loja do Mestre: trocar moeda e preço, pausar/ativar e remover. Remover não tira o item de quem já comprou.

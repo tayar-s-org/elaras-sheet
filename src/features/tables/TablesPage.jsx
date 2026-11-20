@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { loginThen, navigate } from '../../lib/router.js';
 import { createTable, myMemberships, listPublic, joinPublic, joinByCode, STATUS_LABEL, MEMBER_LABEL } from '../../lib/tables.js';
+import { createQueryGate } from '../../lib/queryGate.js';
 import JoinForm from './JoinForm.jsx';
 
 function Tabs({ tab, setTab }) {
@@ -30,8 +31,19 @@ function DiscoverTab() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState('');
   const [joining, setJoining] = useState('');
-  const load = useCallback(q => listPublic(q).then(setRows).catch(e => setError(e.message)), []);
-  useEffect(() => { load(''); }, [load]);
+  const [searchGate] = useState(createQueryGate);
+  // Só a busca mais recente atualiza a tela: respostas atrasadas e erros de buscas antigas são descartados.
+  const load = useCallback(async q => {
+    const isCurrent = searchGate.begin();
+    setError('');
+    try {
+      const found = await listPublic(q);
+      if (isCurrent()) setRows(found);
+    } catch (e) {
+      if (isCurrent()) setError(e.message);
+    }
+  }, [searchGate]);
+  useEffect(() => { load(''); return () => searchGate.invalidate(); }, [load, searchGate]);
   return <>
     <form className="row" onSubmit={e => { e.preventDefault(); load(search); }}>
       <input aria-label="Buscar mesas" placeholder="Buscar por nome ou descrição" value={search} onChange={e => setSearch(e.target.value)} />

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { updateBoard } from '../../lib/board.js';
-import { musicUrl } from '../../lib/music.js';
+import { musicUrl, forgetMusicUrl } from '../../lib/music.js';
 import { musicPosition, musicFinished, playMusic, pauseMusic, stopMusic, setLoop } from '../../music.js';
 
 const VOLUME_KEY = 'manrakora-music-volume';
@@ -18,14 +18,26 @@ export default function MusicPlayer({ board, isGm, local, setError }) {
   const [src, setSrc] = useState(null);
   const [blocked, setBlocked] = useState(false);
   const [vol, setVol] = useState(loadVolume);
+  const renewedPath = useRef(null);
 
   // Link temporário do arquivo, renovado quando a música muda.
   useEffect(() => {
     let alive = true;
     setSrc(null);
+    renewedPath.current = null;
     if (music?.path) musicUrl(music.path).then(u => { if (alive) setSrc(u); }).catch(e => { if (alive) setError?.(e.message); });
     return () => { alive = false; };
   }, [music?.path]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // O navegador recusou o link (provavelmente expirou com a sala aberta): pede um novo uma vez; se falhar de novo, avisa.
+  const onAudioError = () => {
+    const path = musicRef.current?.path;
+    if (!path) return;
+    if (renewedPath.current === path) { setError?.('Não foi possível tocar a música da mesa.'); return; }
+    renewedPath.current = path;
+    forgetMusicUrl(path);
+    musicUrl(path).then(u => { if (musicRef.current?.path === path) setSrc(u); }).catch(e => setError?.(e.message));
+  };
 
   useEffect(() => {
     const a = audioRef.current;
@@ -65,7 +77,7 @@ export default function MusicPlayer({ board, isGm, local, setError }) {
   const playing = Boolean(music.playing);
 
   return <div className="music-bar" role="group" aria-label="Música da mesa">
-    <audio ref={audioRef} src={src || undefined} preload="auto" loop={music.loop} />
+    <audio ref={audioRef} src={src || undefined} preload="auto" loop={music.loop} onError={onAudioError} onPlaying={() => { renewedPath.current = null; }} />
     <span className="music-title" title={music.name}>♪ {music.name}</span>
     {isGm && <span className="music-controls">
       <button type="button" className="outline" onClick={() => save(playing ? pauseMusic(music, musicPosition(music, Date.now(), audioRef.current?.duration || 0)) : playMusic(music, Date.now(), music.offset))}>{playing ? 'Pausar' : 'Tocar'}</button>

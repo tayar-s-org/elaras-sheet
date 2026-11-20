@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { useConfirm } from './ui/ConfirmProvider.jsx';
 import { ATTRIBUTES, SKILLS, DICE, calculate } from './rules.js';
+import { blankDraft, draftFromSheet } from './archetypeDraft.js';
+import { useSharedArchetypeDraft } from './useArchetypeDraft.js';
 import { loadCustomArchetype, advantageNames } from './templates.js';
 import './custom-archetype.css';
 
 const KEY = 'manrakora-custom-archetypes';
 const load = () => { try { const v = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(v) ? v : []; } catch { return []; } };
 const store = list => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* sem storage */ } };
-const blank = () => ({ id: '', name: '', attributes: Object.fromEntries(ATTRIBUTES.map(a => [a, 4])), skills: {}, advantages: [] });
-const fromSheet = c => ({ id: '', name: c.concept || '', attributes: { ...c.attributes }, skills: { ...c.skills }, advantages: c.advantages.map(a => a.name).filter(Boolean) });
 
 // Aba "Criar o meu": monta um arquétipo próprio, aplica na ficha e guarda como modelo reutilizável neste navegador.
 export default function CustomArchetype({ character: c, onChange, onLoad }) {
   const askConfirm = useConfirm();
-  const [draft, setDraft] = useState(blank);
+  const { draft, setDraft, setBaseline, start: startDraft } = useSharedArchetypeDraft();
   const [saved, setSaved] = useState(load);
   const [skillPick, setSkillPick] = useState('');
   const [edgePick, setEdgePick] = useState('');
@@ -33,6 +33,7 @@ export default function CustomArchetype({ character: c, onChange, onLoad }) {
     const next = saved.some(s => s.id === item.id) ? saved.map(s => (s.id === item.id ? item : s)) : [...saved, item];
     setSaved(next);
     store(next);
+    setBaseline(item);
     set({ id: item.id });
   }
   function remove(id) {
@@ -41,13 +42,13 @@ export default function CustomArchetype({ character: c, onChange, onLoad }) {
     store(next);
     if (draft.id === id) set({ id: '' });
   }
-  const apply = t => onLoad(`Aplicar o arquétipo ${t.name}?`, () => onChange(loadCustomArchetype(c, t)));
+  const apply = (t, afterApply) => onLoad(`Aplicar o arquétipo ${t.name}?`, () => { onChange(loadCustomArchetype(c, t)); afterApply?.(); });
 
   return <div className="custom-arch">
     <p className="muted">Monte o seu próprio modelo: atributos, perícias e vantagens. O equipamento você compra no Mercado. Depois aplique na ficha ou guarde para reutilizar. Os pontos seguem as regras da mesa, e você vê o saldo antes de aplicar.</p>
     <div className="row token-row">
-      <button type="button" className="outline" onClick={() => setDraft(fromSheet(c))}>Começar da minha ficha</button>
-      <button type="button" className="text-button" onClick={() => setDraft(blank())}>Limpar</button>
+      <button type="button" className="outline" onClick={() => startDraft(draftFromSheet(c))}>Começar da minha ficha</button>
+      <button type="button" className="text-button" onClick={() => startDraft(blankDraft())}>Limpar</button>
     </div>
     <label className="field"><span>Nome do arquétipo</span>
       <input maxLength={60} value={draft.name} onChange={e => set({ name: e.target.value })} placeholder="Ex.: Bardo errante, Caçador de recompensas…" /></label>
@@ -81,7 +82,7 @@ export default function CustomArchetype({ character: c, onChange, onLoad }) {
 
     {ready && <p className="callout">Saldo de pontos de criação depois de aplicar: <b className={remaining < 0 ? 'negative' : ''}>{remaining}</b>{remaining < 0 ? ' (acima do orçamento da ficha)' : ''}</p>}
     <div className="row token-row">
-      <button type="button" className="primary" disabled={!ready} onClick={() => apply(tpl)}>Aplicar na minha ficha</button>
+      <button type="button" className="primary" disabled={!ready} onClick={() => apply(tpl, () => setBaseline(draft))}>Aplicar na minha ficha</button>
       <button type="button" className="outline" disabled={!ready} onClick={save}>{draft.id ? 'Atualizar meu modelo' : 'Salvar como meu modelo'}</button>
     </div>
 
@@ -94,7 +95,7 @@ export default function CustomArchetype({ character: c, onChange, onLoad }) {
         {t.advantages.length > 0 && <p><b>Vantagens:</b> {t.advantages.join(', ')}</p>}
         <div className="row token-row">
           <button type="button" className="primary" onClick={() => apply(t)}>Usar {t.name}</button>
-          <button type="button" className="outline" onClick={() => setDraft({ ...t })}>Editar</button>
+          <button type="button" className="outline" onClick={() => startDraft({ ...t })}>Editar</button>
           <button type="button" className="text-button danger" onClick={async () => await askConfirm({ title: 'Apagar modelo?', text: `Apagar o modelo "${t.name}"?`, actionLabel: 'Apagar modelo', danger: true }) && remove(t.id)}>Apagar</button>
         </div>
       </article>)}</div>

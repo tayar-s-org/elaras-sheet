@@ -11,10 +11,9 @@
 .ms-dice-top { @apply flex flex-wrap items-baseline justify-between gap-[6px]; }
 .ms-dice-top b { font-size: 1.4rem; @apply text-app-accent; }
 .ms-dice-top small, .ms-next small { @apply text-app-muted; }
-.ms-pips { @apply grid; grid-template-columns: repeat(24, minmax(0, 1fr)); @apply gap-[3px]; }
+.ms-pips { @apply grid; grid-template-columns: repeat(16, minmax(0, 1fr)); @apply gap-[3px]; }
 .ms-pips i { @apply h-[14px] rounded-[3px]; background: var(--field, #1a1a24); border: 1px solid var(--border); }
 .ms-pips i.have { background: var(--accent); @apply border-app-accent; }
-.ms-pips i.spent { background: transparent; border-style: dashed; opacity: .6; }
 .ms-next { @apply grid gap-[4px]; }
 .ms-bar { @apply h-[6px] rounded-[6px]; background: var(--field, #1a1a24); @apply overflow-hidden; }
 .ms-bar i { @apply block h-full; background: var(--gold, #d9a21b); }
@@ -35,4 +34,4 @@
 .ms-history summary { @apply cursor-pointer font-bold text-app-accent; }
 .ms-ok { color: var(--success); @apply font-bold; }
 .ms-fail { color: var(--danger); @apply font-bold; }
-@media (max-width: 520px) { .ms-pips { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .ms-pips { grid-template-columns: repeat(8, minmax(0, 1fr)); } }

@@ -6,6 +6,7 @@ import { inventoryEffects, itemById, unitFills } from "./market/items.js";
 import { sanitizeCustom, isCustomId } from "./market/custom.js";
 import { bookFacts } from "./data/matchBookPower.js";
 import { sanitizeCustomSkills } from "./skills/custom.js";
+import { sanitizeAppliedBenefits } from "./rpg/benefitLedger.js";
 export const ATTRIBUTES = [
   "Agilidade",
   "Astúcia",
@@ -264,32 +265,22 @@ function powerId(index, name) {
   return `p${index}-${h.toString(36)}`;
 }
 
-export function validateCharacter(raw) {
-  if (!raw || raw.schemaVersion !== 1 || !raw.attributes || !raw.rules)
-    throw new Error("Formato de ficha incompatível.");
-  const c = newCharacter();
-  c.xp = integer(raw.xp, 0, 1000000);
-  c.money = normalizeMoney(raw.money);
-  c.dice = {
-    weaponName: string(raw.dice?.weaponName, 100),
-    weaponDie: DICE.includes(raw.dice?.weaponDie) ? raw.dice.weaponDie : 0,
-    weaponCount: integer(raw.dice?.weaponCount, 1, 2, 1),
-    damageBonus: integer(raw.dice?.damageBonus, -100, 100),
-  };
-  for (const name of [
-    "name",
-    "player",
-    "concept",
-    "race",
-    "village",
-    "equipment",
-    "history",
-    "notes",
-  ])
-    c[name] = string(raw[name]);
-  // Mochila do mercado: só ids que existem no catálogo, quantidade 1 a 99, e um item equipado por espaço.
+const TEXT_FIELDS = ["name", "player", "concept", "race", "village", "equipment", "history", "notes"];
+const RACE_IDS = ["Androide","Anão","Atlante","Aviano","Elfo","Humano","Meio-elfo","Meio-orc","Pequenino","Rakashano","Sáurio"];
+
+const normalizeText = raw => ({ ...Object.fromEntries(TEXT_FIELDS.map(name => [name, string(raw[name])])), age: string(raw.age, 30) });
+
+const normalizeDice = dice => ({
+  weaponName: string(dice?.weaponName, 100),
+  weaponDie: DICE.includes(dice?.weaponDie) ? dice.weaponDie : 0,
+  weaponCount: integer(dice?.weaponCount, 1, 2, 1),
+  damageBonus: integer(dice?.damageBonus, -100, 100),
+});
+
+// Mochila do mercado: só ids que existem no catálogo, quantidade 1 a 99, e um item equipado por espaço.
+function normalizeInventory(inventory) {
   const takenSlots = new Set();
-  c.inventory = (Array.isArray(raw.inventory) ? raw.inventory : []).slice(0, 300).flatMap(entry => {
+  return (Array.isArray(inventory) ? inventory : []).slice(0, 300).flatMap(entry => {
     if (isCustomId(entry?.id)) {
       const custom = sanitizeCustom(entry.custom, { attributes: ATTRIBUTES, skills: SKILLS.map(([name]) => name) });
       return custom ? [{ id: entry.id, custom, qty: integer(entry.qty, 1, 99, 1), equipped: entry.equipped === true }] : [];
@@ -302,81 +293,140 @@ export function validateCharacter(raw) {
     // Recipientes de líquido guardam o nível de cada unidade (litros).
     return [{ id: item.id, qty, equipped, ...(item.liquid ? { fills: unitFills({ qty, fills: entry.fills }, item) } : {}) }];
   });
-  c.tokenImage = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(raw.tokenImage) ? raw.tokenImage : "";
-  if (c.tokenImage && raw.tokenArtwork) c.tokenArtwork = tokenArtwork(raw.tokenArtwork);
-  c.age = string(raw.age, 30);
-  c.raceId = ["Androide","Anão","Atlante","Aviano","Elfo","Humano","Meio-elfo","Meio-orc","Pequenino","Rakashano","Sáurio"].includes(raw.raceId) ? raw.raceId : "";
-  c.raceChoice = raw.raceChoice === "Vantagem" ? "Vantagem" : "Agilidade";
-  c.raceSkill = SKILLS.some(([name]) => name === raw.raceSkill) ? raw.raceSkill : "Conhecimento";
-  for (const name of ATTRIBUTES) {
-    if (!DICE.includes(raw.attributes[name]))
-      throw new Error("Atributo inválido no arquivo.");
-    c.attributes[name] = raw.attributes[name];
-  }
-  // Perícias personalizadas (aprovadas pelo mestre) guardam o dado em c.skills junto com as do livro.
-  c.customSkills = sanitizeCustomSkills(raw.customSkills, SKILLS.map(([name]) => name));
-  c.skills = Object.fromEntries(
-    [...SKILLS.map(([name]) => name), ...c.customSkills.map(s => s.name)]
+}
+
+function normalizeToken(raw) {
+  const tokenImage = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(raw.tokenImage) ? raw.tokenImage : "";
+  return tokenImage && raw.tokenArtwork ? { tokenImage, tokenArtwork: tokenArtwork(raw.tokenArtwork) } : { tokenImage };
+}
+
+const normalizeRace = raw => ({
+  raceId: RACE_IDS.includes(raw.raceId) ? raw.raceId : "",
+  raceChoice: raw.raceChoice === "Vantagem" ? "Vantagem" : "Agilidade",
+  raceSkill: SKILLS.some(([name]) => name === raw.raceSkill) ? raw.raceSkill : "Conhecimento",
+});
+
+function normalizeAttributes(attributes) {
+  return Object.fromEntries(ATTRIBUTES.map(name => {
+    if (!DICE.includes(attributes[name])) throw new Error("Atributo inválido no arquivo.");
+    return [name, attributes[name]];
+  }));
+}
+
+// Perícias personalizadas (aprovadas pelo mestre) guardam o dado em c.skills junto com as do livro.
+function normalizeSkills(raw) {
+  const customSkills = sanitizeCustomSkills(raw.customSkills, SKILLS.map(([name]) => name));
+  const skills = Object.fromEntries(
+    [...SKILLS.map(([name]) => name), ...customSkills.map(s => s.name)]
       .filter(name => DICE.includes(raw.skills?.[name]))
       .map(name => [name, raw.skills[name]]),
   );
-  // Bônus de d12+N e passos de evolução: só valem para traços que existem e (no caso do bônus) com dado d12.
+  return { customSkills, skills };
+}
+
+// Bônus de d12+N e passos de evolução: só valem para traços que existem e (no caso do bônus) com dado d12.
+function normalizeProgression(raw, { attributes, skills }) {
+  const dice = { skills, attributes };
   const counts = (source, group, names, max, only12) => {
     const out = {};
     for (const name of names) {
       const v = integer(source?.[group]?.[name], 0, max);
-      if (v > 0 && (!only12 || c[group][name] === 12)) out[name] = v;
+      if (v > 0 && (!only12 || dice[group][name] === 12)) out[name] = v;
     }
     return out;
   };
-  const skillNames = Object.keys(c.skills).concat(SKILLS.map(([n]) => n).filter(n => !(n in c.skills)));
-  c.bonuses = { skills: counts(raw.bonuses, "skills", skillNames, 50, true), attributes: counts(raw.bonuses, "attributes", ATTRIBUTES, 50, true) };
-  c.evolved = { skills: counts(raw.evolved, "skills", skillNames, 20, false), attributes: counts(raw.evolved, "attributes", ATTRIBUTES, 20, false) };
-  c.advantages = (Array.isArray(raw.advantages) ? raw.advantages : [])
-    .slice(0, 100)
-    .map((x) => ({
-      name: string(x.name, 200),
-      description: string(x.description),
-      power: x.power === true,
-    }));
-  c.hindrances = (Array.isArray(raw.hindrances) ? raw.hindrances : [])
-    .slice(0, 100)
-    .map((x) => ({
-      name: string(x.name, 200),
-      description: string(x.description),
-      severity: x.severity === "Maior" ? "Maior" : "Menor",
-    }));
-  c.powers = (Array.isArray(raw.powers) ? raw.powers : [])
-    .slice(0, 100)
-    .map((x, i) => ({
-      // id estável do feitiço (treino e melhorias se ligam a ele). Quem não tem ganha um determinístico (posição + nome),
-      // que passa a valer quando a ficha é salva; ids já gravados nunca mudam.
-      id: /^[A-Za-z0-9_-]{1,64}$/.test(x.id || "") ? x.id : powerId(i, x.name),
-      name: string(x.name, 200),
-      description: string(x.description),
-      cost: string(x.cost, 100),
-      // Dados de regra do feitiço mostrados na ficha.
-      // Campos vazios de poderes que vieram do livro são preenchidos com os dados do livro (o que o jogador escreveu prevalece).
-      damage: string(x.damage, 100) || fromBook(x, "damage"),
-      range: string(x.range, 100) || fromBook(x, "range"),
-      duration: string(x.duration, 100) || fromBook(x, "duration"),
-      // Melhorias conquistadas no Estudo Mágico: { n, description, at }.
-      upgrades: (Array.isArray(x.upgrades) ? x.upgrades : []).slice(0, 20).map((u, i) => ({
-        n: integer(u?.n, 1, 20, i + 1), description: string(u?.description, 2000), at: string(u?.at, 40),
-      })),
-    }));
-  for (const key of ["armor", "movementBonus", "parryBonus", "manaBonus"])
-    c[key] = integer(raw[key], -100, 1000);
-  c.rules = {
-    budget: raw.rules.budget === "" ? 30 : integer(raw.rules.budget, 0, 10000, 30),
-    racialAgility: raw.rules.racialAgility === true,
-    extraPoints: integer(raw.rules.extraPoints, 0, 10000),
-    spentElsewhere: integer(raw.rules.spentElsewhere, 0, 10000),
-    ownedAdvantages: integer(raw.rules.ownedAdvantages, 0, 100),
-    advantageDiscount: integer(raw.rules.advantageDiscount, 0, 10000),
+  const skillNames = Object.keys(skills).concat(SKILLS.map(([n]) => n).filter(n => !(n in skills)));
+  return {
+    bonuses: { skills: counts(raw.bonuses, "skills", skillNames, 50, true), attributes: counts(raw.bonuses, "attributes", ATTRIBUTES, 50, true) },
+    evolved: { skills: counts(raw.evolved, "skills", skillNames, 20, false), attributes: counts(raw.evolved, "attributes", ATTRIBUTES, 20, false) },
   };
+}
+
+const normalizeAdvantages = advantages => (Array.isArray(advantages) ? advantages : [])
+  .slice(0, 100)
+  .map((x) => ({
+    name: string(x.name, 200),
+    description: string(x.description),
+    power: x.power === true,
+  }));
+
+const normalizeHindrances = hindrances => (Array.isArray(hindrances) ? hindrances : [])
+  .slice(0, 100)
+  .map((x) => ({
+    name: string(x.name, 200),
+    description: string(x.description),
+    severity: x.severity === "Maior" ? "Maior" : "Menor",
+  }));
+
+const normalizePowers = powers => (Array.isArray(powers) ? powers : [])
+  .slice(0, 100)
+  .map((x, i) => ({
+    // id estável do feitiço (treino e melhorias se ligam a ele). Quem não tem ganha um determinístico (posição + nome),
+    // que passa a valer quando a ficha é salva; ids já gravados nunca mudam.
+    id: /^[A-Za-z0-9_-]{1,64}$/.test(x.id || "") ? x.id : powerId(i, x.name),
+    name: string(x.name, 200),
+    description: string(x.description),
+    cost: string(x.cost, 100),
+    // Dados de regra do feitiço mostrados na ficha.
+    // Campos vazios de poderes que vieram do livro são preenchidos com os dados do livro (o que o jogador escreveu prevalece).
+    damage: string(x.damage, 100) || fromBook(x, "damage"),
+    range: string(x.range, 100) || fromBook(x, "range"),
+    duration: string(x.duration, 100) || fromBook(x, "duration"),
+    // Melhorias conquistadas no Estudo Mágico: { n, description, at }.
+    upgrades: (Array.isArray(x.upgrades) ? x.upgrades : []).slice(0, 20).map((u, i) => ({
+      n: integer(u?.n, 1, 20, i + 1), description: string(u?.description, 2000), at: string(u?.at, 40),
+    })),
+  }));
+
+const normalizeModifiers = raw => Object.fromEntries(
+  ["armor", "movementBonus", "parryBonus", "manaBonus"].map(key => [key, integer(raw[key], -100, 1000)]));
+
+const normalizeRules = rules => ({
+  budget: rules.budget === "" ? 30 : integer(rules.budget, 0, 10000, 30),
+  racialAgility: rules.racialAgility === true,
+  extraPoints: integer(rules.extraPoints, 0, 10000),
+  spentElsewhere: integer(rules.spentElsewhere, 0, 10000),
+  ownedAdvantages: integer(rules.ownedAdvantages, 0, 100),
+  advantageDiscount: integer(rules.advantageDiscount, 0, 10000),
+});
+
+// A raça garante um dado mínimo em certos atributos e na perícia racial.
+function applyRacialMinimums(c) {
   const racial = racialEffects(c);
   for (const [name, die] of Object.entries(racial.base)) c.attributes[name] = Math.max(die, c.attributes[name]);
   if (racial.skill) c.skills[racial.skill] = Math.max(6, c.skills[racial.skill] || 0);
+}
+
+// Registro dos benefícios do servidor já aplicados à ficha; sem a chave quando vazio, para a ficha em branco seguir igual a newCharacter().
+function normalizeAppliedBenefits(raw) {
+  const applied = sanitizeAppliedBenefits(raw.appliedBenefits);
+  return applied.length ? { appliedBenefits: applied } : {};
+}
+
+export function validateCharacter(raw) {
+  if (!raw || raw.schemaVersion !== 1 || !raw.attributes || !raw.rules)
+    throw new Error("Formato de ficha incompatível.");
+  const attributes = normalizeAttributes(raw.attributes);
+  const { customSkills, skills } = normalizeSkills(raw);
+  const c = Object.assign(newCharacter(), {
+    xp: integer(raw.xp, 0, 1000000),
+    money: normalizeMoney(raw.money),
+    dice: normalizeDice(raw.dice),
+    ...normalizeText(raw),
+    inventory: normalizeInventory(raw.inventory),
+    ...normalizeToken(raw),
+    ...normalizeRace(raw),
+    attributes,
+    customSkills,
+    skills,
+    ...normalizeProgression(raw, { attributes, skills }),
+    advantages: normalizeAdvantages(raw.advantages),
+    hindrances: normalizeHindrances(raw.hindrances),
+    powers: normalizePowers(raw.powers),
+    ...normalizeModifiers(raw),
+    ...normalizeAppliedBenefits(raw),
+    rules: normalizeRules(raw.rules),
+  });
+  applyRacialMinimums(c);
   return c;
 }

@@ -255,6 +255,23 @@ test('meditar: sessões por Espírito, mana por hora 1/(4−x/4), sessão encerr
   assert.equal(bonus.state.mana, 2, 'd12+9 continua com 2 sessões');
 });
 
+test('meditar: hora do novo dia sem meditar encerra a sessão aberta do dia anterior', () => {
+  const stats0 = stats();
+  const first = processHour({ dayNo: 0, row: { a: ACT.MEDITATE }, stats: stats0, state: { stamina: 100, mana: 0 }, day: null, rng: max });
+  const second = processHour({ dayNo: 0, row: { a: ACT.MEDITATE }, stats: stats0, state: first.state, day: first.day, rng: max });
+  const nextDay = processHour({ dayNo: 1, row: { a: '' }, stats: stats0, state: second.state, day: second.day, rng: max });
+  assert.deepEqual(nextDay.event.meditation, { closed: true, hours: 2, roll: 12, rate: 1, atDayChange: true });
+  assert.equal(nextDay.day.medActive, false);
+  assert.equal(nextDay.day.medClosed, 0, 'o dia novo começa com as sessões renovadas');
+});
+
+test('processHour: atividade desconhecida ou nome herdado de Object não tem tratador', () => {
+  for (const a of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'inexistente']) {
+    const r = processHour({ dayNo: 0, row: { a }, stats: stats(), state: { stamina: 10, mana: 10 }, day: null, rng: max });
+    assert.equal(r.event.ok, false, a);
+  }
+});
+
 test('meditar: uma rolagem por sessão (guardada no evento) define a taxa da sessão toda', () => {
   const seq = [4, 12];
   let i = 0;
@@ -293,11 +310,11 @@ test('meditação aberta no fim do dia é encerrada na virada do dia', () => {
   assert.equal(day.medActive, false);
 });
 
-test('estudo mágico: só feitiço já treinado, sem custo, conta horas; 25 h = 1 dado, máximo 24', () => {
+test('estudo mágico: só feitiço já treinado, sem custo, conta horas; 25 h = 1 dado, sem teto', () => {
   const ok = run([{ a: ACT.STUDY, spell: 's1' }]).events[0];
   assert.equal(ok.ok, true); assert.equal(ok.study, 1); assert.equal(ok.staminaDelta, 0); assert.equal(ok.manaDelta, 0);
   assert.equal(run([{ a: ACT.STUDY, spell: 's2' }]).events[0].ok, false, 's2 nunca foi treinado');
-  assert.deepEqual([0, 24, 25, 49, 50, 100, 400, 600, 601, 9999].map(astuciaDiceFor), [0, 0, 1, 1, 2, 4, 16, 24, 24, 24]);
+  assert.deepEqual([0, 24, 25, 49, 50, 100, 400, 600, 601, 9999].map(astuciaDiceFor), [0, 0, 1, 1, 2, 4, 16, 24, 24, 399]);
 });
 
 test('trabalhar ainda não está liberado e não tem efeito', () => {
