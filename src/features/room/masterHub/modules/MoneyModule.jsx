@@ -5,7 +5,7 @@ import ExperienceIcon from '../ExperienceIcon.jsx';
 import IconPicker from '../IconPicker.jsx';
 import ModuleTabs from '../ModuleTabs.jsx';
 import AdjustForm from '../AdjustForm.jsx';
-import { CURRENCY_ICONS, iconText, DEFAULT_CURRENCY_ICON } from '../experienceIcons.js';
+import { CURRENCY_ICONS, iconText, DEFAULT_CURRENCY_ICON } from '../../../../market/experienceIcons.js';
 import { BatchResults, useMasterRun, previewText } from '../ui.jsx';
 import '../../../../ui/money.css';
 

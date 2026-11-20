@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import EffectEditor from '../../../token/EffectEditor.jsx';
 import ActiveConditions from '../../../sheet/ActiveConditions.jsx';
-import { setConditions } from '../../../../lib/masterHub.js';
+import { changeConditions } from '../conditionsDelta.js';
 import { creatureOf } from '../../../../creature.js';
 import { addEffect, removeEffect, conditionsOf, effectsOf, displayName } from '../../../../tokenState.js';
 import { BatchResults, useMasterRun, targetsFor, defaultTarget, previewText } from '../ui.jsx';
@@ -25,14 +25,11 @@ export default function ConditionsModule({ ctx }) {
   const targets = isCreature ? (token ? [{ id: value, name: displayName(token, true, 'Criatura'), token }] : []) : playerTargets;
   const listOf = t => (t.token ? effectsOf(t.token) : conditionsOf(states[t.id]));
 
-  // Aplica a nova lista num alvo e devolve o resultado no formato do histórico (antes/depois vindos do servidor ou do token).
-  async function write(t, next, requestId) {
-    if (t.token) {
-      const before = effectsOf(t.token);
-      await tools.setTokenEffects(t.token, next);
-      return { category: 'condition', kind: next.length >= before.length ? 'add' : 'remove', before: { conditions: before }, after: { conditions: next }, replayed: false };
-    }
-    return setConditions({ tableId, characterId: t.id, conditions: next, requestId });
+  // Criatura: o token guarda a lista inteira. Devolve o resultado no formato do histórico (antes/depois vindos do token).
+  async function writeCreature(t, next) {
+    const before = effectsOf(t.token);
+    await tools.setTokenEffects(t.token, next);
+    return { category: 'condition', kind: next.length >= before.length ? 'add' : 'remove', before: { conditions: before }, after: { conditions: next }, replayed: false };
   }
 
   function add(input) {
@@ -44,7 +41,8 @@ export default function ConditionsModule({ ctx }) {
         const before = listOf(t);
         const next = addEffect(before, { ...input, gender });
         if (next.length === before.length) return { category: 'condition', kind: 'update', before: { conditions: before }, after: { conditions: before }, replayed: true };
-        return write(t, next, requestId);
+        // Personagem: manda só a condição nova; o servidor junta à lista atual dele (outra aba pode ter mudado a lista desde a leitura).
+        return t.token ? writeCreature(t, next) : changeConditions({ tableId, characterId: t.id, add: [next[next.length - 1]], requestId });
       },
     });
   }
@@ -54,7 +52,7 @@ export default function ConditionsModule({ ctx }) {
     run.start({
       title: 'Remover condição', actionLabel: 'Remover', danger: true, opKey: `cond:rm:${id}:${value}`, targets,
       text: previewText([`Remover "${label}" de ${nameOf(targets[0])}?`, 'Ela some da ficha, do token e do Grupo ao mesmo tempo.']),
-      fn: (t, requestId) => write(t, removeEffect(listOf(t), id), requestId),
+      fn: (t, requestId) => (t.token ? writeCreature(t, removeEffect(listOf(t), id)) : changeConditions({ tableId, characterId: t.id, remove: [id], requestId })),
     });
   }
 

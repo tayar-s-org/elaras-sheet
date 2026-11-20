@@ -1,33 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from '../../ui/Modal.jsx';
-import { SHAPES, FRAMES, defaultDesign, drawToken, canvasToBlob, loadFrameImage } from './tokenArt.js';
-import { TOKEN_SIZE, tokenSourceUrl, tokenUrl } from '../../lib/tokens.js';
+import { SHAPES, FRAMES, defaultDesign, drawToken, loadFrameImage } from './tokenArt.js';
 import { CREATURE_FRAME, CREATURE_BG, parseHp, MAX_HP } from '../../creature.js';
-import { cleanCreatureSheet, CREATURE_SIZES, HEX_COLOR, tokenArtwork } from '../../tokenArtwork.js';
+import { CREATURE_SIZES, tokenArtwork } from '../../tokenArtwork.js';
 import CreatureSheetFields, { creatureFieldErrors } from './CreatureSheetFields.jsx';
+import ColorControl from './ColorControl.jsx';
+import TokenFramingControls from './TokenFramingControls.jsx';
+import useTokenImage from './useTokenImage.js';
+import { renderTokenBlob } from './renderTokenBlob.js';
+import { buildTokenPayload, tokenFileName } from './tokenPayload.js';
+import { imageFileError } from './tokenImageFile.js';
+import { FRAMING_RESET, draggedOffset, wheelZoom } from './tokenFraming.js';
 import './token.css';
 
 const PREVIEW = 320;
 const CREATURE_FRAME_URL = `${import.meta.env.BASE_URL}assets/frames/creature-frame.png`;
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-const MAX_BYTES = 8 * 1024 * 1024;
 const BG_COLORS = ['#2a2a35', '#7a4dff', '#b3382c', '#2e9e5b', '#2f7fd0', '#d9a21b', '#f1ece0', '#000000'];
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initialsOf = name => (name || '').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-
-function ColorControl({ label, value, onChange }) {
-  const [draft, setDraft] = useState(null);
-  return <div className="token-color">
-    <label className="field"><span>{label}</span><input type="color" value={value}
-      onChange={event => { setDraft(null); onChange(event.target.value); }} /></label>
-    <label className="field"><span>{label} em hexadecimal</span><input maxLength={7} value={draft ?? value}
-      onBlur={() => setDraft(null)} onChange={event => {
-        const next = event.target.value;
-        setDraft(next);
-        if (HEX_COLOR.test(next)) onChange(next);
-      }} /></label>
-  </div>;
-}
+const LOAD_FAILED = 'Não foi possível carregar a imagem atual. Escolha outra imagem para salvar este token.';
 
 export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, saveLabel = 'Salvar token', creature, artwork, imagePath }) {
   const editorRef = useRef(null);
@@ -35,14 +25,8 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const drag = useRef(null);
-  const [image, setImage] = useState(null);
-  const saved = tokenArtwork(artwork);
-  const [sourcePath] = useState(saved?.sourcePath || '');
-  const [legacyPath, setLegacyPath] = useState(saved?.legacyPath || (!saved ? imagePath : '') || '');
-  const [usingFallback, setUsingFallback] = useState(false);
-  const [sourceFile, setSourceFile] = useState(null);
-  const [imageState, setImageState] = useState(sourcePath || legacyPath ? 'loading' : 'ready');
-  const generation = useRef(0);
+  const [saved] = useState(() => tokenArtwork(artwork));
+  const sourcePath = saved?.sourcePath || '';
   const saving = useRef(false);
   const [design, setDesign] = useState(() => saved?.design || {
     ...defaultDesign(), initials: initialsOf(name), frameColor: '#d9a21b',
@@ -50,42 +34,16 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
   });
   const [size, setSize] = useState(creature?.size || 1);
   const [sheet, setSheet] = useState(creature?.sheet || {});
-
-  useEffect(() => {
-    if (!sourcePath && !legacyPath) return undefined;
-    const request = ++generation.current;
-    (async () => {
-      const load = async url => {
-        if (!url) throw new Error('Imagem indisponível.');
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = url;
-        await img.decode();
-        return img;
-      };
-      let img;
-      try {
-        img = await load(usingFallback || !sourcePath ? tokenUrl(legacyPath) : await tokenSourceUrl(sourcePath));
-      } catch (error) {
-        if (!sourcePath || usingFallback || !imagePath || generation.current !== request) throw error;
-        setLegacyPath(imagePath);
-        setUsingFallback(true);
-        setDesign(prev => ({ ...defaultDesign(), initials: prev.initials, frameColor: prev.frameColor, frame: 'none', shine: false, legacyBase: true }));
-        return;
-      }
-      if (generation.current === request) { setImage(img); setImageState('ready'); }
-    })().catch(() => {
-      if (generation.current === request) {
-        setImageState('failed');
-        setError('Não foi possível carregar a imagem atual. Escolha outra imagem para salvar este token.');
-      }
-    });
-    return () => { generation.current += 1; };
-  }, [sourcePath, legacyPath, imagePath, usingFallback]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [over, setOver] = useState(false);
-  const patch = p => setDesign(d => ({ ...d, ...p }));
+  const patch = useCallback(p => setDesign(d => ({ ...d, ...p })), []);
+  const applyLegacyDesign = useCallback(() => setDesign(prev => ({ ...defaultDesign(), initials: prev.initials, frameColor: prev.frameColor, frame: 'none', shine: false, legacyBase: true })), []);
+  const showLoadFailure = useCallback(() => setError(LOAD_FAILED), []);
+  const { image, imageState, legacyPath, usingFallback, sourceFile, replaceWithFile } = useTokenImage({
+    sourcePath, initialLegacyPath: saved?.legacyPath || (!saved ? imagePath : '') || '',
+    fallbackPath: imagePath, onFallback: applyLegacyDesign, onFailed: showLoadFailure,
+  });
   const [cName, setCName] = useState(creature?.name || '');
   const [cHp, setCHp] = useState(creature?.hp ? String(creature.hp) : '');
   const [hideHp, setHideHp] = useState(Boolean(creature?.hideHp)); // vida oculta dos jogadores (o mestre sempre vê)
@@ -124,16 +82,10 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
   const loadFile = useCallback(file => {
     setError('');
     if (!file || saving.current) return;
-    if (!IMAGE_TYPES.includes(file.type)) { setError('Use uma imagem PNG, JPEG, WebP ou GIF.'); return; }
-    if (file.size > MAX_BYTES) { setError('A imagem passa de 8 MB.'); return; }
-    const request = ++generation.current;
-    setImageState('loading');
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => { URL.revokeObjectURL(url); if (request !== generation.current) return; setImage(img); setSourceFile(file); setImageState('ready'); patch({ zoom: 1, x: 0, y: 0, rotate: 0, flip: false }); };
-    img.onerror = () => { URL.revokeObjectURL(url); if (request !== generation.current) return; setImageState('failed'); setError('Não foi possível ler a imagem.'); };
-    img.src = url;
-  }, []);
+    const problem = imageFileError(file);
+    if (problem) { setError(problem); return; }
+    replaceWithFile(file, { onLoaded: () => patch(FRAMING_RESET), onFailed: () => setError('Não foi possível ler a imagem.') });
+  }, [replaceWithFile, patch]);
 
   // Colar uma imagem da area de transferencia (Ctrl+V), como no TokenStamp.
   useEffect(() => {
@@ -154,39 +106,28 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
     const g = drag.current;
     if (!g) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    patch({ x: clamp(g.x + (e.clientX - g.sx) / rect.width, -1, 1), y: clamp(g.y + (e.clientY - g.sy) / rect.height, -1, 1) });
+    patch({ x: draggedOffset(g.x, e.clientX - g.sx, rect.width), y: draggedOffset(g.y, e.clientY - g.sy, rect.height) });
   }
   const onPointerUp = () => { drag.current = null; };
-  const onWheel = e => { if (image) { e.preventDefault(); patch({ zoom: clamp(design.zoom * (e.deltaY < 0 ? 1.06 : 0.94), 0.3, 4) }); } };
+  const onWheel = e => { if (image) { e.preventDefault(); patch({ zoom: wheelZoom(design.zoom, e.deltaY) }); } };
 
-  async function render() {
-    const out = document.createElement('canvas');
-    drawToken(out, TOKEN_SIZE, shown, image);
-    let blob = await canvasToBlob(out);
-    if (blob.size > 900 * 1024) { // limite do bucket e 1 MB: reduz se a foto ficou pesada
-      drawToken(out, Math.round(TOKEN_SIZE * 0.7), shown, image);
-      blob = await canvasToBlob(out);
-    }
-    return blob;
-  }
   async function download() {
     setError('');
     try {
-      const url = URL.createObjectURL(await render());
+      const url = URL.createObjectURL(await renderTokenBlob(shown, image));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `token-${((creature ? cName : name) || 'personagem').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-') || 'personagem'}.png`;
+      a.download = tokenFileName(creature ? cName : name);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setError(e.message); }
   }
-  // Criatura nova: guarda só a predefinição (sem pôr no mapa), para deixar os monstros preparados. O modal continua aberto.
-  function payload() {
-    const artwork = { sourcePath: usingFallback ? '' : sourcePath, legacyPath, sourceFile, design };
-    if (!creature) return { artwork };
-    return { artwork, name: cName.trim(), hp: parseHp(cHp), hideHp, hideName, size, sheet: cleanCreatureSheet(sheet) };
-  }
+  const payload = () => buildTokenPayload({
+    creature, usingFallback, artwork: { sourcePath, legacyPath, sourceFile, design },
+    form: { name: cName, hp: cHp, hideHp, hideName, size, sheet },
+  });
 
+  // Criatura nova: guarda só a predefinição (sem pôr no mapa), para deixar os monstros preparados. O modal continua aberto.
   async function savePresetOnly() {
     if (saving.current || !validateFields()) return;
     saving.current = true;
@@ -195,7 +136,7 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
     setNote('');
     try {
       const data = payload();
-      setNote(`Predefinição “${await onSavePreset(await render(), data)}” salva.`);
+      setNote(`Predefinição “${await onSavePreset(await renderTokenBlob(shown, image), data)}” salva.`);
     } catch (e) { setError(e.message); }
     saving.current = false;
     setBusy(false);
@@ -207,7 +148,7 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
     setError('');
     try {
       const data = payload();
-      await onSave(await render(), data);
+      await onSave(await renderTokenBlob(shown, image), data);
       onClose(creature && !creature.editing ? "placed" : "saved");
     } catch (e) {
       setError(e.message);
@@ -247,7 +188,7 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
             onDragOver={e => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
             onDrop={e => { e.preventDefault(); setOver(false); loadFile(e.dataTransfer.files?.[0]); }}>
             <canvas ref={canvasRef} width={PREVIEW} height={PREVIEW} className={image ? 'draggable' : ''}
-              aria-label="Pré-visualização do token. Arraste para reposicionar, use a roda do mouse para o zoom."
+              aria-label="Pré-visualização do token. Arraste para reposicionar e use a roda do mouse para o zoom; pelo teclado, use os controles de posição e zoom ao lado."
               onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel} />
           </div>
           <button type="button" className="outline" onClick={() => fileRef.current.click()}>{image ? 'Trocar imagem' : 'Escolher imagem'}</button>
@@ -258,14 +199,7 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
         </div>
 
           <div className="token-controls">
-          <label className="field"><span>Zoom</span>
-            <input type="range" min="0.3" max="4" step="0.01" value={design.zoom} disabled={!image} onChange={e => patch({ zoom: Number(e.target.value) })} /></label>
-          <label className="field"><span>Rotação ({design.rotate}°)</span>
-            <input type="range" min="-180" max="180" step="1" value={design.rotate} disabled={!image} onChange={e => patch({ rotate: Number(e.target.value) })} /></label>
-          <div className="row token-row">
-            <button type="button" className="outline" disabled={!image} aria-pressed={design.flip} onClick={() => patch({ flip: !design.flip })}>Espelhar</button>
-            <button type="button" className="text-button" disabled={!image} onClick={() => patch({ zoom: 1, x: 0, y: 0, rotate: 0, flip: false })}>Recentralizar</button>
-          </div>
+          <TokenFramingControls design={design} patch={patch} disabled={!image} />
 
           <fieldset className="token-set"><legend>Forma</legend>
             <div className="tabs-row">{SHAPES.map(s => <button key={s.id} type="button" className={design.shape === s.id ? 'primary' : 'outline'} aria-pressed={design.shape === s.id} onClick={() => patch({ shape: s.id, legacyBase: false, ...(design.frame === 'creature' ? { frame: CREATURE_FRAME } : {}) })}>{s.label}</button>)}</div>

@@ -1,7 +1,7 @@
 // Núcleo puro da Central do Mestre (sem React, sem rede): lista de módulos, execução em lote idempotente com resultado por
 // alvo, prévia de valores (espelha os limites do servidor) e texto do histórico administrativo. Testado em core.test.js.
 // Documentação: src/features/room/masterHub/README.md.
-import { iconText, iconText as iconTextPlain, cleanIconKeys, DEFAULT_CURRENCY_ICON } from './experienceIcons.js';
+import { iconText, iconText as iconTextPlain, cleanIconKeys, DEFAULT_CURRENCY_ICON } from '../../../market/experienceIcons.js';
 
 // Ordem e rótulos dos módulos. O componente de cada um é ligado em modules.jsx (adicionar módulo = uma linha aqui e uma lá).
 // needsHub: depende da migração 0040 (a Central mostra o aviso em vez de chamar função inexistente).
@@ -41,6 +41,14 @@ export function previewAdjust(kind, current, mode, amount) {
   if (n === 0 || Math.abs(n) > lim.addMax) return { ok: false, error: `Informe um valor de 1 a ${lim.addMax} (negativo remove).` };
   const next = Math.max(lim.min, Math.min(lim.max, cur + n));
   return { ok: true, current: cur, next, delta: next - cur };
+}
+
+// Texto do campo → { ok, value } ou { ok: false, error }. Vazio ou não inteiro nunca vira número: Number('') é 0 e "Definir valor" zeraria o saldo.
+export function parseWholeNumber(text) {
+  const trimmed = String(text ?? '').trim();
+  if (trimmed === '') return { ok: false, error: 'Informe um valor.' };
+  if (!/^[+-]?\d+$/.test(trimmed) || !Number.isSafeInteger(Number(trimmed))) return { ok: false, error: 'Use um número inteiro, sem vírgula nem decimais.' };
+  return { ok: true, value: Number(trimmed) };
 }
 
 // ---------- ids pendentes (sobrevivem a recarregar/reconectar até haver resposta definitiva) ----------

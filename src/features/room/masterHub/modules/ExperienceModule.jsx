@@ -4,7 +4,7 @@ import ExperienceIcon from '../ExperienceIcon.jsx';
 import IconPicker from '../IconPicker.jsx';
 import ModuleTabs from '../ModuleTabs.jsx';
 import AdjustForm from '../AdjustForm.jsx';
-import { IMAGE_ICONS, iconText } from '../experienceIcons.js';
+import { IMAGE_ICONS, iconText } from '../../../../market/experienceIcons.js';
 import { BatchResults, useMasterRun, previewText } from '../ui.jsx';
 
 const amountLabel = (mode, unit) => `${mode === 'set' ? `Novo ${unit}` : mode === 'subtract' ? `${unit === 'XP' ? 'XP' : 'Pontos'} a remover` : `${unit === 'XP' ? 'XP' : 'Pontos'} a somar`}`;
