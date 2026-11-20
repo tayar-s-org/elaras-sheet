@@ -9,6 +9,7 @@
 -- (confirm_benefits). Confirmar o mesmo ID de novo não muda nada, e o registro de IDs na ficha impede aplicar duas vezes.
 --
 -- Aditiva: as funções claim_* continuam como estão para os apps já publicados. Só o dono da ficha consulta e confirma.
+-- Funciona com ou sem a 0032: o atributo da perícia é lido por to_jsonb(linha), sem citar a coluna (sem a 0032 vem nulo, como no fluxo antigo).
 -- Pode ser repetida (create or replace).
 
 create or replace function public.peek_pending_benefits() returns jsonb
@@ -38,7 +39,7 @@ begin
     ), '[]'::jsonb),
     'custom_skills', coalesce((
       select jsonb_agg(jsonb_build_object('id', s.id, 'character_id', s.character_id, 'name', s.name, 'die', s.die,
-        'attribute', s.attribute) order by s.created_at)
+        'attribute', to_jsonb(s) ->> 'attribute') order by s.created_at)
       from (
         select t.* from public.table_custom_skills t
         join public.characters c on c.id = t.character_id
@@ -73,7 +74,7 @@ begin
   -- O gatilho de table_custom_skills só deixa alterar delivered_at com esta marca (0027).
   perform set_config('app.custom_skill_claim', '1', true);
   update public.table_custom_skills t set delivered_at = now()
-  where t.id = any(coalesce(p_custom_skills, '{}')) and t.user_id = uid and t.delivered_at is null;
+  where t.id = any(coalesce(p_custom_skills, '{}')) and t.user_id = uid and t.status = 'approved' and t.delivered_at is null;
   get diagnostics n_skills = row_count;
   perform set_config('app.custom_skill_claim', '0', true);
 

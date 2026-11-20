@@ -13,9 +13,14 @@ export default function CustomItemForm({ cloudId, tableId: sheetTable }) {
   const [form, setForm] = useState({ ...emptyItemForm(), tableId: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [loadError, setLoadError] = useState("");
   const set = patch => setForm(f => ({ ...f, ...patch }));
 
-  const refresh = useCallback(async () => { setMine(await listMyCustomItems()); }, []);
+  // Se a consulta falha (rede, sessão), mantém a lista anterior e mostra o erro com "Tentar de novo".
+  const refresh = useCallback(async () => {
+    try { setMine(await listMyCustomItems()); setLoadError(""); }
+    catch (e) { setLoadError(e.message); }
+  }, []);
   useEffect(() => {
     myMemberships().then(rows => {
       // A ficha vale numa mesa só: o item vai para a mesa da própria ficha.
@@ -64,7 +69,8 @@ export default function CustomItemForm({ cloudId, tableId: sheetTable }) {
     </form>
 
     <h3>Meus itens enviados</h3>
-    {mine === undefined ? <p className="muted">Carregando…</p>
+    {loadError && <p role="alert" className="muted">{loadError} <button type="button" className="text-button" onClick={refresh}>Tentar de novo</button></p>}
+    {mine === undefined ? (!loadError && <p className="muted">Carregando…</p>)
       : mine === null ? <p className="callout">Os itens customizados ainda não estão disponíveis neste servidor. Falta rodar a migration <code>0018_custom_items.sql</code> no Supabase.</p>
         : !mine.length ? <p className="muted">Você ainda não enviou nenhum item.</p>
           : <div className="mk-list">{mine.map(row => <article key={row.id} className="mk-item">

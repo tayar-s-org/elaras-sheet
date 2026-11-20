@@ -21,7 +21,6 @@ function fixture({ character = { ...newCharacter(), skills: { Lutar: 6 } }, save
     editCharacter: (sheetId, edit) => { state.session = editSheet(state.session, sheetId, edit); },
     notify: message => state.notices.push(message),
     confirm: async ids => { state.confirmed.push(ids); },
-    isCurrent: () => true,
   };
   return { state, ctx };
 }

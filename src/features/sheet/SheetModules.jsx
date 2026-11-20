@@ -1,11 +1,11 @@
-import React, { lazy, Suspense, useRef } from "react";
+import React, { lazy, Suspense } from "react";
 import Modal from '../../ui/Modal.jsx';
 import { stageForXP } from "../../catalogRules.js";
 import { formatMoney } from "../../money.js";
 import "../../ui/money.css";
 import { tokenUrl } from "../../lib/tokens.js";
 import { useConfirm } from "../../ui/ConfirmProvider.jsx";
-import { UnsavedChangesContext } from "../../unsavedChanges.js";
+import ErrorBoundary from "../../app/ErrorBoundary.jsx";
 import { resolveItem } from "../../market/items.js";
 import { itemEffects } from "../../market/effects.js";
 import "./modules.css";
@@ -172,7 +172,7 @@ const editorFor = (index, ctx) => {
   }
 };
 
-export const renderEditor = (index, ctx) => <Suspense fallback={<p className="muted" role="status">Carregando…</p>}>{editorFor(index, ctx)}</Suspense>;
+export const renderEditor = (index, ctx) => <ErrorBoundary key={index}><Suspense fallback={<p className="muted" role="status">Carregando…</p>}>{editorFor(index, ctx)}</Suspense></ErrorBoundary>;
 
 // Ficha completa só para leitura (usada na sala para ver a ficha de outro jogador): todos os módulos, sem editar.
 export function SheetOverview({ c, d, apt }) {
@@ -188,15 +188,17 @@ export function SheetOverview({ c, d, apt }) {
 }
 
 // Ficha em modulos: cada cartao resume a secao e o botao "Editar" abre o editor completo dela.
-export default function SheetModules({ ctx, editing, setEditing }) {
+// draftGuard: { isDirty, discard } do rascunho de arquetipo, que mora acima desta tela.
+export default function SheetModules({ ctx, editing, setEditing, draftGuard }) {
   const { c, d } = ctx;
   const apt = useAptitudeFor({ characterId: ctx.cloudId, tableId: ctx.tableId || null });
   const askConfirm = useConfirm();
-  const unsavedChanges = useRef(false);
   // Escape, clique no fundo e "Concluir" passam por aqui: um formulario com edicao nao salva pede confirmacao antes de sumir.
   const closeEditor = async () => {
-    const discard = !unsavedChanges.current || await askConfirm({ title: 'Descartar o que você montou?', text: 'Há alterações que ainda não foram salvas nem aplicadas. Se fechar agora, elas serão perdidas.', actionLabel: 'Descartar', danger: true });
-    if (discard) setEditing(null);
+    const discard = !draftGuard.isDirty || await askConfirm({ title: 'Descartar o que você montou?', text: 'Há alterações que ainda não foram salvas nem aplicadas. Se fechar agora, elas serão perdidas.', actionLabel: 'Descartar', danger: true });
+    if (!discard) return;
+    draftGuard.discard();
+    setEditing(null);
   };
 
   return <>
@@ -229,14 +231,14 @@ export default function SheetModules({ ctx, editing, setEditing }) {
       })}
     </div>
     {editing != null && <Modal onClose={closeEditor} aria-labelledby="mod-editor-title">
-      <UnsavedChangesContext.Provider value={unsavedChanges}><div className="mod-editor">
+      <div className="mod-editor">
         <header className="mod-editor-head">
           <h2 id="mod-editor-title">{editing === "guide" ? "Guia de criação" : editing === "market" ? "Mercado" : editing === "aptitude" ? "Aptidão" : MODULES[editing]}</h2>
           <button type="button" className="primary" onClick={closeEditor}>Concluir</button>
         </header>
         {POINT_EDITORS.includes(editing) && <PointsStrip d={d} />}
         <div className="mod-editor-body">{renderEditor(editing, ctx)}</div>
-      </div></UnsavedChangesContext.Provider>
+      </div>
     </Modal>}
   </>;
 }

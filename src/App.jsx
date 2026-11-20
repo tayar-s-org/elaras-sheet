@@ -24,7 +24,7 @@ export default function App() {
   const route = useHashRoute();
   const { session, setSession, sessionRef, storageError } = useSheetSession(setToast);
   const autosave = useAutosave(session, setSession, Boolean(auth.user));
-  const { signOut } = useAccountSession({ auth, sessionRef, setSession, autosave });
+  const { signOut, signingOut } = useAccountSession({ auth, sessionRef, setSession, autosave });
   const sync = useCloudSync({ user: auth.user, sessionRef, setSession, autosave });
   useBenefitClaims(session, setSession, auth.user, setToast);
   useRewardSync(session, setSession, auth.user, setToast);
@@ -35,6 +35,7 @@ export default function App() {
 
   return <>
     <TopBar theme={theme} setTheme={setTheme} route={route} auth={auth} onSignOut={signOut} />
+    {signingOut && <p className="muted mx-[16px] my-[4px]" role="status">Saindo…</p>}
     <AppRoutes route={route} auth={auth} sheets={{ session, setSession, setConfirm, setToast }} workspace={{ autosave, sync, storageError }} />
     <Toast toast={toast} onClose={() => setToast("")} />
     <Assistant />

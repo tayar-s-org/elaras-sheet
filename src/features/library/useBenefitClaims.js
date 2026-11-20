@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { editSheet } from '../../sheets.js';
 import { runClaimCycle } from './claimCycle.js';
+import { CLAIM_SOURCES } from './claimSources.js';
+import { createStepGate } from './stepGate.js';
 import { useCycleEffect } from './useCycleEffect.js';
 
 // Recolhe para as fichas abertas da conta tudo o que o mestre e o servidor entregam: XP e dinheiro da fila, itens e perícias
@@ -11,8 +13,8 @@ export function useBenefitClaims(session, setSession, user, notify) {
   sessionRef.current = session;
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
-  const disabledSteps = useRef(new Set()); // etapas que o servidor ainda não tem (migration pendente), por conta
-  useEffect(() => { disabledSteps.current = new Set(); }, [user?.id]);
+  const stepGate = useRef(createStepGate()); // etapas que o servidor ainda não tem (migration pendente), por conta
+  useEffect(() => { stepGate.current.reset(); }, [user?.id]);
 
   useCycleEffect({
     userId: user?.id,
@@ -26,8 +28,8 @@ export function useBenefitClaims(session, setSession, user, notify) {
     run: ({ isCurrent }) => runClaimCycle({
       readSession: () => sessionRef.current,
       editCharacter: (sheetId, edit) => setSession(prev => editSheet(prev, sheetId, edit)),
-      notify: message => notifyRef.current?.(message),
+      notify: message => { if (isCurrent()) notifyRef.current?.(message); },
       isCurrent,
-    }, disabledSteps.current),
+    }, stepGate.current, CLAIM_SOURCES),
   });
 }

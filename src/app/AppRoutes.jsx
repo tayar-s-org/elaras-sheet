@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { cloudConfigured } from '../lib/supabase.js';
 import { navigate, loginThen } from '../lib/router.js';
+import ErrorBoundary from './ErrorBoundary.jsx';
 
 // Cada rota carrega sob demanda: quem abre o site so baixa a pagina que usa.
 const AuthPage = lazy(() => import('../features/auth/AuthPage.jsx'));
@@ -34,5 +35,5 @@ function pageFor({ route, auth, sheets, workspace }) {
 
 // `sheets` = { session, setSession, setConfirm, setToast } (contrato da sala); `workspace` = { autosave, sync, storageError } (so a ficha).
 export default function AppRoutes(props) {
-  return <Suspense fallback={<LoadingPage />}>{pageFor(props)}</Suspense>;
+  return <ErrorBoundary key={props.route} className="page"><Suspense fallback={<LoadingPage />}>{pageFor(props)}</Suspense></ErrorBoundary>;
 }

@@ -9,6 +9,7 @@ import TableBinding from "../features/sheet/TableBinding.jsx";
 import SheetSummary from "../features/sheet/SheetSummary.jsx";
 import SheetModules from "../features/sheet/SheetModules.jsx";
 import { sheetOps } from "../features/sheet/sheetOps.js";
+import { ArchetypeDraftContext, useArchetypeDraftState } from "../useArchetypeDraft.js";
 
 // Rola ate a secao n do modulo (a ficha e uma pagina unica).
 const scrollToSection = i => {
@@ -35,7 +36,9 @@ export default function SheetWorkspace({ auth, sheets: { session, setSession, se
   const [master, setMaster] = useState(false);
   const [editing, setEditing] = useState(null); // modulo aberto no editor completo
   const [requestedPage, setRequestedPage] = useState(null);
-  useEffect(() => { setEditing(null); }, [activeId]);
+  const archetypeDraft = useArchetypeDraftState();
+  // Trocar de ficha fecha o editor, menos com um arquetipo em elaboracao (o rascunho nao pertence a ficha).
+  useEffect(() => { if (!archetypeDraft.isDirty) setEditing(null); }, [activeId]);
   // Chamado pelas secoes: 6 abre o livro; as demais rolam ate o modulo.
   const setTab = i => { if (i === 6) setEditing(6); else { setEditing(null); scrollToSection(i); } };
   const addCharacter = character => { setSession(prev => openSheet(prev, character)); setMaster(false); setTab(0); };
@@ -79,7 +82,7 @@ export default function SheetWorkspace({ auth, sheets: { session, setSession, se
   const ctx = { cloudId: activeSheet.cloud?.id, cloudBase: activeSheet.cloud?.base, tableId: activeSheet.tableId, auth, c, d, update, rule, setC, setConfirm, setToast, setRequestedPage, setTab, changeItem, addItem, requestedPage };
 
   return (
-    <>
+    <ArchetypeDraftContext.Provider value={archetypeDraft}>
       <CloudSheets status={autosave.active} otherSheets={autosave.others} auth={auth} sheet={activeSheet} onSync={auth.user ? sync.syncNow : undefined} syncing={sync.syncing}
         onDelete={activeSheet.cloud ? deleteActiveSheet : undefined} />
       {sync.syncNote && <p className="muted mx-[16px] my-[4px]" role="status">{sync.syncNote}</p>}
@@ -121,10 +124,10 @@ export default function SheetWorkspace({ auth, sheets: { session, setSession, se
         </aside>
         <section className="editor" key={activeId}>
           {auth.user && <TableBinding key={activeSheet.id} sheet={activeSheet} onBind={bindSheetTable} />}
-          <SheetModules ctx={ctx} editing={editing} setEditing={setEditing} />
+          <SheetModules ctx={ctx} editing={editing} setEditing={setEditing} draftGuard={archetypeDraft} />
         </section>
         <SheetSummary c={c} d={d} tableId={activeSheet.tableId} cloudId={activeSheet.cloud?.id} />
       </main>}
-    </>
+    </ArchetypeDraftContext.Provider>
   );
 }

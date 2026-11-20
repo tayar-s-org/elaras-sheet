@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useConfirm } from './ui/ConfirmProvider.jsx';
 import { ATTRIBUTES, SKILLS, DICE, calculate } from './rules.js';
-import { blankDraft, draftFromSheet, isDraftDirty } from './archetypeDraft.js';
-import { useReportUnsavedChanges } from './unsavedChanges.js';
+import { blankDraft, draftFromSheet } from './archetypeDraft.js';
+import { useSharedArchetypeDraft } from './useArchetypeDraft.js';
 import { loadCustomArchetype, advantageNames } from './templates.js';
 import './custom-archetype.css';
 
@@ -13,14 +13,11 @@ const store = list => { try { localStorage.setItem(KEY, JSON.stringify(list)); }
 // Aba "Criar o meu": monta um arquétipo próprio, aplica na ficha e guarda como modelo reutilizável neste navegador.
 export default function CustomArchetype({ character: c, onChange, onLoad }) {
   const askConfirm = useConfirm();
-  const [draft, setDraft] = useState(blankDraft);
-  const [baseline, setBaseline] = useState(draft); // ponto de partida do rascunho: so o que diverge dele se perderia ao fechar
+  const { draft, setDraft, setBaseline, start: startDraft } = useSharedArchetypeDraft();
   const [saved, setSaved] = useState(load);
   const [skillPick, setSkillPick] = useState('');
   const [edgePick, setEdgePick] = useState('');
   const set = patch => setDraft(d => ({ ...d, ...patch }));
-  const startDraft = next => { setDraft(next); setBaseline(next); };
-  useReportUnsavedChanges(isDraftDirty(draft, baseline));
   const ready = draft.name.trim().length > 0;
   const tpl = { ...draft, name: draft.name.trim() };
   const remaining = ready ? calculate(loadCustomArchetype(c, tpl)).remaining : null;

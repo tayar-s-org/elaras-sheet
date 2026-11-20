@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LEGACY_STORAGE, SHEETS_STORAGE, newSession, closeSheet } from '../sheets.js';
 import { navigate } from '../lib/router.js';
 import { supabase } from '../lib/supabase.js';
@@ -48,14 +48,26 @@ export function useAccountSession({ auth, sessionRef, setSession, autosave }) {
     closeForeignCloudTabs(next, userId, setSession);
   }, [userId]);
 
+  const [signingOut, setSigningOut] = useState(false);
+  const signOutRunning = useRef(false);
   async function signOut() {
-    const leaving = userId;
-    await autosave.flush(); // edicao recente ainda esta no tempo de espera do salvamento automatico
-    await auth.signOut();
-    if (leaving) stashDrafts(leaving, sessionRef.current);
-    try { [SHEETS_STORAGE, LEGACY_STORAGE, OWNER_KEY, LAST_ROOM_KEY].forEach(key => localStorage.removeItem(key)); } catch { /* sem storage */ }
-    setSession(newSession());
-    navigate('/');
+    if (signOutRunning.current) return;
+    signOutRunning.current = true;
+    setSigningOut(true);
+    try {
+      const leaving = userId;
+      await autosave.flush(); // edicao recente ainda esta no tempo de espera do salvamento automatico
+      await auth.signOut();
+      // Limitacao: se o limite do flush estourou com uma ficha nova ainda sendo criada na nuvem, ela ainda nao tem id da nuvem e
+      // vai para o cofre como rascunho local; ao voltar, pode ser criada de novo (ficha duplicada, que e melhor do que perder a ficha).
+      if (leaving) stashDrafts(leaving, sessionRef.current);
+      try { [SHEETS_STORAGE, LEGACY_STORAGE, OWNER_KEY, LAST_ROOM_KEY].forEach(key => localStorage.removeItem(key)); } catch { /* sem storage */ }
+      setSession(newSession());
+      navigate('/');
+    } finally {
+      signOutRunning.current = false;
+      setSigningOut(false);
+    }
   }
-  return { signOut };
+  return { signOut, signingOut };
 }
