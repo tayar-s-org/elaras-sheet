@@ -7,11 +7,14 @@ export function createSignedUrlCache({ sign, ttlMs, marginMs = RENEW_MARGIN_MS, 
   const entries = new Map();
   const pending = new Map();
 
+  // Só o pedido ainda registrado em `pending` grava o resultado: forget(key) descarta um pedido em andamento.
   const request = key => {
     const issuedAt = now();
-    return sign(key)
-      .then(url => { entries.set(key, { url, expiresAt: issuedAt + ttlMs }); return url; })
-      .finally(() => pending.delete(key));
+    const current = () => pending.get(key) === promise;
+    const promise = sign(key)
+      .then(url => { if (current()) entries.set(key, { url, expiresAt: issuedAt + ttlMs }); return url; })
+      .finally(() => { if (current()) pending.delete(key); });
+    return promise;
   };
 
   return {
@@ -21,6 +24,6 @@ export function createSignedUrlCache({ sign, ttlMs, marginMs = RENEW_MARGIN_MS, 
       if (!pending.has(key)) pending.set(key, request(key));
       return pending.get(key);
     },
-    forget(key) { entries.delete(key); },
+    forget(key) { entries.delete(key); pending.delete(key); },
   };
 }

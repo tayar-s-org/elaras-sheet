@@ -16,6 +16,8 @@ import IncapPanel from './IncapPanel.jsx';
 import MoneyTag from '../../ui/MoneyTag.jsx';
 import MoneyGrant from './MoneyGrant.jsx';
 import GmItemsModal from './GmItemsModal.jsx';
+import { createOperationGuard } from '../../operationGuard.js';
+import { createSerialQueue } from '../../serialQueue.js';
 import './party.css';
 
 function Counter({ id, label, value, max, amount, canEdit, onChange }) {
@@ -38,6 +40,8 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   const [giving, setGiving] = useState(false);
   const [viewing, setViewing] = useState(false);
   const [amountText, setAmountText] = useState('1');
+  const [enqueueWrite] = useState(createSerialQueue);
+  const [writes] = useState(createOperationGuard);
   const extras = useExtras();
   // Experiências personalizadas: todos veem (como o XP). Carteira de moedas: só o dono e o mestre (a RLS só entrega a eles).
   const wallet = canEdit ? walletChips(extras, row.id) : [];
@@ -45,14 +49,18 @@ function CharacterCard({ member, row, state, canEdit, isGm, tableId, patchState,
   const amount = Math.max(1, Math.min(999, Math.trunc(Number(amountText)) || 1));
   const max = safeMaxima(row.data);
   const value = k => currentValue(state, max, k);
-  // Mostra o valor na hora. Se o servidor recusar, volta ao estado que ele tem (ou ao anterior) e repassa o erro.
+  // Mostra o valor na hora e grava em ordem. Só a gravação mais recente acerta a tela com o servidor (resposta ou, se recusada,
+  // o estado que ele tem); assim uma resposta lenta de um clique antigo não desfaz o clique seguinte. O erro sempre é repassado.
   async function persist(optimisticState, saveOnServer) {
     const previous = state;
+    const write = writes.begin(row.id);
     patchState(row.id, optimisticState);
     try {
-      patchState(row.id, await saveOnServer());
+      const saved = await enqueueWrite(saveOnServer);
+      if (writes.isCurrent(write)) patchState(row.id, saved);
     } catch (e) {
-      patchState(row.id, (await loadCharacterState(tableId, row.id)) ?? previous);
+      const serverState = (await loadCharacterState(tableId, row.id)) ?? previous;
+      if (writes.isCurrent(write)) patchState(row.id, serverState);
       throw e;
     }
   }

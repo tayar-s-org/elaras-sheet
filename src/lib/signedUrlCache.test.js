@@ -59,3 +59,18 @@ test('chaves diferentes não se misturam', async () => {
   await cache.get('b.mp3');
   assert.deepEqual(calls, ['a.mp3', 'b.mp3']);
 });
+
+test('forget durante um pedido em andamento impede que o link velho volte para o cache', async () => {
+  let release;
+  const calls = [];
+  const sign = key => new Promise(resolve => { calls.push(key); release = () => resolve(`link-${calls.length}`); });
+  const cache = createSignedUrlCache({ sign, ttlMs: HOUR });
+  const stale = cache.get('a');
+  cache.forget('a');
+  release();
+  assert.equal(await stale, 'link-1');
+  const fresh = cache.get('a');
+  release();
+  assert.equal(await fresh, 'link-2');
+  assert.equal(calls.length, 2);
+});

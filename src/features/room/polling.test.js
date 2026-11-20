@@ -53,3 +53,22 @@ test('createCoalescedRunner nunca roda em paralelo e junta pedidos feitos durant
   assert.equal(runs, 2);
   assert.equal(maxRunning, 1);
 });
+
+test('createCoalescedRunner: falha da tarefa nao rejeita nem perde o pedido pendente', async () => {
+  let runs = 0;
+  let release;
+  const run = createCoalescedRunner(async () => {
+    runs += 1;
+    if (runs === 1) {
+      await new Promise(resolve => { release = resolve; });
+      throw new Error('falhou');
+    }
+  });
+  const first = run();
+  run();
+  release();
+  await first; // nao rejeita
+  assert.equal(runs, 2);
+  await run();
+  assert.equal(runs, 3);
+});

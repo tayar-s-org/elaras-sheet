@@ -12,7 +12,8 @@ export function pollWhileVisible(task, intervalMs, doc = document) {
 }
 
 // Nunca executa a tarefa assincrona em paralelo: pedidos feitos durante uma execucao viram uma unica nova execucao
-// ao terminar (a leitura em andamento pode ja estar velha para quem pediu).
+// ao terminar (a leitura em andamento pode ja estar velha para quem pediu). Falha da tarefa nao derruba o runner
+// nem rejeita quem chamou sem aguardar: a tarefa trata e mostra o proprio erro.
 export function createCoalescedRunner(task) {
   let running = false;
   let rerunRequested = false;
@@ -22,7 +23,7 @@ export function createCoalescedRunner(task) {
     try {
       do {
         rerunRequested = false;
-        await task();
+        try { await task(); } catch { /* a proxima execucao tenta de novo */ }
       } while (rerunRequested);
     } finally { running = false; }
   };

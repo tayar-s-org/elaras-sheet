@@ -21,11 +21,12 @@ import { boardGeometry, keepIn } from './boardViewport.js';
 import { useBoardGestures } from './useBoardGestures.js';
 import { useStepMove } from './useStepMove.js';
 import { useTokenOperations } from './useTokenOperations.js';
+import { nextRollToAnimate } from './rollAnimation.js';
 
 const DiceStage = lazy(() => import('./DiceStage.jsx'));
 
 // Anima no tabuleiro, para todos, cada rolagem nova que chega pelo servidor.
-function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
+function DiceLayer({ rolls, caughtUpTo, ready, names, settings, markAnimating }) {
   const [event, setEvent] = useState(null);
   const last = useRef(null);
   const seq = useRef(0);
@@ -33,14 +34,13 @@ function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
   useLayoutEffect(() => {
     if (!ready) return;
     if (last.current === null) { last.current = rolls.reduce((m, r) => Math.max(m, r.id), 0); return; }
-    const fresh = rolls.filter(r => r.id > last.current);
-    if (!fresh.length) return;
-    last.current = Math.max(...fresh.map(r => r.id));
-    if (!settings.anim) return;
-    const roll = fresh[fresh.length - 1];
+    const next = nextRollToAnimate(rolls, last.current, caughtUpTo);
+    last.current = next.lastSeenId;
+    const roll = next.roll;
+    if (!roll || !settings.anim) return;
     markAnimating(roll.id, true);
     setEvent({ seq: ++seq.current, roll, who: names[roll.user_id] || 'Jogador' });
-  }, [rolls, ready, settings.anim]);
+  }, [rolls, caughtUpTo, ready, settings.anim]);
   useEffect(() => { if (!settings.anim) markAnimating(null, false); }, [settings.anim]);
   if (!settings.anim) return null;
   return <Suspense fallback={null}><DiceStage event={event} settings={settings} onFinish={id => markAnimating(id, false)} /></Suspense>;
@@ -207,7 +207,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       {isGm && <CreatureSheetPeek key={sel.id} token={sel} tableId={tableId} room={room} closed={closed}
         revision={creatureRevision} onEdit={() => editCreature(sel)} />}
     </CreaturePeek>}
-    <DiceLayer rolls={room.rolls} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
+    <DiceLayer rolls={room.rolls} caughtUpTo={room.rollsCaughtUpTo} ready={room.ready} names={names} settings={diceSettings} markAnimating={markAnimating} />
     </div>
     {logSlot}
     {error && <p role="alert" className="muted">{error}</p>}

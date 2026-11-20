@@ -55,10 +55,15 @@ export function useBoard(tableId, user, room) {
     let alive = true;
     let channel;
     let boardRequest = 0;
-    // Ao (re)assinar, mudancas de fichas, movimentos e exclusoes perdidos nao chegam pelo Realtime: recarrega tambem os itens.
+    // Os itens sao lidos so depois de o canal estar assinado (nenhum evento se perde entre a leitura e a assinatura) e
+    // de novo a cada reassinatura: movimentos e exclusoes perdidos durante uma queda nao chegam pelo Realtime.
+    let itemsLoaded = false;
+    function loadItems(boardId) {
+      refreshItems(boardId).then(() => { itemsLoaded = true; }).catch(e => setError(e.message));
+    }
     function resync(boardId) {
       reloadBoard();
-      refreshItems(boardId).catch(e => setError(e.message));
+      loadItems(boardId);
     }
     async function reloadBoard() {
       const request = ++boardRequest;
@@ -80,8 +85,7 @@ export function useBoard(tableId, user, room) {
         setBoard(b);
         boardRef.current = b;
         if (!b) return;
-        await Promise.all([refreshItems(b.id), refreshMap(b)]);
-        if (!alive) return;
+        refreshMap(b);
         channel = supabase.channel(`board:${tableId}`)
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'boards', filter: `table_id=eq.${tableId}` }, p => {
             const prev = boardRef.current;
@@ -100,7 +104,10 @@ export function useBoard(tableId, user, room) {
             if (p.eventType === 'DELETE') setMarks(prev => prev.filter(m => m.id !== p.old.id));
             else setMarks(prev => upsert(prev, p.new));
           })
-          .subscribe(status => { if (status === 'SUBSCRIBED') resync(b.id); });
+          .subscribe(status => {
+            if (status === 'SUBSCRIBED') resync(b.id);
+            else if (!itemsLoaded && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')) loadItems(b.id); // sem tempo real o tabuleiro ainda aparece
+          });
       } catch (e) { if (alive) { setError(e.message); setBoard(prev => (prev === undefined ? null : prev)); } }
     })();
     return () => { alive = false; stopRefresh(); mapRequest.current += 1; if (channel) supabase.removeChannel(channel); };

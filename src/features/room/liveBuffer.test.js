@@ -25,3 +25,15 @@ test('mergeById usa um item por id e respeita o limite pelos mais novos', () => 
   const merged = mergeById([{ id: 2, body: 'tempo real' }], [{ id: 2, body: 'snapshot' }, { id: 1 }, { id: 3 }], 2);
   assert.deepEqual(merged, [{ id: 2, body: 'tempo real' }, { id: 3 }]);
 });
+
+test('mergeById descarta o buffer antigo quando mais itens foram perdidos do que o snapshot cobre', () => {
+  assert.deepEqual(ids(mergeById(rows(1, 2, 5), rows(300, 301, 302))), [300, 301, 302]);
+});
+
+test('mergeById na lacuna ainda preserva o que o tempo real trouxe durante a leitura', () => {
+  assert.deepEqual(ids(mergeById(rows(1, 2, 500), rows(300, 301, 302))), [300, 301, 302, 500]);
+});
+
+test('mergeById sem buffer devolve o snapshot', () => {
+  assert.deepEqual(ids(mergeById([], rows(3, 4))), [3, 4]);
+});

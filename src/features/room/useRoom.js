@@ -18,6 +18,7 @@ export function useRoom(tableId, user, displayName) {
   const [members, setMembers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [rolls, setRolls] = useState([]);
+  const [rollsCaughtUpTo, setRollsCaughtUpTo] = useState(0); // maior rolagem recuperada pela reconciliacao (historico, nao rolagem nova)
   const [stateLog, setStateLog] = useState([]);
   const [rewards, setRewards] = useState({ xp: [], money: [], custom: [] });
   const [ready, setReady] = useState(false);
@@ -49,21 +50,37 @@ export function useRoom(tableId, user, displayName) {
     if (!supabase || !user) return undefined;
     let alive = true;
     let channel;
+    setReady(false);
+    setMessages([]);
+    setRolls([]);
+    setStateLog([]);
+    setStates({});
     const applyRealtimeState = row => {
       historyGuard.touch(row.character_id);
       setStates(prev => ({ ...prev, [row.character_id]: row.state }));
     };
+    // Leitura inicial e reconciliacao apos reconexao sao a mesma operacao: o historico lido se junta ao que o tempo real ja trouxe.
+    // Devolve false se a resposta foi descartada (sala fechada ou leitura mais nova em andamento).
     const reconcileHistory = async () => {
       const ticket = historyGuard.begin();
       const history = await fetchHistory(tableId);
-      if (!alive || !historyGuard.isLatest(ticket)) return;
+      if (!alive || !historyGuard.isLatest(ticket)) return false;
       setMessages(prev => mergeById(prev, history.messages));
       setRolls(prev => mergeById(prev, history.rolls));
+      setRollsCaughtUpTo(prev => history.rolls.reduce((max, r) => Math.max(max, r.id), prev));
       if (history.stateLog) setStateLog(prev => mergeById(prev, history.stateLog));
       setStates(prev => reconcileByKey(history.states, prev, characterId => historyGuard.touchedAfter(ticket, characterId)));
+      return true;
     };
+    // A leitura inicial acontece depois de o canal estar assinado, para nenhum evento se perder entre a leitura e a assinatura.
+    let historyLoaded = false;
+    const syncHistory = () => reconcileHistory().then(applied => {
+      if (!applied) return;
+      historyLoaded = true;
+      setReady(true);
+    }).catch(e => { if (alive && !historyLoaded) setError(e.message); });
     const resync = () => {
-      reconcileHistory().catch(() => {});
+      syncHistory();
       reloadMembers().catch(() => {});
     };
     (async () => {
@@ -75,17 +92,12 @@ export function useRoom(tableId, user, displayName) {
         const list = await reloadMembers();
         const me = list.find(m => m.user_id === user.id);
         if (!me || me.status !== 'approved') return;
-        const history = await fetchHistory(tableId);
+        const stateLogAvailable = (await recentStateLog(tableId, 1)) !== null;
         if (!alive) return;
-        setMessages(history.messages);
-        setStates(history.states);
-        setRolls(history.rolls);
-        setStateLog(history.stateLog || []);
-        setReady(true);
         channel = supabase.channel(`table:${tableId}`, { config: { private: true, presence: { key: user.id } } });
         channelRef.current = channel;
         // So assina o historico se a tabela existe (um binding para tabela inexistente derruba o canal inteiro).
-        if (history.stateLog) channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_state_log', filter: `table_id=eq.${tableId}` },
+        if (stateLogAvailable) channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'table_state_log', filter: `table_id=eq.${tableId}` },
           p => setStateLog(prev => appendById(prev, p.new)));
         channel
           .on('presence', { event: 'sync' }, () => setOnline(Object.values(channel.presenceState()).flat()))
@@ -107,9 +119,12 @@ export function useRoom(tableId, user, displayName) {
             if (status === 'SUBSCRIBED') {
               setError('');
               channel.track({ user_id: user.id, name: nameRef.current, at: new Date().toISOString() });
-              resync(); // eventos perdidos entre a leitura inicial e a assinatura, ou durante uma queda
+              resync(); // leitura inicial e, nas reconexoes, eventos perdidos durante a queda
             }
-            if (status === 'CHANNEL_ERROR') setError('Conexão em tempo real indisponível. Recarregue a página.');
+            if (status === 'CHANNEL_ERROR') {
+              setError('Conexão em tempo real indisponível. Recarregue a página.');
+              if (!historyLoaded) syncHistory(); // sem tempo real a sala ainda mostra o historico
+            }
           });
       } catch (e) { if (alive) { setError(e.message); setTable(prev => (prev === undefined ? null : prev)); } }
     })();
@@ -151,5 +166,5 @@ export function useRoom(tableId, user, displayName) {
     historyGuard.touch(characterId);
     setStates(prev => ({ ...prev, [characterId]: { ...state, ...(prev[characterId]?.conditions ? { conditions: prev[characterId].conditions } : {}) } }));
   }, [historyGuard]);
-  return { stateLog, rewards, ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, addRoll, states, characters, online, connected, error, addMessage, patchState };
+  return { stateLog, rewards, ready, reload, sendBroadcast, onBroadcast, table, members, messages, rolls, rollsCaughtUpTo, addRoll, states, characters, online, connected, error, addMessage, patchState };
 }

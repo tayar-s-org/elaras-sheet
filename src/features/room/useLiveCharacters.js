@@ -6,7 +6,8 @@ import { createCoalescedRunner, isTabHidden, pollWhileVisible } from './polling.
 
 const POLL_MS = 5000;
 
-// Única fonte de atualização das fichas dos jogadores vinculados à mesa (dinheiro, XP, dados...). Elas pertencem aos
+// Única fonte de releitura periódica das fichas dos jogadores vinculados à mesa (dinheiro, XP, dados...); a useRoom só
+// as lê quando a lista de membros muda e entrega o resultado como `base`. Elas pertencem aos
 // jogadores e não têm tempo real próprio, então: relê a cada 5 s com a aba visível, ao voltar o foco da aba e logo depois que
 // um dinheiro é recolhido (o jogador salva a ficha ~1 s depois de receber) ou o mestre concede XP/dinheiro (a nuvem muda na hora).
 // Pedidos que chegam durante uma leitura viram uma única releitura ao terminar. Devolve as fichas da sala já mescladas.
@@ -17,6 +18,13 @@ export function useLiveCharacters(tableId, members, base, enabled) {
     () => members.filter(m => m.status === 'approved' && m.character_id).map(m => m.character_id).sort().join(','),
     [members],
   );
+
+  const clearFresh = () => {
+    freshRef.current = {};
+    setFresh(prev => (Object.keys(prev).length ? {} : prev));
+  };
+  useEffect(clearFresh, [tableId]); // fichas de outra mesa nao valem
+  useEffect(() => { if (!ids) clearFresh(); }, [ids]);
 
   useEffect(() => {
     if (!supabase || !enabled || !ids) return undefined;
