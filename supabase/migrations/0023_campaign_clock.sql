@@ -12,7 +12,7 @@
 --     dia passado ficam travados.
 --  6) check_advance / advance_clock: validacao obrigatoria no servidor. Nao existe dia vazio tratado como descanso.
 --
--- Para desfazer: 0023_rollback.sql.
+-- Para desfazer: rollbacks/0023_rollback.sql.
 
 -- 1) Copias de seguranca (so existem se ainda nao foram criadas; rodar de novo nao sobrescreve o original).
 create table if not exists public.table_training_backup_0023 as select * from public.table_training;

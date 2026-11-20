@@ -7,8 +7,10 @@
 --
 -- Regras de segurança (todas checadas aqui, no servidor, não só na interface):
 --  * o jogador só mexe na própria mochila (owns_character); o mestre da mesa da ficha também (is_gm);
---  * NINGUÉM aumenta quantidade por conta própria: inventory_consume só diminui; itens novos entram só por
---    gm_give_item (mestre) ou inventory_transfer (sai de um e entra no outro, na mesma transação);
+--  * estas funções nunca aumentam quantidade por conta própria: inventory_consume só diminui; itens novos entram só por
+--    gm_give_item (mestre) ou inventory_transfer (sai de um e entra no outro, na mesma transação).
+--    Isto vale só para elas: a ficha é livre (o dono edita characters.data direto, inclusive inventário, dinheiro e XP;
+--    ver "Modelo de confiança" em supabase/migrations/README.md), então não é uma garantia contra o próprio dono;
 --  * transferência: remetente e destinatário aprovados NA MESMA mesa, quantidade <= saldo salvo, teto de 99 no destino.
 --    Se algo falha (ex.: estouro do teto), a transação inteira volta: nada some e nada se duplica;
 --  * item customizado transferido: o payload (name/weight/effects/description) vai junto, então o destinatário não depende de
