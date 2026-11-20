@@ -1,27 +1,26 @@
-import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useConfirm } from '../../ui/ConfirmProvider.jsx';
-import { updateToken, removeToken, addToken, loadCreatureDetails, saveCreatureToken, addMark, removeMark } from '../../lib/board.js';
-import { uploadTokenImage, tokenUrl, saveTokenArtwork } from '../../lib/tokens.js';
-import { setCharacterTokenImage } from '../../lib/cloud.js';
-import { loadPresets, savePreset } from '../../lib/presets.js';
+import React, { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import TokenMaker from '../token/TokenMaker.jsx';
 import MasterModule from './MasterModule.jsx';
 import MapWorkspace from './MapWorkspace.jsx';
-import { boardGrid, gridLines, snapInsideGrid } from '../../boardGrid.js';
+import { gridLines } from '../../boardGrid.js';
 import MusicPlayer from './MusicPlayer.jsx';
 import { SfxVolume } from './SoundBar.jsx';
 import AudioModal from './AudioModal.jsx';
 import useSoundpad from './useSoundpad.js';
 import CreaturePeek from './CreaturePeek.jsx';
 import CreatureSheetPeek from './CreatureSheetPeek.jsx';
-import { creatureOf, uniqueName, metaForCopy, metaWithHp, metaWithMaxHp, metaWithHideHp, hpVisible, newCreatureMeta, hpTone, CREATURE_COLOR } from '../../creature.js';
-import { displayName, imageVisible, isNameHidden, effectsOf, addEffect, removeEffect, effectBadges, tokenEffects } from '../../tokenState.js';
+import { creatureOf, hpVisible, hpTone } from '../../creature.js';
+import { displayName, imageVisible, isNameHidden, effectBadges, tokenEffects } from '../../tokenState.js';
 import MasterHub from './masterHub/MasterHub.jsx';
 import { useExtras } from './masterHub/extras.jsx';
 import SheetPeek from './SheetPeek.jsx';
 import BoardSheetPanel from './boardSheet/BoardSheetPanel.jsx';
 import { useAptitudeFor } from '../routine/AptitudeSummary.jsx';
 import { safeMaxima, currentValue } from './vitals.js';
+import { boardGeometry, keepIn } from './boardViewport.js';
+import { useBoardGestures } from './useBoardGestures.js';
+import { useStepMove } from './useStepMove.js';
+import { useTokenOperations } from './useTokenOperations.js';
 
 const DiceStage = lazy(() => import('./DiceStage.jsx'));
 
@@ -47,40 +46,25 @@ function DiceLayer({ rolls, ready, names, settings, markAnimating }) {
   return <Suspense fallback={null}><DiceStage event={event} settings={settings} onFinish={id => markAnimating(id, false)} /></Suspense>;
 }
 
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const initials = name => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
 export default function BoardView({ tableId, me, members, characters, isGm, closed, room, boardState, diceSettings, markAnimating, logSlot, immersive = false, sheets = null, auth = null, fullscreenAction = null, campaign = null }) {
-  const askConfirm = useConfirm();
   const { board, tokens, marks, mapSrc, drags, error, setError, local } = boardState;
-  const svgRef = useRef(null);
-  const [view, setViewRaw] = useState(null); // { x, y, w } em unidades do mapa
-  const ratioRef = useRef(0.6); // altura/largura do SVG na tela
   const [tool, setTool] = useState('move');
   const [selected, setSelected] = useState(null);
   const extras = useExtras();
-  const [movingToken, setMovingToken] = useState(false);
-  const [moveNotice, setMoveNotice] = useState('');
-  const [creatureRevision, setCreatureRevision] = useState(0);
   const [maker, setMaker] = useState(null); // { token } para um token existente, { token: null } para o meu token ainda sem lugar
-  const [tokenOverride, setTokenOverride] = useState({}); // ficha -> imagem recém-salva, até a leitura periódica das fichas trazer a nova
-  const [busy, setBusy] = useState(false);
   const [masterOpen, setMasterOpen] = useState(false);
   const [mapTools,setMapTools] = useState(null);
   const [presetNotice, setPresetNotice] = useState("");
   const [audioOpen, setAudioOpen] = useState(null);
   const [immersiveAudio,setImmersiveAudio] = useState(false);
   const gesture = useRef(null);
-  const lastSend = useRef(0);
 
   const myCharacter = members.find(m => m.user_id === me)?.character_id;
-  const W = board?.width || 2000;
-  const H = board?.height || 1400;
-  const grid = boardGrid(board?.grid);
-  const gsize = grid.size;
-  const tokenScale = clamp(Number(board?.settings?.tokenScale) || 1.25, 0.5, 3);
-  // O token inteiro (nao so o centro) fica dentro do tabuleiro.
-  // Tokens de criatura têm o mesmo tamanho dos de jogador (o mestre pode ajustar o `size` de cada um no módulo do mestre).
+  const names = Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador']));
+  const geometry = boardGeometry(board);
+  const { W, H, grid, gsize, tokenUnit, tokenHalf } = geometry;
   // Barra de vida dos tokens de jogador (vida atual da ficha, visivel a todos na mesa).
   const pcLife = t => {
     if (!t.character_id) return null;
@@ -93,327 +77,33 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       return { hp, maxHp: max.life, ratio: hp / max.life };
     } catch { return null; }
   };
-  const unit = t => gsize * t.size * tokenScale;
-  const tokenHalf = t => unit(t) / 2;
-  const keepIn = (v, half, max) => (max <= half * 2 ? max / 2 : clamp(v, half, max - half));
-
-  const fitWidth = (ratio = ratioRef.current) => Math.max(W, H / ratio);
-  const constrain = v => {
-    if (!v) return v;
-    const r = ratioRef.current;
-    const width = clamp(v.w, W / 8, fitWidth(r));
-    const height = width * r;
-    return { w:width, x:width >= W ? (W-width)/2 : clamp(v.x,0,W-width),
-      y:height >= H ? (H-height)/2 : clamp(v.y,0,H-height) };
-  };
-  const setView = next => setViewRaw(prev => constrain(typeof next === 'function' ? next(prev) : next));
-  const frameMap = () => setView({ x:0, y:0, w:fitWidth() });
-  useEffect(() => { frameMap(); }, [W,H,board?.id,board?.map_path]);
-
-  // Acompanha o tamanho do SVG (janela redimensionada, painel aberto) e reajusta a visao.
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => {
-      const b = el.getBoundingClientRect();
-      if (!b.width || !b.height) return;
-      const previousRatio = ratioRef.current;
-      const ratio = b.height / b.width;
-      if (Math.abs(previousRatio-ratio) < 0.001) return;
-      ratioRef.current = ratio;
-      setViewRaw(prev => {
-        if (!prev) return prev;
-        const w = prev.w * fitWidth(ratio) / fitWidth(previousRatio);
-        return constrain({ w, x:prev.x+(prev.w-w)/2, y:prev.y+(prev.w*previousRatio-w*ratio)/2 });
-      });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [Boolean(board), W, H]);
-
-  const svgRatio = () => ratioRef.current;
-  const toMap = useCallback((clientX, clientY) => {
-    const svg = svgRef.current;
-    const ctm = svg?.getScreenCTM();
-    if (!ctm) return { x: 0, y: 0 };
-    const p = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse());
-    return { x: p.x, y: p.y };
-  }, []);
 
   const canMove = t => !closed && (isGm || (t.character_id && t.character_id === myCharacter));
   const tokenPos = t => drags[t.id] || t;
+  const tokenLabel = t => (t.character_id && characters[t.character_id]?.name) || displayName(t, isGm);
 
-  const wheelRef = useRef(null);
-  // O onWheel do React e passivo (preventDefault e ignorado e a pagina rola); por isso o listener e nativo.
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return undefined;
-    const handler = e => wheelRef.current?.(e);
-    el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  }, [Boolean(board)]);
-
-  function onWheel(e) {
-    e.preventDefault(); // impede a pagina de rolar enquanto o mouse esta sobre o tabuleiro
-    const pt = toMap(e.clientX, e.clientY);
-    const factor = e.deltaY < 0 ? 0.88 : 1.14;
-    setView(v => {
-      if (!v) return v;
-      const w = clamp(v.w * factor, W / 8, fitWidth());
-      const k = w / v.w;
-      return { w, x: pt.x - (pt.x - v.x) * k, y: pt.y - (pt.y - v.y) * k };
-    });
-  }
-  wheelRef.current = onWheel;
-  const zoomBy = factor => view && setView(v => {
-    const w = clamp(v.w * factor, W / 8, fitWidth());
-    const cx = v.x + v.w / 2, cy = v.y + (v.w * svgRatio()) / 2;
-    return { w, x: cx - w / 2, y: cy - (w * svgRatio()) / 2 };
-  });
-
-  function onPointerDown(e) {
-    if (e.button !== 0 || !view || movingToken || gesture.current) return;
-    const tokenEl = e.target.closest?.('[data-token]');
-    const markEl = e.target.closest?.('[data-mark]');
-    svgRef.current.setPointerCapture?.(e.pointerId);
-    if (tokenEl) {
-      const t = tokens.find(x => x.id === tokenEl.dataset.token);
-      if (tool === 'move' && t && canMove(t)) {
-        // Só um clique (sem arrastar) abre as informações do token; arrastar apenas move.
-        const pt = toMap(e.clientX, e.clientY);
-        local.beginDrag(t.id);
-        gesture.current = { type: 'token', pointerId: e.pointerId, id: t.id, start: { x: t.x, y: t.y }, dx: t.x - pt.x, dy: t.y - pt.y, half: tokenHalf(t), moved: false, sx: e.clientX, sy: e.clientY };
-        return;
-      }
-      if (tool === 'move' && t) { gesture.current = { type: 'tap', pointerId: e.pointerId, id: t.id }; return; }
-      if (t) setSelected(t.id);
-    }
-    if (markEl && tool === 'marker') {
-      const m = marks.find(x => x.id === markEl.dataset.mark);
-      if (m && (m.created_by === me || isGm)) removeMark(m.id).then(() => local.setMarks(prev => prev.filter(x => x.id !== m.id))).catch(err => setError(err.message));
-      return;
-    }
-    if (tool === 'marker' && !closed) {
-      const pt = toMap(e.clientX, e.clientY);
-      addMark(board, { kind: 'marker', x: clamp(pt.x, 0, W), y: clamp(pt.y, 0, H), color: isGm ? '#d9a21b' : '#2e9e5b' })
-        .then(m => local.setMarks(prev => (prev.some(x => x.id === m.id) ? prev : [...prev, m]))).catch(err => setError(err.message));
-      return;
-    }
-    if (!tokenEl) setSelected(null);
-    gesture.current = { type: 'pan', pointerId: e.pointerId, sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y };
-  }
-  function onPointerMove(e) {
-    const g = gesture.current;
-    if (!g || g.pointerId !== e.pointerId) return;
-    if (g.type === 'tap') return;
-    if (g.type === 'pan') {
-      const scale = view.w / svgRef.current.getBoundingClientRect().width;
-      setView(v => ({ ...v, x: g.vx - (e.clientX - g.sx) * scale, y: g.vy - (e.clientY - g.sy) * scale }));
-      return;
-    }
-    // Pequenos tremores do mouse ou do dedo não contam como arrasto (continua sendo um clique).
-    if (!g.moved && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 5) return;
-    const pt = toMap(e.clientX, e.clientY);
-    const x = keepIn(pt.x + g.dx, g.half, W), y = keepIn(pt.y + g.dy, g.half, H);
-    g.moved = true;
-    g.x = x; g.y = y;
-    local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, x, y } : t)));
-    const now = Date.now();
-    if (now - lastSend.current > 60) {
-      lastSend.current = now;
-      room.sendBroadcast('drag', { id: g.id, x, y });
-    }
-  }
-  async function onPointerUp(e) {
-    const g = gesture.current;
-    if (!g || g.pointerId !== e.pointerId) return;
-    gesture.current = null;
-    const cancelled = e.type !== 'pointerup';
-    if (g.type === 'tap') { if (!cancelled) setSelected(g.id); return; }
-    if (g.type !== 'token') return;
-    local.endDrag(g.id);
-    if (!g.moved) { if (!cancelled) setSelected(g.id); return; }
-    if (cancelled) {
-      local.setTokens(prev => prev.map(t => t.id === g.id ? { ...t, ...g.start } : t));
-      room.sendBroadcast('drag', { id: g.id, done: true });
-      return;
-    }
-    const final = grid.snap ? { x: snapInsideGrid(g.x,gsize,grid.x,g.half,W), y: snapInsideGrid(g.y,gsize,grid.y,g.half,H) } : { x: g.x, y: g.y };
-    local.setTokens(prev => prev.map(t => (t.id === g.id ? { ...t, ...final } : t)));
-    room.sendBroadcast('drag', { id: g.id, ...final, done: true });
-    try { await updateToken(g.id, final); } catch (err) { setError(err.message); local.reloadItems(); }
-  }
+  const stepMove = useStepMove({ geometry, canMove, gesture, local, setError, tokenLabel });
+  const gestures = useBoardGestures({ geometry, board, tokens, marks, tool, closed, isGm, me, canMove, movingToken: stepMove.movingToken, gesture, local, sendBroadcast: room.sendBroadcast, onSelect: setSelected, setError });
+  const tokenOps = useTokenOperations({ board, tokens, characters, me, myCharacter, names, geometry, local, setError, maker, setMaker, setMasterOpen, onSelect: setSelected });
+  const { sheetImage, newerArtwork, imageOf, busy, creatureRevision, placeMine, editCreature, adjustHp, duplicateCreature, removeCreature,
+    toggleName, addTokenEffect, removeTokenEffect, setTokenEffects, saveTokenImage, saveCreaturePreset } = tokenOps;
+  const { movingToken, moveNotice, clearMoveNotice, moveSelected } = stepMove;
+  const { svgRef, viewBox, zoomBy, frameMap, centerOn, pointerHandlers } = gestures;
 
   const pad = useSoundpad(room, tableId, isGm);
   const myToken = myCharacter ? tokens.find(t => t.character_id === myCharacter) : null;
-  // Token de personagem: a imagem é a da ficha (sempre sincronizada); a gravada no token só vale para tokens antigos, de ficha sem imagem.
-  const newerArtwork = characterId => {
-    const cached = tokenOverride[characterId];
-    return cached && cached.revision > (characters[characterId]?.revision || 0) ? cached : null;
-  };
-  const sheetImage = characterId => (characterId ? newerArtwork(characterId)?.path ?? characters[characterId]?.data?.tokenImage : '') || '';
-  const imageOf = t => tokenUrl(sheetImage(t.character_id) || t.image_path);
-  const place = () => ({ x: (board?.width || 2000) / 2 + (tokens.length % 5) * 20, y: (board?.height || 1400) / 2 + (tokens.length % 5) * 20 });
-  const addMine = async imagePath => {
-    const c = characters[myCharacter];
-    const t = await addToken(board, { kind: 'pc', name: c?.name || names[me] || 'Personagem', character_id: myCharacter, image_path: imagePath || null, ...place() });
-    local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev : [...prev, t]));
-    setSelected(t.id);
-  };
-  const placeMine = async () => {
-    setBusy(true);
-    setError('');
-    try { await addMine(null); } catch (e) { setError(e.message); } finally { setBusy(false); }
-  };
-  // Coloca o token na lista local; se o Realtime ja o trouxe (em branco, quando o nome esta oculto), completa com os valores reais.
-  const putToken = t => local.setTokens(prev => (prev.some(x => x.id === t.id) ? prev.map(x => (x.id === t.id ? { ...x, ...t } : x)) : [...prev, t]));
-  // Mestre: nome oculto e efeitos de uma criatura ja criada. O estado local muda na hora; se o servidor recusar, recarrega.
-  const patchCreature = async (token, patch) => {
-    local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, ...patch } : t)));
-    try { await updateToken(token.id, patch); } catch (err) { setError(err.message); local.reloadItems(); }
-  };
-  const toggleName = (token, hide) => patchCreature(token, { name_hidden: hide });
-  const addTokenEffect = (token, input) => {
-    const effects = addEffect(token.effects, input);
-    if (effects.length !== effectsOf(token).length) patchCreature(token, { effects });
-  };
-  const removeTokenEffect = (token, id) => patchCreature(token, { effects: removeEffect(token.effects, id) });
-  // Central do Mestre: grava a lista inteira de efeitos do token e DEVOLVE a falha (patchCreature só mostra o erro), para o lote não dar sucesso falso.
-  const setTokenEffects = async (token, effects) => {
-    local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, effects } : t)));
-    try { await updateToken(token.id, { effects }); } catch (err) { local.reloadItems(); throw err; }
-  };
-  const editCreature = async token => {
-    const details = await loadCreatureDetails(token.id);
-    setMasterOpen(false);
-    setMaker({ creature: true, token, details });
-  };
-
-  const saveCreature = async (blob, extra) => {
-    const editing = maker?.token;
-    const target = editing && tokens.find(t => t.id === editing.id);
-    if (editing && !target) throw new Error('Esta criatura não está mais no tabuleiro.');
-    const artwork = await saveTokenArtwork(me, extra.artwork);
-    const image_path = await uploadTokenImage(me, blob);
-    const position = target || place();
-    const half = tokenHalf({ size: extra.size });
-    const meta = target && extra.hp !== null
-      ? metaWithHideHp({ meta: metaWithMaxHp(target, extra.hp) }, extra.hideHp)
-      : newCreatureMeta(extra.hp, extra.hideHp);
-    const next = await saveCreatureToken(board, target?.id || null, {
-      name: extra.name, image_path, size: extra.size, meta, name_hidden: extra.hideName,
-      color: CREATURE_COLOR,
-      ...(!target || target.size !== extra.size ? { x: keepIn(position.x, half, W), y: keepIn(position.y, half, H) } : {}),
-    }, { artwork, sheet: extra.sheet });
-    local.setTokens(prev => prev.some(t => t.id === next.id) ? prev.map(t => t.id === next.id ? next : t) : [...prev, next]);
-    setCreatureRevision(rev => rev + 1);
-    setSelected(next.id);
-  };
-  const adjustHp = async (token, delta) => {
-    const c = creatureOf(token);
-    if (!c || c.noHp) return;
-    const meta = metaWithHp(token, c.hp + delta);
-    local.setTokens(prev => prev.map(t => (t.id === token.id ? { ...t, meta } : t)));
-    try { await updateToken(token.id, { meta }); } catch (err) { setError(err.message); local.reloadItems(); }
-  };
-  // Mestre: guarda a criatura so como predefinicao da mesa (nao poe no mapa). Devolve o nome salvo.
-  const saveCreaturePreset = async (blob, extra) => {
-    const artwork = await saveTokenArtwork(me, extra.artwork);
-    const image_path = await uploadTokenImage(me, blob);
-    const previous = maker?.preset;
-    const taken = (await loadPresets(board.table_id)).filter(p => p.id !== previous?.id).map(p => p.name);
-    const p = await savePreset(board.table_id, {
-      name: uniqueName(extra.name, taken), image_path, max_hp: extra.hp, size: extra.size,
-      details: { artwork, sheet: extra.sheet, hideHp: extra.hideHp, hideName: extra.hideName },
-    }, previous?.id);
-    return p.name;
-  };
-  // Duplica a criatura (so o mestre): mesmo nome (com numero), foto, vida cheia e nome oculto; efeitos nao vao junto. Fica na celula ao lado.
-  const duplicateCreature = async token => {
-    const spot = { x: keepIn(token.x + gsize, tokenHalf(token), W), y: keepIn(token.y, tokenHalf(token), H) };
-    try {
-      const details = await loadCreatureDetails(token.id);
-      const t = await saveCreatureToken(board, null, { name: uniqueName(token.name, tokens.map(x => x.name)), color: token.color, size: token.size, image_path: token.image_path || null, meta: metaForCopy(token), name_hidden: isNameHidden(token), ...spot }, details);
-      putToken(t);
-      setSelected(t.id);
-    } catch (err) { setError(err.message); }
-  };
-  // Apaga o token da criatura (so o mestre); pede confirmacao porque nao tem volta.
-  const removeCreature = async token => {
-    if (!(await askConfirm({ title: 'Apagar token?', text: `Apagar o token "${token.name || 'da criatura'}" do tabuleiro? Isso não pode ser desfeito.`, actionLabel: 'Apagar token', danger: true }))) return;
-    try {
-      await removeToken(token.id);
-      local.setTokens(prev => prev.filter(t => t.id !== token.id));
-      setSelected(null);
-    } catch (err) { setError(err.message); local.reloadItems(); }
-  };
-  // Envia a imagem do token; atualiza o token existente ou, se ainda nao ha token do jogador, cria um.
-  const saveTokenImage = async (blob, extra) => {
-    if (maker?.preset) return saveCreaturePreset(blob, extra);
-    if (maker?.creature) return saveCreature(blob, extra);
-    const target = maker?.token;
-    // Token do próprio jogador: a imagem vai para a ficha (e o token a acompanha); o token não guarda imagem própria.
-    if (myCharacter && (!target || target.character_id === myCharacter)) {
-      const artwork = await saveTokenArtwork(me, extra.artwork);
-      const path = await uploadTokenImage(me, blob);
-      const saved = await setCharacterTokenImage(myCharacter, path, artwork);
-      setTokenOverride(prev => ({ ...prev, [myCharacter]: { path, artwork, revision: saved.revision } }));
-      if (!target) await addMine(null);
-      return;
-    }
-    const path = await uploadTokenImage(me, blob);
-    if (target) {
-      await updateToken(target.id, { image_path: path });
-      local.setTokens(prev => prev.map(t => (t.id === target.id ? { ...t, image_path: path } : t)));
-    } else {
-      await addMine(path);
-    }
-  };
-
-  const tokenLabel = t => (t.character_id && characters[t.character_id]?.name) || displayName(t, isGm);
-
-  async function moveSelected(token, dx, dy, direction) {
-    if (movingToken || gesture.current || !canMove(token)) return;
-    const half = tokenHalf(token);
-    const x = grid.snap ? snapInsideGrid(token.x+dx*gsize,gsize,grid.x,half,W) : token.x + dx * gsize;
-    const y = grid.snap ? snapInsideGrid(token.y+dy*gsize,gsize,grid.y,half,H) : token.y + dy * gsize;
-    const next = {
-      x: dx ? keepIn(x, half, W) : token.x,
-      y: dy ? keepIn(y, half, H) : token.y,
-    };
-    if (next.x === token.x && next.y === token.y) {
-      setMoveNotice('O token chegou ao limite do mapa.');
-      return;
-    }
-    setMovingToken(true);
-    setError('');
-    setMoveNotice('');
-    try {
-      await updateToken(token.id, next);
-      local.setTokens(prev => prev.map(t => t.id === token.id ? { ...t, ...next } : t));
-      setMoveNotice(`${tokenLabel(token)}: movido para ${direction}.`);
-    } catch (err) {
-      setError(err.message);
-      local.reloadItems();
-    } finally {
-      setMovingToken(false);
-    }
-  }
-
   const visibleTokens = useMemo(() => tokens.filter(t => isGm || !t.hidden), [tokens, isGm]);
-  const names = Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador']));
+  const sel = visibleTokens.find(t => t.id === selected);
+  const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
 
   if (board === undefined) return <p className="muted">Carregando o tabuleiro…</p>;
   if (!board) return <p className="muted">{error || 'Tabuleiro indisponível.'}</p>;
 
-  const vb = view ? `${view.x} ${view.y} ${view.w} ${view.w * svgRatio()}` : `0 0 ${W} ${H}`;
   const lines = [];
   if (grid.visible) {
     for (const x of gridLines(W,gsize,grid.x)) lines.push(<line key={`v${x}`} x1={x} y1={0} x2={x} y2={H} />);
     for (const y of gridLines(H,gsize,grid.y)) lines.push(<line key={`h${y}`} x1={0} y1={y} x2={W} y2={y} />);
   }
-  const sel = visibleTokens.find(t => t.id === selected);
-  const selectedAptitude = useAptitudeFor({ characterId: sel?.character_id, tableId, enabled: Boolean(sel?.character_id) && (isGm || sel?.character_id === myCharacter) });
 
   return <div className="board">
     {isGm && <MasterHub tableId={tableId} closed={closed} members={members} characters={characters} states={room.states} board={board} tokens={tokens} pad={pad} sheets={sheets} auth={auth} extras={extras} campaign={campaign || { name: '', gmName: '', clock: '' }}
@@ -448,7 +138,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
     {visibleTokens.length > 0 && <div className="board-token-controls">
       <label className="field">
         <span>Selecionar token no mapa</span>
-        <select value={sel?.id || ''} onChange={e => { setSelected(e.target.value || null); setMoveNotice(''); }}>
+        <select value={sel?.id || ''} onChange={e => { setSelected(e.target.value || null); clearMoveNotice(); }}>
           <option value="">Nenhum token selecionado</option>
           {visibleTokens.map(t => <option key={t.id} value={t.id}>{tokenLabel(t)}</option>)}
         </select>
@@ -460,9 +150,8 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       </div>}
       <span className="board-move-status muted" role="status">{movingToken ? 'Movendo token…' : moveNotice}</span>
     </div>}
-    <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img"
-      aria-label="Tabuleiro compartilhado" onPointerDown={onPointerDown} onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onLostPointerCapture={onPointerUp}>
+    <svg ref={svgRef} className={`board-svg tool-${tool}`} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" role="img"
+      aria-label="Tabuleiro compartilhado" {...pointerHandlers}>
       <rect x="0" y="0" width={W} height={H} className="board-bg" />
       {mapSrc && <image href={mapSrc} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid meet" />}
       <g className="board-grid" opacity={grid.opacity}>{lines}</g>
@@ -473,7 +162,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       <g>{visibleTokens.map(t => {
         const raw = tokenPos(t);
         const p = { x: keepIn(raw.x, tokenHalf(t), W), y: keepIn(raw.y, tokenHalf(t), H) };
-        const r = unit(t) / 2 - 3;
+        const r = tokenUnit(t) / 2 - 3;
         const mine = t.character_id && t.character_id === myCharacter;
         const src = imageVisible(t, isGm) ? imageOf(t) : null; // nome oculto: sem foto para os jogadores
         const badges = effectBadges(tokenEffects(t, room.states)); // criatura: efeitos do token · personagem: condições da mesa
@@ -527,11 +216,7 @@ export default function BoardView({ tableId, me, members, characters, isGm, clos
       selected={sel} onSelect={setSelected} room={room} local={local} mode={masterOpen} onMapTools={view => { setMasterOpen(false); setMapTools(view); }} initialNotice={masterOpen === "presets" ? presetNotice : ""}
       onGoToToken={token => {
         setSelected(token.id);
-        setView(previous => {
-          const width = previous?.w || W;
-          return { w: width, x: token.x - width / 2, y: token.y - width * svgRatio() / 2 };
-        });
-        svgRef.current?.scrollIntoView({ block: 'nearest' });
+        centerOn(token);
       }}
       onClose={() => setMasterOpen(false)}
       onCreateCreature={() => { setMasterOpen(false); setMaker({ creature: true, fromPresets: masterOpen === "presets" }); }}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadSounds } from '../../lib/sounds.js';
 import { musicUrl } from '../../lib/music.js';
 import { DEFAULT_SOUNDS } from '../../defaultSounds.js';
+import { createOperationGuard } from '../../operationGuard.js';
 
 const KEY = 'manrakora-sfx-volume';
 const loadVolume = () => {
@@ -13,9 +14,10 @@ export default function useSoundpad(room, tableId, isGm) {
   const [custom, setCustom] = useState([]);
   const [active, setActive] = useState([]);
   const [vol, setVol] = useState(loadVolume);
+  const [error, setError] = useState('');
+  const [operations] = useState(createOperationGuard);
   const soundsRef = useRef([]);
   const volRef = useRef(vol);
-  const urls = useRef(new Map());
   const audios = useRef(new Map());
   const sounds = [...DEFAULT_SOUNDS, ...custom];
   soundsRef.current = sounds;
@@ -38,36 +40,43 @@ export default function useSoundpad(room, tableId, isGm) {
     setActive(prev => prev.filter(x => x !== id));
   }, []);
 
+  // Cada pedido de tocar pega um token: depois dos awaits só segue se nenhum parar/tocar de novo/sair da tela o invalidou.
   const startLocal = useCallback(async id => {
-    let sound = soundsRef.current.find(s => s.id === id);
-    if (!sound) sound = (await reload()).find(s => s.id === id);
-    if (!sound) return;
-    end(id);
-    let url = sound.url || urls.current.get(sound.path);
-    if (!url) { url = await musicUrl(sound.path); urls.current.set(sound.path, url); }
-    const a = new Audio(url);
-    a.loop = sound.loop;
-    a.volume = volRef.current.volume;
-    a.muted = volRef.current.muted;
-    a.onended = () => end(id);
-    audios.current.set(id, a);
-    setActive(prev => (prev.includes(id) ? prev : [...prev, id]));
-    a.play().catch(() => end(id));
-  }, [end, reload]);
+    const token = operations.begin(id);
+    setError('');
+    try {
+      const sound = soundsRef.current.find(s => s.id === id) ?? (await reload()).find(s => s.id === id);
+      if (!sound) return;
+      const url = sound.url || await musicUrl(sound.path);
+      if (!operations.isCurrent(token)) return;
+      end(id);
+      const a = new Audio(url);
+      a.loop = sound.loop;
+      a.volume = volRef.current.volume;
+      a.muted = volRef.current.muted;
+      a.onended = () => end(id);
+      audios.current.set(id, a);
+      setActive(prev => (prev.includes(id) ? prev : [...prev, id]));
+      a.play().catch(() => { if (audios.current.get(id) === a) end(id); });
+    } catch (e) {
+      if (operations.isCurrent(token)) setError(e.message);
+    }
+  }, [operations, end, reload]);
 
-  const stopAllLocal = useCallback(() => { [...audios.current.keys()].forEach(end); }, [end]);
+  const cancel = useCallback(id => { operations.cancel(id); end(id); }, [operations, end]);
+  const stopAllLocal = useCallback(() => { operations.cancelAll(); [...audios.current.keys()].forEach(end); }, [operations, end]);
 
   useEffect(() => onBroadcast('sound', p => {
-    if (p?.action === 'play') startLocal(p.id); else if (p?.action === 'stop') end(p.id); else if (p?.action === 'stopAll') stopAllLocal();
-  }), [onBroadcast, startLocal, end, stopAllLocal]);
+    if (p?.action === 'play') startLocal(p.id); else if (p?.action === 'stop') cancel(p.id); else if (p?.action === 'stopAll') stopAllLocal();
+  }), [onBroadcast, startLocal, cancel, stopAllLocal]);
   useEffect(() => onBroadcast('sounds_refresh', () => { reload(); }), [onBroadcast, reload]);
-  useEffect(() => () => { audios.current.forEach(a => a.pause()); audios.current.clear(); }, []);
+  useEffect(() => () => { operations.cancelAll(); audios.current.forEach(a => a.pause()); audios.current.clear(); }, [operations]);
 
   // Ações do mestre: tocam aqui e avisam a mesa.
   const play = useCallback(id => { if (!isGm) return; sendBroadcast('sound', { id, action: 'play' }); startLocal(id); }, [isGm, sendBroadcast, startLocal]);
-  const stop = useCallback(id => { if (!isGm) return; sendBroadcast('sound', { id, action: 'stop' }); end(id); }, [isGm, sendBroadcast, end]);
+  const stop = useCallback(id => { if (!isGm) return; sendBroadcast('sound', { id, action: 'stop' }); cancel(id); }, [isGm, sendBroadcast, cancel]);
   const stopAll = useCallback(() => { if (!isGm) return; sendBroadcast('sound', { action: 'stopAll' }); stopAllLocal(); }, [isGm, sendBroadcast, stopAllLocal]);
   const changed = useCallback(async () => { await reload(); sendBroadcast('sounds_refresh', {}); }, [reload, sendBroadcast]);
 
-  return { sounds, custom, active, vol, setVol, play, stop, stopAll, changed };
+  return { sounds, custom, active, vol, setVol, play, stop, stopAll, changed, error };
 }

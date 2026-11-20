@@ -1,6 +1,8 @@
 @reference "../../tailwind.css";
 /* Chat */
 .chat2 { @apply flex flex-col gap-[10px]; height: calc(100vh - 230px); @apply min-h-[320px]; }
+.chat2-stage { @apply relative flex flex-col min-h-0; flex: 1; }
+.chat2-new { @apply absolute bottom-[10px]; left: 50%; transform: translateX(-50%); }
 .chat2-log { flex: 1; @apply overflow-auto flex flex-col gap-[8px] p-[12px]; border: 1px solid var(--border); @apply rounded-[10px]; background: var(--surface-soft); }
 .chat2-empty { @apply m-auto text-center text-app-muted; }
 .chat2-empty span { font-size: 2rem; }

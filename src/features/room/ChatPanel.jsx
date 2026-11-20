@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { sendMessage } from '../../lib/room.js';
+import { useStickyScroll } from './useStickyScroll.js';
 import './roompanels.css';
 
 const time = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -11,10 +12,8 @@ export default function ChatPanel({ tableId, me, members, messages, addMessage, 
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const logRef = useRef(null);
+  const { ref: logRef, onScroll, hasNew, scrollToEnd } = useStickyScroll(messages.at(-1)?.id);
   const names = Object.fromEntries(members.map(m => [m.user_id, m.profiles?.display_name || 'Jogador']));
-  // Rola so o proprio quadro (scrollIntoView arrastaria a pagina inteira).
-  useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length]);
 
   async function submit(e) {
     e.preventDefault();
@@ -22,14 +21,15 @@ export default function ChatPanel({ tableId, me, members, messages, addMessage, 
     if (!text || busy) return;
     setBusy(true);
     setError('');
-    try { addMessage(await sendMessage(tableId, text)); setBody(''); }
+    try { const sent = await sendMessage(tableId, text); scrollToEnd(); addMessage(sent); setBody(''); }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
   const onKeyDown = e => { if (e.key === 'Enter' && !e.shiftKey) submit(e); };
 
   return <div className="chat2">
-    <div className="chat2-log" ref={logRef} role="log" aria-live="polite" aria-label="Chat da mesa">
+    <div className="chat2-stage">
+    <div className="chat2-log" ref={logRef} onScroll={onScroll} role="log" aria-live="polite" aria-label="Chat da mesa">
       {!messages.length && <div className="chat2-empty"><span aria-hidden="true">💬</span><p>Nenhuma mensagem ainda.<br />Diga olá para a mesa!</p></div>}
       {messages.map((m, i) => {
         const mine = m.user_id === me;
@@ -43,6 +43,8 @@ export default function ChatPanel({ tableId, me, members, messages, addMessage, 
           </div>
         </div>;
       })}
+    </div>
+    {hasNew && <button type="button" className="chat2-new primary" onClick={scrollToEnd}>Novas mensagens ↓</button>}
     </div>
     <form className="chat2-form" onSubmit={submit}>
       <textarea aria-label="Mensagem" rows={1} maxLength={2000} value={body} disabled={disabled}

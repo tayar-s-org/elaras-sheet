@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase.js';
 import { loadBoard, loadBoardItems, mapUrl } from '../../lib/board.js';
 import { applyTokenRow } from '../../tokenState.js';
+import { createSnapshotGuard, reconcileById } from './snapshotGuard.js';
 
 const upsert = (list, row) => (list.some(x => x.id === row.id) ? list.map(x => (x.id === row.id ? { ...x, ...row } : x)) : [...list, row]);
 
@@ -16,13 +17,18 @@ export function useBoard(tableId, user, room) {
   const dragging = useRef(new Set());
   const boardRef = useRef(null);
   const mapRequest = useRef(0);
+  const [itemsGuard] = useState(createSnapshotGuard); // chave = id do token/marcador que o tempo real alterou
   const { onBroadcast } = room;
 
+  // Respostas velhas sao descartadas; o que o tempo real ou um arraste local alterou durante a leitura nao e sobrescrito.
   const refreshItems = useCallback(async id => {
+    const ticket = itemsGuard.begin();
     const items = await loadBoardItems(id);
-    setTokens(items.tokens);
-    setMarks(items.marks);
-  }, []);
+    if (!itemsGuard.isLatest(ticket)) return;
+    const changedSinceSnapshot = rowId => dragging.current.has(rowId) || itemsGuard.touchedAfter(ticket, rowId);
+    setTokens(prev => reconcileById(items.tokens, prev, changedSinceSnapshot));
+    setMarks(prev => reconcileById(items.marks, prev, changedSinceSnapshot));
+  }, [itemsGuard]);
   const refreshMap = useCallback(async b => {
     const request = ++mapRequest.current;
     setMapSrc(null);
@@ -49,6 +55,11 @@ export function useBoard(tableId, user, room) {
     let alive = true;
     let channel;
     let boardRequest = 0;
+    // Ao (re)assinar, mudancas de fichas, movimentos e exclusoes perdidos nao chegam pelo Realtime: recarrega tambem os itens.
+    function resync(boardId) {
+      reloadBoard();
+      refreshItems(boardId).catch(e => setError(e.message));
+    }
     async function reloadBoard() {
       const request = ++boardRequest;
       const previous = boardRef.current;
@@ -77,6 +88,7 @@ export function useBoard(tableId, user, room) {
             if (prev?.id === p.new.id) syncBoard({ ...prev, ...p.new });
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'board_tokens', filter: `table_id=eq.${tableId}` }, p => {
+            itemsGuard.touch(p.eventType === 'DELETE' ? p.old.id : p.new.id);
             if (p.eventType === 'DELETE') setTokens(prev => prev.filter(t => t.id !== p.old.id));
             else if (!dragging.current.has(p.new.id)) {
               setTokens(prev => applyTokenRow(prev, p.new)); // token com nome oculto chega em branco: o mestre mantém o nome real
@@ -84,14 +96,15 @@ export function useBoard(tableId, user, room) {
             }
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'board_marks', filter: `table_id=eq.${tableId}` }, p => {
+            itemsGuard.touch(p.eventType === 'DELETE' ? p.old.id : p.new.id);
             if (p.eventType === 'DELETE') setMarks(prev => prev.filter(m => m.id !== p.old.id));
             else setMarks(prev => upsert(prev, p.new));
           })
-          .subscribe(status => { if (status === 'SUBSCRIBED') reloadBoard(); });
+          .subscribe(status => { if (status === 'SUBSCRIBED') resync(b.id); });
       } catch (e) { if (alive) { setError(e.message); setBoard(prev => (prev === undefined ? null : prev)); } }
     })();
     return () => { alive = false; stopRefresh(); mapRequest.current += 1; if (channel) supabase.removeChannel(channel); };
-  }, [tableId, user?.id, onBroadcast, refreshItems, refreshMap, syncBoard]);
+  }, [tableId, user?.id, onBroadcast, refreshItems, refreshMap, syncBoard, itemsGuard]);
 
   // Posicoes provisorias vindas de outros jogadores durante o arraste.
   useEffect(() => onBroadcast('drag', p => {

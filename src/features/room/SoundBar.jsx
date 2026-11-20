@@ -3,7 +3,7 @@ import React from 'react';
 // Botões dos sons do soundpad para o mestre (tocam para todos), parar efeitos e o volume dos efeitos.
 // Ficam dentro do módulo "Soundpad" da Central do Mestre (masterHub/modules/ToolModules.jsx).
 export function SoundPads({ pad }) {
-  const { sounds, active, vol, setVol, play, stop, stopAll } = pad;
+  const { sounds, active, vol, setVol, play, stop, stopAll, error } = pad;
   return <div className="sfx-bar" role="group" aria-label="Efeitos sonoros">
     <div className="sfx-pads">
       {sounds.map(s => {
@@ -14,6 +14,7 @@ export function SoundPads({ pad }) {
       })}
       <button type="button" className="text-button danger" disabled={!active.length} onClick={stopAll}>Parar efeitos</button>
     </div>
+    {error && <p role="alert" className="muted">{error}</p>}
     <span className="music-volume">
       <span className="muted">Efeitos</span>
       <button type="button" className="quiet" aria-pressed={vol.muted} onClick={() => setVol(v => ({ ...v, muted: !v.muted }))}>{vol.muted ? 'Som off' : 'Som on'}</button>
