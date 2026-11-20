@@ -8,8 +8,8 @@ const stats = { maxStamina: 100, maxMana: 60, spirit: { die: 12, bonus: 0 }, con
 const row = (a, extra = {}) => ({ a, skill: '', spell: '', job: '', mode: 'normal', n: '', ...extra });
 
 // Gera "linhas do ledger" como o servidor guardaria, a partir do motor.
-function ledger(plan, { start = { stamina: 100, mana: 60 } } = {}) {
-  const [res] = processTicks({ entries: [{ characterId: 'A', stats, state: start, day: null, rowAt: (_d, slot) => ({ row: plan[slot] || row(''), routineId: 'r', fed: true }) }], fromTick: 0, hours: 24, rng: s => s });
+function ledger(plan, { start = { stamina: 100, mana: 60 }, hours = 24 } = {}) {
+  const [res] = processTicks({ entries: [{ characterId: 'A', stats, state: start, day: null, rowAt: (_d, slot) => ({ row: plan[slot] || row(''), routineId: 'r', fed: true }) }], fromTick: 0, hours, rng: s => s });
   const pools = {};
   return res.events.map(e => ({
     tick: e.tick, day_no: e.dayNo, slot: e.slot, activity: e.activity, ok: e.ok, reason: e.reason, routine_name: 'Dia 1',
@@ -85,6 +85,13 @@ test('sessões de meditação: início, duração e rolagem; mais recente primei
   assert.equal(list[0].startTick, 3);
   assert.equal(list[0].sides, 8);
   assert.equal(list[0].closed, true);
+});
+
+test('sessões de meditação: na virada do dia fecha a sessão antiga e mantém a nova aberta', () => {
+  const runs = ledger(plan([slots(0, 24, row(ACT.MEDITATE))]), { start: { stamina: 10, mana: 0 }, hours: 26 });
+  const [current, previous] = meditationSessions(runs);
+  assert.deepEqual([previous.startTick, previous.hours, previous.closed], [0, 24, true]);
+  assert.deepEqual([current.startTick, current.hours, current.closed], [24, 2, false]);
 });
 
 test('situação de hoje: descanso em andamento, sessões e limites que sobram', () => {

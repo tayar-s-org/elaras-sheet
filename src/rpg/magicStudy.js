@@ -1,4 +1,4 @@
-import { astuciaDiceFor } from './activities.js';
+import { astuciaDiceFor, STUDY_HOURS_PER_DIE } from './activities.js';
 
 // Estudo Mágico: tentativa de aprimorar um feitiço. As regras abaixo espelham o servidor (attempt_spell_upgrade), que é
 // quem de fato rola e decide; aqui servem para mostrar dificuldade, Pity e dados na tela e para os testes.
@@ -36,9 +36,9 @@ export function judgeAttempt(total, improvements, pity = 0) {
   return { success: false, pityAfter: earnsPity ? Math.min(MAX_PITY, d.pity + 1) : d.pity, ...d };
 }
 
-// Dados de Astúcia: ganhos (1 a cada 25 h, máx. 24), gastos (16 por tentativa) e disponíveis.
+// Dados de Astúcia: ganhos (1 a cada 25 h, sem teto), gastos (16 por tentativa) e disponíveis.
 export function astuciaDice(studyHours, spent = 0) {
   const earned = astuciaDiceFor(studyHours);
   const available = Math.max(0, earned - spent);
-  return { earned, spent, available, canAttempt: available >= ATTEMPT_DICE, hoursToNext: earned >= 24 ? 0 : 25 - (Number(studyHours) % 25) };
+  return { earned, spent, available, canAttempt: available >= ATTEMPT_DICE, hoursToNext: STUDY_HOURS_PER_DIE - ((Number(studyHours) || 0) % STUDY_HOURS_PER_DIE) };
 }

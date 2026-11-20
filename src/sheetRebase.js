@@ -21,28 +21,37 @@ const byId = list => new Map((Array.isArray(list) ? list : []).filter(e => e?.id
 const fillsOf = e => (Array.isArray(e?.fills) ? e.fills : []);
 const sameEntry = (a, b) => a.qty === b.qty && Boolean(a.equipped) === Boolean(b.equipped) && sameSheet(fillsOf(a), fillsOf(b));
 
-// Níveis dos recipientes de líquido (um por unidade). Parte dos níveis locais e aplica o que a nuvem mudou:
-// unidades acrescentadas, unidades retiradas (casa pelo valor, senão tira a última) e níveis alterados que o local não mexeu.
+// Identidade das unidades de um recipiente de líquido: o nível guardado na base. Cada nível da base que continua na nuvem é a
+// mesma unidade; as sobras da base e da nuvem se pareiam na ordem (a unidade teve o nível alterado lá); o que sobra só da base
+// foi retirado e o que sobra só da nuvem foi acrescentado.
+function diffUnits(baseF, cloudF) {
+  const unseen = [...cloudF];
+  const unmatchedBase = baseF.filter(was => {
+    const k = unseen.indexOf(was);
+    if (k >= 0) unseen.splice(k, 1);
+    return k < 0;
+  });
+  return {
+    changed: unmatchedBase.slice(0, unseen.length).map((was, i) => [was, unseen[i]]),
+    removed: unmatchedBase.slice(unseen.length),
+    added: unseen.slice(unmatchedBase.length),
+  };
+}
+
+// Níveis dos recipientes (um por unidade). Parte dos níveis locais e aplica o que a nuvem mudou; unidade que a ficha também
+// alterou não casa mais com o nível da base e fica com o valor local.
 function mergeFills(baseF, localF, cloudF) {
+  const { changed, removed, added } = diffUnits(baseF, cloudF);
   const out = [...localF];
-  if (cloudF.length >= baseF.length) {
-    baseF.forEach((was, i) => {
-      if (cloudF[i] === was) return;
-      if (localF.length === baseF.length) { if (localF[i] === was) out[i] = cloudF[i]; return; } // alinhado: local vence se também mexeu
-      const j = out.findIndex(v => v === was);
-      if (j >= 0) out[j] = cloudF[i];
-    });
-    out.push(...cloudF.slice(baseF.length));
-  } else {
-    const pool = [...cloudF];
-    for (const was of baseF) {
-      const k = pool.indexOf(was);
-      if (k >= 0) { pool.splice(k, 1); continue; } // continua na nuvem
-      const j = out.lastIndexOf(was); // foi retirada na nuvem
-      out.splice(j >= 0 ? j : out.length - 1, 1);
-    }
+  for (const [was, now] of changed) {
+    const j = out.indexOf(was);
+    if (j >= 0) out[j] = now;
   }
-  return out;
+  for (const was of removed) {
+    const j = out.lastIndexOf(was);
+    out.splice(j >= 0 ? j : out.length - 1, 1);
+  }
+  return [...out, ...added];
 }
 
 export function mergeInventory(base, local, cloud) {
@@ -57,6 +66,7 @@ export function mergeInventory(base, local, cloud) {
       } else if (le) out.push(le);
       continue;
     }
+    if (be && le && sameEntry(be, le)) { out.push(ce); continue; } // a ficha não mexeu na entrada: vale a nuvem inteira
     const bq = be?.qty || 0, lq = le?.qty || 0;
     let qty = Math.min(MAX_QTY, Math.max(0, lq + ce.qty - bq));
     if (!be && le && id.startsWith('custom-')) qty = Math.max(lq, ce.qty); // o mesmo item customizado entregue duas vezes não duplica

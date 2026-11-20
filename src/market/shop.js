@@ -1,7 +1,7 @@
 // Loja do Mestre (migração 0041): regras puras usadas pela tela do mestre e pelo Mercado do jogador.
 // Cada anúncio é um item customizado (nome, peso, efeitos, descrição — o mesmo modelo da ficha) com moeda e preço.
 import { formatMoney } from '../money.js';
-import { iconText, DEFAULT_CURRENCY_ICON } from '../features/room/masterHub/experienceIcons.js';
+import { iconText, DEFAULT_CURRENCY_ICON } from './experienceIcons.js';
 
 export const MAX_PRICE = 999999999;
 

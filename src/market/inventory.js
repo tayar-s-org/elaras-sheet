@@ -15,14 +15,22 @@ export function equipmentText(c) {
 
 export const sellPrice = (item, qty = 1) => Math.floor(item.cost * qty * SELL_RATE);
 
-// Compra: desconta o dinheiro e põe na mochila. Devolve null se o item não existe ou falta dinheiro.
+// Motivo curto pelo qual a compra não pode acontecer (vazio = pode). Confere antes do débito: o limite da pilha
+// nunca pode cortar a entrega depois de cobrar.
+export function buyBlockedReason(c, item, qty = 1) {
+  if (item.cost * qty > normalizeMoney(c.money)) return 'Sem dinheiro';
+  const inBag = c.inventory.find(e => e.id === item.id)?.qty ?? 0;
+  return inBag + qty > MAX_QTY ? `Mochila cheia (${MAX_QTY})` : '';
+}
+
+// Compra: desconta o dinheiro e põe na mochila. Devolve null se o item não existe, falta dinheiro ou passa do limite da pilha.
 export function buyItem(c, id, qty = 1) {
   const item = itemById.get(id);
+  if (!item || qty < 1 || buyBlockedReason(c, item, qty)) return null;
   const money = normalizeMoney(c.money);
-  const total = item ? item.cost * qty : 0;
-  if (!item || qty < 1 || total > money) return null;
+  const total = item.cost * qty;
   const inventory = c.inventory.some(e => e.id === id)
-    ? c.inventory.map(e => (e.id === id ? resized(e, item, Math.min(MAX_QTY, e.qty + qty)) : e))
+    ? c.inventory.map(e => (e.id === id ? resized(e, item, e.qty + qty) : e))
     : [...c.inventory, resized({ id, qty: 0, equipped: false }, item, qty)];
   return { ...c, money: money - total, inventory };
 }

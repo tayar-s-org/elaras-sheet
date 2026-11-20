@@ -139,3 +139,27 @@ test('rebaseSheet: ficha sem edições passa a ser a da nuvem', () => {
   const fix = rebaseSheet(tab, { id: 'c1', revision: 4, character: cloudChar });
   assert.equal(qtyOf(fix.character.inventory, flecha.id), 19);
 });
+
+test('cantil: ficha sem mexer aceita a nuvem inteira (dois cantis viram um cheio)', () => {
+  const base = [e(cantil.id, 2, { fills: [0.2, 0.6] })];
+  const cloud = [e(cantil.id, 1, { fills: [1] })];
+  const merged = mergeInventory(base, base, cloud);
+  assert.equal(merged[0].qty, 1);
+  assert.deepEqual(merged[0].fills, [1]);
+});
+
+test('cantil: ficha alterou uma unidade e a nuvem trocou o nível de outra ao retirar uma', () => {
+  const base = [e(cantil.id, 2, { fills: [0.2, 0.6] })];
+  const local = setFill(sheet(base), cantil.id, 0, 0.3).inventory;
+  const cloud = [e(cantil.id, 1, { fills: [1] })]; // sobrou uma unidade, agora cheia
+  const merged = mergeInventory(base, local, cloud)[0];
+  assert.equal(merged.qty, 1);
+  assert.deepEqual(merged.fills, [0.3], 'a unidade que a ficha mexeu mantém o nível local; a outra foi retirada');
+});
+
+test('cantil: nível alterado na nuvem vale para a unidade mesmo com valores repetidos', () => {
+  const base = [e(cantil.id, 2, { fills: [0.5, 0.5] })];
+  const local = setFill(sheet(base), cantil.id, 0, 0.1).inventory;
+  const cloud = [e(cantil.id, 2, { fills: [0.5, 0.9] })];
+  assert.deepEqual(mergeInventory(base, local, cloud)[0].fills, [0.1, 0.9]);
+});

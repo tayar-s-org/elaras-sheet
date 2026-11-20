@@ -293,11 +293,11 @@ test('meditação aberta no fim do dia é encerrada na virada do dia', () => {
   assert.equal(day.medActive, false);
 });
 
-test('estudo mágico: só feitiço já treinado, sem custo, conta horas; 25 h = 1 dado, máximo 24', () => {
+test('estudo mágico: só feitiço já treinado, sem custo, conta horas; 25 h = 1 dado, sem teto', () => {
   const ok = run([{ a: ACT.STUDY, spell: 's1' }]).events[0];
   assert.equal(ok.ok, true); assert.equal(ok.study, 1); assert.equal(ok.staminaDelta, 0); assert.equal(ok.manaDelta, 0);
   assert.equal(run([{ a: ACT.STUDY, spell: 's2' }]).events[0].ok, false, 's2 nunca foi treinado');
-  assert.deepEqual([0, 24, 25, 49, 50, 100, 400, 600, 601, 9999].map(astuciaDiceFor), [0, 0, 1, 1, 2, 4, 16, 24, 24, 24]);
+  assert.deepEqual([0, 24, 25, 49, 50, 100, 400, 600, 601, 9999].map(astuciaDiceFor), [0, 0, 1, 1, 2, 4, 16, 24, 24, 399]);
 });
 
 test('trabalhar ainda não está liberado e não tem efeito', () => {

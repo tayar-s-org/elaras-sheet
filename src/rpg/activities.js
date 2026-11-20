@@ -31,7 +31,6 @@ export const LOW_RESOURCE = 1; // estamina/mana em 1 ou menos: não começa ativ
 // Nenhuma atividade da rotina deixa a estamina abaixo de 1: só se gasta o que passa de 1 (a hora ainda conta, o custo é limitado).
 export const spendableStamina = stamina => Math.max(0, stamina - LOW_RESOURCE);
 export const STUDY_HOURS_PER_DIE = 25;
-export const MAX_ASTUCIA_DICE = 24;
 
 // Estamina por hora de treino de perícia: horas 1–4 custam 1, 5–8 custam 2, 9–12 custam 4 (4h=4, 8h=12, 12h=28).
 export const trainingStaminaCost = hour => (hour <= 4 ? 1 : hour <= 8 ? 2 : 4);
@@ -52,8 +51,9 @@ export function meditationRate(roll) {
   return 1 / (4 - x / 4);
 }
 
-// Dados de Astúcia ganhos no Estudo Mágico: 1 a cada 25 horas, no máximo 24.
-export const astuciaDiceFor = hours => Math.min(MAX_ASTUCIA_DICE, Math.floor((Number(hours) || 0) / STUDY_HOURS_PER_DIE));
+// Dados de Astúcia ganhos no Estudo Mágico: 1 a cada 25 horas. Sem teto no total ganho: cada tentativa gasta 16 e o saldo
+// precisa poder se recompor (um teto no total ganho deixava no máximo 8 dados depois da 1ª tentativa, para sempre).
+export const astuciaDiceFor = hours => Math.floor((Number(hours) || 0) / STUDY_HOURS_PER_DIE);
 
 // Atributo ligado à perícia: o do livro ou, nas personalizadas, o escolhido na ficha (stats.customAttrs).
 export const linkedAttribute = (skill, stats) => SKILLS.find(([name]) => name === skill)?.[1] || stats?.customAttrs?.[skill] || null;
@@ -105,6 +105,108 @@ export const newDay = dayNo => ({
 
 const round = n => Math.round(n * 1000) / 1000;
 
+// Cada atividade tem seu tratador: recebe { row, stats, state, d (estado do dia), ev (evento), fed, rng, fail } e devolve a variação
+// de recursos { stamina, mana } (ausente = 0). Recusar a hora = fail(motivo); recursos e XP só valem se ev.ok.
+function handleSkill({ row, stats, state, d, ev, fail }) {
+  if (rowIssue(row, stats)) return fail(`Perícia ${rowIssue(row, stats)}.`);
+  if (d.trainHours >= SKILL_TRAIN_MAX_HOURS) return fail(`Limite de ${SKILL_TRAIN_MAX_HOURS} horas de treino por dia.`);
+  const blocked = blockedReason(ACT.SKILL, state.stamina, state.mana, row.skill);
+  if (blocked) return fail(blocked);
+  d.trainHours += 1;
+  const cost = trainingStaminaCost(d.trainHours) * modalityFactor(row);
+  const delta = { stamina: -Math.min(cost, spendableStamina(state.stamina)) };
+  if (row.skill === CAST_SKILL) { delta.mana = -Math.min(CAST_MANA_COST, state.mana); ev.manaCost = CAST_MANA_COST; }
+  const mod = modalityOf(row);
+  ev.xp.push({ kind: 'skill', name: row.skill, modality: mod, amount: 1 });
+  const attr = linkedAttribute(row.skill, stats);
+  if (attr) ev.xp.push({ kind: 'attribute', name: attr, modality: mod, amount: 0.5 });
+  ev.cost = cost;
+  ev.trainHour = d.trainHours;
+  return delta;
+}
+
+function handleSpell({ row, stats, state, d, ev, fail }) {
+  const limit = spellTrainingHoursPerDay(stats.conjurar);
+  if (rowIssue(row, stats)) return fail(`Feitiço: ${rowIssue(row, stats)}.`);
+  if (d.spellHours >= limit) return fail(`Limite de ${limit} hora(s) de treino de feitiço por dia (metade do dado-base de Conjurar).`);
+  const blocked = blockedReason(ACT.SPELL, state.stamina, state.mana);
+  if (blocked) return fail(blocked);
+  d.spellHours += 1;
+  const cost = modalityFactor(row);
+  const mod = modalityOf(row);
+  ev.xp.push({ kind: 'spell', name: row.spell, modality: mod, amount: 1 });
+  ev.xp.push({ kind: 'skill', name: 'Conjurar', modality: mod, amount: 0.5 });
+  ev.xp.push({ kind: 'attribute', name: 'Espírito', modality: mod, amount: 0.25 });
+  ev.cost = cost;
+  return { mana: -Math.min(cost, state.mana) };
+}
+
+function handleStudy({ row, stats, ev, fail }) {
+  if (rowIssue(row, stats)) return fail(`Estudo: ${rowIssue(row, stats)}.`);
+  ev.study = 1;
+  ev.spell = row.spell;
+}
+
+function handleRest({ d, ev, fail }) {
+  if (d.restHours >= REST_MAX_HOURS) return fail(`Limite de ${REST_MAX_HOURS} horas de descanso completo por dia.`);
+  d.restHours += 1;
+  d.restStreak = d.prev === ACT.REST ? d.restStreak + 1 : 1;
+  const pay = restPayout(d.restStreak);
+  ev.rest = { streak: d.restStreak, paid: pay };
+  return { stamina: pay };
+}
+
+function handleQuickRest({ d, fed, fail }) {
+  d.quickHours += 1;
+  if (!fed) return fail('Descanso rápido sem estar alimentado: não recupera.');
+  if (d.quickHours > QUICK_MAX_HOURS) return fail(`Descanso rápido só recupera nas primeiras ${QUICK_MAX_HOURS}h do dia.`);
+  return { stamina: QUICK_PER_HOUR };
+}
+
+function handleMeditate({ stats, d, ev, rng, fail }) {
+  if (!d.medActive) {
+    if (d.medClosed >= meditationSessionsPerDay(stats.spirit)) return fail(`Sem sessões de meditação: limite de ${meditationSessionsPerDay(stats.spirit)} por dia.`);
+    const r = rollDie(stats.meditar, rng);
+    d.medActive = true; d.medHours = 0; d.medRoll = Math.min(12, Math.max(0, r.total)); d.medRate = meditationRate(d.medRoll);
+    ev.meditation = { ...(ev.meditation || {}), started: true, face: r.face, sides: r.sides, roll: d.medRoll, rate: round(d.medRate) };
+  }
+  d.medHours += 1;
+  // Cada hora meditada dá +1 XP em Meditar e +0,5 em Espírito (a Aptidão é aplicada pelo servidor ao gravar).
+  ev.xp.push({ kind: 'skill', name: 'Meditar', modality: 'normal', amount: 1 });
+  ev.xp.push({ kind: 'attribute', name: 'Espírito', modality: 'normal', amount: 0.5 });
+  return { mana: d.medRate };
+}
+
+// Trabalho configurado pelo mestre: custos de estamina e mana por faixa de horas (1–4, 5–8, 9–12), pagamento e XP por hora.
+function handleWork({ row, stats, state, d, ev, fail }) {
+  const job = stats.jobs?.[row.job];
+  if (!row.job) return fail('Trabalho não escolhido.');
+  if (!job) return fail('Este trabalho não está aprovado pelo mestre.');
+  if (d.workHours >= WORK_MAX_HOURS) return fail(`Limite de ${WORK_MAX_HOURS} horas de trabalho por dia.`);
+  const n = d.workHours + 1;
+  const tier = n <= 4 ? 0 : n <= 8 ? 1 : 2;
+  const sCost = job.staminaTiers[tier], mCost = job.manaTiers[tier];
+  if (sCost > 0 && state.stamina <= LOW_RESOURCE) return fail('Bloqueado: estamina em 1 ou menos, sem forças para trabalhar.');
+  if (mCost > 0 && state.mana <= LOW_RESOURCE) return fail('Bloqueado: mana em 1 ou menos, sem mana para trabalhar.');
+  d.workHours = n;
+  if (job.xp > 0 && job.xpSkill) ev.xp.push({ kind: 'skill', name: job.xpSkill, modality: 'normal', amount: job.xp });
+  ev.pay = job.pay;
+  ev.job = row.job;
+  ev.workHour = n;
+  return { stamina: -Math.min(sCost, spendableStamina(state.stamina)), mana: -Math.min(mCost, state.mana) };
+}
+
+// Linha vazia = hora ociosa; atividade desconhecida não tem efeito.
+function handleIdle({ ev }, act) {
+  ev.ok = act === '';
+  if (act === '') ev.idle = true;
+}
+
+const HANDLERS = {
+  [ACT.SKILL]: handleSkill, [ACT.SPELL]: handleSpell, [ACT.STUDY]: handleStudy, [ACT.REST]: handleRest,
+  [ACT.QUICK]: handleQuickRest, [ACT.MEDITATE]: handleMeditate, [ACT.WORK]: handleWork,
+};
+
 // Processa UMA hora de UM personagem. Função pura: recebe o estado e devolve o evento e o novo estado.
 //   ctx = { dayNo, row, fed, stats, state: { stamina, mana }, day (estado do dia ou null), rng }
 // Devolve { event, state, day }. event.ok é falso (com reason) quando a hora não teve efeito; recursos e XP só mudam se ok.
@@ -113,7 +215,6 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
   const d = rolled ? { ...day } : newDay(dayNo);
   const act = row?.a || '';
   const ev = { activity: act, ok: true, reason: '', staminaDelta: 0, manaDelta: 0, xp: [], study: 0 };
-  let dS = 0, dM = 0;
   const fail = reason => { ev.ok = false; ev.reason = reason; };
   const closeMeditation = () => {
     ev.meditation = { ...(ev.meditation || {}), closed: true, hours: d.medHours, roll: d.medRoll, rate: round(d.medRate) };
@@ -125,106 +226,9 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
   }
   if (d.medActive && act !== ACT.MEDITATE) closeMeditation();
 
-  switch (act) {
-    case ACT.SKILL: {
-      if (rowIssue(row, stats)) fail(`Perícia ${rowIssue(row, stats)}.`);
-      else if (d.trainHours >= SKILL_TRAIN_MAX_HOURS) fail(`Limite de ${SKILL_TRAIN_MAX_HOURS} horas de treino por dia.`);
-      else if (blockedReason(act, state.stamina, state.mana, row.skill)) fail(blockedReason(act, state.stamina, state.mana, row.skill));
-      else {
-        d.trainHours += 1;
-        const cost = trainingStaminaCost(d.trainHours) * modalityFactor(row);
-        dS = -Math.min(cost, spendableStamina(state.stamina));
-        if (row.skill === CAST_SKILL) { dM = -Math.min(CAST_MANA_COST, state.mana); ev.manaCost = CAST_MANA_COST; }
-        const mod = modalityOf(row);
-        ev.xp.push({ kind: 'skill', name: row.skill, modality: mod, amount: 1 });
-        const attr = linkedAttribute(row.skill, stats);
-        if (attr) ev.xp.push({ kind: 'attribute', name: attr, modality: mod, amount: 0.5 });
-        ev.cost = cost;
-        ev.trainHour = d.trainHours;
-      }
-      break;
-    }
-    case ACT.SPELL: {
-      const limit = spellTrainingHoursPerDay(stats.conjurar);
-      if (rowIssue(row, stats)) fail(`Feitiço: ${rowIssue(row, stats)}.`);
-      else if (d.spellHours >= limit) fail(`Limite de ${limit} hora(s) de treino de feitiço por dia (metade do dado-base de Conjurar).`);
-      else if (blockedReason(act, state.stamina, state.mana)) fail(blockedReason(act, state.stamina, state.mana));
-      else {
-        d.spellHours += 1;
-        const cost = modalityFactor(row);
-        dM = -Math.min(cost, state.mana);
-        const mod = modalityOf(row);
-        ev.xp.push({ kind: 'spell', name: row.spell, modality: mod, amount: 1 });
-        ev.xp.push({ kind: 'skill', name: 'Conjurar', modality: mod, amount: 0.5 });
-        ev.xp.push({ kind: 'attribute', name: 'Espírito', modality: mod, amount: 0.25 });
-        ev.cost = cost;
-      }
-      break;
-    }
-    case ACT.STUDY: {
-      if (rowIssue(row, stats)) fail(`Estudo: ${rowIssue(row, stats)}.`);
-      else { ev.study = 1; ev.spell = row.spell; }
-      break;
-    }
-    case ACT.REST: {
-      if (d.restHours >= REST_MAX_HOURS) { fail(`Limite de ${REST_MAX_HOURS} horas de descanso completo por dia.`); break; }
-      d.restHours += 1;
-      d.restStreak = d.prev === ACT.REST ? d.restStreak + 1 : 1;
-      const pay = restPayout(d.restStreak);
-      dS = pay;
-      ev.rest = { streak: d.restStreak, paid: pay };
-      break;
-    }
-    case ACT.QUICK: {
-      d.quickHours += 1;
-      if (!fed) fail('Descanso rápido sem estar alimentado: não recupera.');
-      else if (d.quickHours > QUICK_MAX_HOURS) fail(`Descanso rápido só recupera nas primeiras ${QUICK_MAX_HOURS}h do dia.`);
-      else dS = QUICK_PER_HOUR;
-      break;
-    }
-    case ACT.MEDITATE: {
-      if (!d.medActive) {
-        if (d.medClosed >= meditationSessionsPerDay(stats.spirit)) { fail(`Sem sessões de meditação: limite de ${meditationSessionsPerDay(stats.spirit)} por dia.`); break; }
-        const r = rollDie(stats.meditar, rng);
-        d.medActive = true; d.medHours = 0; d.medRoll = Math.min(12, Math.max(0, r.total)); d.medRate = meditationRate(d.medRoll);
-        ev.meditation = { ...(ev.meditation || {}), started: true, face: r.face, sides: r.sides, roll: d.medRoll, rate: round(d.medRate) };
-      }
-      d.medHours += 1;
-      dM = d.medRate;
-      // Cada hora meditada dá +1 XP em Meditar e +0,5 em Espírito (a Aptidão é aplicada pelo servidor ao gravar).
-      ev.xp.push({ kind: 'skill', name: 'Meditar', modality: 'normal', amount: 1 });
-      ev.xp.push({ kind: 'attribute', name: 'Espírito', modality: 'normal', amount: 0.5 });
-      break;
-    }
-    case ACT.WORK: {
-      // Trabalho configurado pelo mestre: custos de estamina e mana por faixa de horas (1–4, 5–8, 9–12), pagamento e XP por hora.
-      const job = stats.jobs?.[row.job];
-      if (!row.job) fail('Trabalho não escolhido.');
-      else if (!job) fail('Este trabalho não está aprovado pelo mestre.');
-      else if (d.workHours >= WORK_MAX_HOURS) fail(`Limite de ${WORK_MAX_HOURS} horas de trabalho por dia.`);
-      else {
-        const n = d.workHours + 1;
-        const tier = n <= 4 ? 0 : n <= 8 ? 1 : 2;
-        const sCost = job.staminaTiers[tier], mCost = job.manaTiers[tier];
-        if (sCost > 0 && state.stamina <= LOW_RESOURCE) fail('Bloqueado: estamina em 1 ou menos, sem forças para trabalhar.');
-        else if (mCost > 0 && state.mana <= LOW_RESOURCE) fail('Bloqueado: mana em 1 ou menos, sem mana para trabalhar.');
-        else {
-          d.workHours = n;
-          dS = -Math.min(sCost, spendableStamina(state.stamina));
-          dM = -Math.min(mCost, state.mana);
-          if (job.xp > 0 && job.xpSkill) ev.xp.push({ kind: 'skill', name: job.xpSkill, modality: 'normal', amount: job.xp });
-          ev.pay = job.pay;
-          ev.job = row.job;
-          ev.workHour = n;
-        }
-      }
-      break;
-    }
-    default:
-      ev.ok = act !== '' ? false : true;
-      if (act === '') ev.idle = true;
-      break;
-  }
+  const ctx = { row, stats, state, d, ev, fed, rng, fail };
+  const handler = HANDLERS[act];
+  const { stamina: dS = 0, mana: dM = 0 } = (handler ? handler(ctx) : handleIdle(ctx, act)) || {};
 
   // O estado também fica arredondado (3 casas): assim a soma dos efeitos gravados é sempre igual ao estado final.
   const stamina = round(Math.min(stats.maxStamina, Math.max(0, state.stamina + dS)));

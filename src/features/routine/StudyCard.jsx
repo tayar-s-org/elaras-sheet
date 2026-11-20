@@ -3,14 +3,12 @@ import { attemptDifficulty, ATTEMPT_DICE, MAX_IMPROVEMENTS, MAX_PITY } from '../
 import { fmt } from '../../rpg/describe.js';
 import './studyCard.css';
 
-const MAX_DICE = 24;
-
 // Estudo Mágico: dados de Astúcia (ganhos com horas de estudo), melhorias e Pity de cada feitiço e o botão de tentar aprimorar.
 // A tentativa gasta 16 dados de Astúcia, por isso o botão só libera quando há 16 ou mais disponíveis.
 export default function StudyCard({ dice, studyHours, stats, spellProgress, attempts, spellName, owner, onGo }) {
   const ready = dice.available >= ATTEMPT_DICE;
   const missing = Math.max(0, ATTEMPT_DICE - dice.available);
-  const nextPct = dice.earned >= MAX_DICE ? 100 : Math.round(((Number(studyHours) || 0) % 25) / 25 * 100);
+  const nextPct = Math.round(((Number(studyHours) || 0) % 25) / 25 * 100);
   return <article className="th-card ms-card" aria-label="Estudo Mágico">
     <header className="ms-head">
       <h4>Estudo Mágico</h4>
@@ -22,12 +20,12 @@ export default function StudyCard({ dice, studyHours, stats, spellProgress, atte
         <span><b>{dice.available}</b> dado{dice.available === 1 ? '' : 's'} de Astúcia disponíve{dice.available === 1 ? 'l' : 'is'}</span>
         <small>{dice.earned} ganhos · {dice.spent} gastos · cada tentativa usa {ATTEMPT_DICE}</small>
       </div>
-      <div className="ms-pips" role="img" aria-label={`${dice.available} disponíveis de ${MAX_DICE}`}>
-        {Array.from({ length: MAX_DICE }, (_, i) => <i key={i} className={i < dice.spent ? 'spent' : i < dice.earned ? 'have' : ''} />)}
+      <div className="ms-pips" role="img" aria-label={`${Math.min(dice.available, ATTEMPT_DICE)} de ${ATTEMPT_DICE} dados para a próxima tentativa`}>
+        {Array.from({ length: ATTEMPT_DICE }, (_, i) => <i key={i} className={i < dice.available ? 'have' : ''} />)}
       </div>
       <div className="ms-next">
         <div className="ms-bar" aria-hidden="true"><i style={{ width: `${nextPct}%` }} /></div>
-        <small>{dice.earned >= MAX_DICE ? 'Máximo de 24 dados ganhos' : `Próximo dado em ${fmt(dice.hoursToNext)} h de estudo`}</small>
+        <small>Próximo dado em {fmt(dice.hoursToNext)} h de estudo</small>
       </div>
     </div>
 

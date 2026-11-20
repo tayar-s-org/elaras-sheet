@@ -87,7 +87,7 @@ function AttemptPanel({ r, training, spellProgress, spellName, onDone }) {
     try { setResult(await attemptUpgrade(r.id)); onDone?.(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   return <div className="rq-attempt">
-    <p><b>Dados de Astúcia:</b> {dice.available} disponíveis ({dice.earned} ganhos, {dice.spent} gastos){dice.earned < 24 ? ` · faltam ${fmt(dice.hoursToNext)} h de Estudo para o próximo` : ' · máximo de 24'}</p>
+    <p><b>Dados de Astúcia:</b> {dice.available} disponíveis ({dice.earned} ganhos, {dice.spent} gastos) · faltam {fmt(dice.hoursToNext)} h de Estudo para o próximo</p>
     <p><b>Melhorias do feitiço:</b> {sp.improvements}/{MAX_IMPROVEMENTS} · <b>Pity:</b> {sp.pity}/5{sp.pity ? ` (dificuldade −${sp.pity * 10}%)` : ''}</p>
     {diff ? <p><b>Dificuldade desta tentativa:</b> {fmt(diff.effective)}{diff.pity ? ` (tabela: ${diff.base})` : ''} · a soma de {ATTEMPT_DICE} dados precisa ser maior que isso</p> : <p className="muted">Este feitiço já tem o máximo de melhorias.</p>}
     <p><XpCostNote cost={r.config?.xp_cost} /></p>

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MARKET_ITEMS, CATEGORIES, itemById, inventoryEffects } from './items.js';
-import { buyItem, sellItem, toggleEquip, sellPrice } from './inventory.js';
+import { buyItem, buyBlockedReason, sellItem, toggleEquip, sellPrice, MAX_QTY } from './inventory.js';
 import { newCharacter, calculate, validateCharacter } from '../rules.js';
 
 const find = name => MARKET_ITEMS.find(i => i.name === name);
@@ -30,6 +30,19 @@ test('comprar desconta o dinheiro, junta quantidades e recusa sem saldo', () => 
   assert.equal(buyItem(c, find('Machado Grande').id, 2), null, 'dois custam mais que o saldo');
   assert.equal(buyItem(c, find('Katana').id, 1), null, 'katana ($1000) passa do saldo');
   assert.equal(buyItem(c, 'item-que-nao-existe', 1), null);
+});
+
+test('comprar no limite da pilha recusa antes de cobrar', () => {
+  const dagger = find('Adaga');
+  const full = { ...newCharacter(), money: 500, inventory: [{ id: dagger.id, qty: MAX_QTY, equipped: false }] };
+  assert.equal(buyItem(full, dagger.id, 1), null, 'não cobra nem entrega');
+  assert.equal(buyBlockedReason(full, dagger), `Mochila cheia (${MAX_QTY})`);
+  const almostFull = { ...full, inventory: [{ id: dagger.id, qty: MAX_QTY - 1, equipped: false }] };
+  assert.equal(buyBlockedReason(almostFull, dagger), '');
+  const bought = buyItem(almostFull, dagger.id, 1);
+  assert.equal(bought.inventory[0].qty, MAX_QTY);
+  assert.equal(bought.money, 500 - dagger.cost);
+  assert.equal(buyBlockedReason({ ...full, money: 0, inventory: [] }, dagger), 'Sem dinheiro');
 });
 
 test('vender devolve metade do preço e remove da mochila ao acabar', () => {
