@@ -19,6 +19,7 @@ import "./modules.css";
 import AptitudeSummary, { useAptitudeFor } from "../routine/AptitudeSummary.jsx";
 import SheetAptitude from "../routine/SheetAptitude.jsx";
 import PointsStrip from "./PointsStrip.jsx";
+import { charismaTitle, signed } from "../../rpg/charisma.js";
 
 export const MODULES = [
   "Identidade",
@@ -59,7 +60,7 @@ const bagItems = c => c.inventory.map(e => ({ ...e, name: resolveItem(e)?.name }
 const bonusText = b => (b ? ` (${b > 0 ? `+${b}` : `−${Math.abs(b)}`})` : "");
 const kg = n => `${(Math.round(n * 100) / 100).toString().replace(".", ",")} kg`;
 const Empty = ({ children }) => <p className="mod-empty">{children}</p>;
-const Chip = ({ label, value, tone }) => <span className={`mod-chip${tone ? ` ${tone}` : ""}`}>{label}{value != null && <b>{value}</b>}</span>;
+const Chip = ({ label, value, tone, title }) => <span className={`mod-chip${tone ? ` ${tone}` : ""}`} title={title}>{label}{value != null && <b>{value}</b>}</span>;
 const Stat = ({ label, value }) => <div className="mod-stat"><b>{value}</b><span>{label}</span></div>;
 
 // Resumos diretos (so leitura) de cada modulo da ficha.
@@ -82,7 +83,10 @@ export function Summary({ index, c, d, bagActions }) {
     }
     case 1:
       return <>
-        <div className="mod-chips">{ATTRIBUTE_ORDER.map(a => <Chip key={a} label={a} value={`d${c.attributes[a]}${bonusText(d.inventory.rollBonus.attribute[a])}`} />)}</div>
+        <div className="mod-chips">
+          {ATTRIBUTE_ORDER.map(a => <Chip key={a} label={a} value={`d${c.attributes[a]}${bonusText(d.inventory.rollBonus.attribute[a])}`} />)}
+          <Chip label="Carisma" value={signed(d.charismaTotal)} title={charismaTitle(d.charismaInfo)} />
+        </div>
         <div className="mod-stats">
           <Stat label="Movimento" value={d.movement} /><Stat label="Aparar" value={d.parry} /><Stat label="Resistência" value={d.toughness} />
           <Stat label="Vida" value={d.life} /><Stat label="Stamina" value={d.stamina} /><Stat label="Mana" value={d.mana} />

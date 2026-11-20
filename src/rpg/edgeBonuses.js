@@ -91,9 +91,9 @@ function hits(fx, kind, name, attrOf) {
   return hit && !(fx.except || []).some(x => same(x, kind, name));
 }
 
-function collect(table, ownerKey, owns, tag, kind, name, attrOf) {
-  const always = [];
-  const optional = [];
+// Entradas da tabela que a ficha tem e que atingem o alvo, já com o valor final (gravidade, melhoria).
+function matches(table, ownerKey, owns, kind, name, attrOf) {
+  const found = [];
   table.forEach((fx, index) => {
     const owned = fx[ownerKey];
     const severities = owns(owned);
@@ -104,29 +104,55 @@ function collect(table, ownerKey, owns, tag, kind, name, attrOf) {
     let suffix = '';
     if (typeof value === 'object') value = severities.has('Maior') ? value.Maior : value.Menor;
     if (fx.upgrade && owns(fx.upgrade[0])) { value = fx.upgrade[1]; suffix = ' Aprimorada'; }
+    found.push({ fx, index, owned, suffix, value });
+  });
+  return found;
+}
+
+function collect(table, ownerKey, owns, tag, kind, name, attrOf) {
+  const always = [];
+  const optional = [];
+  for (const { fx, index, owned, suffix, value } of matches(table, ownerKey, owns, kind, name, attrOf)) {
     const base = `${tag} ${owned}${suffix}`;
     const label = fx.charisma ? `Carisma (${base})` : base;
     if (fx.when) optional.push({ id: `${tag}:${index}`, label: `${label} (${fx.when})`, value, source: tag === 'Vantagem' ? 'edge' : 'hindrance' });
     else always.push({ label, value, source: tag === 'Vantagem' ? 'edge' : 'hindrance' });
-  });
+  }
   return { always, optional };
 }
 
-// Bônus das vantagens da ficha para um atributo (kind 'attribute') ou perícia (kind 'skill').
-// A mesma vantagem repetida na ficha conta uma vez só. Devolve { always, optional } no formato de sheetRoll.
-export function edgeParts(advantages, kind, name, attrOf) {
+const edgeOwns = advantages => {
   const owned = new Set((advantages || []).map(a => norm(a.name)));
-  const owns = n => (owned.has(norm(n)) ? new Set(['Menor']) : null);
-  return collect(EDGE_ROLL_EFFECTS, 'edge', owns, 'Vantagem', kind, name, attrOf);
-}
-
-// Penalidades (e o Carisma) das complicações da ficha. Complicação repetida conta uma vez; a gravidade vale a maior.
-export function hindranceParts(hindrances, kind, name, attrOf) {
+  return n => (owned.has(norm(n)) ? new Set(['Menor']) : null);
+};
+const hindranceOwns = hindrances => {
   const owned = new Map();
   for (const h of hindrances || []) {
     const key = norm(h.name);
     if (!owned.has(key)) owned.set(key, new Set());
     owned.get(key).add(h.severity === 'Maior' ? 'Maior' : 'Menor');
   }
-  return collect(HINDRANCE_ROLL_EFFECTS, 'hindrance', n => owned.get(norm(n)) || null, 'Complicação', kind, name, attrOf);
+  return n => owned.get(norm(n)) || null;
+};
+
+// O que as vantagens e complicações da ficha somam ao Carisma: [{ name, kind, value, when? }].
+// Sem `when` conta sempre; com `when` só naquela situação.
+export function charismaEntries(advantages, hindrances) {
+  const pick = (table, ownerKey, owns, kind) => matches(table.filter(fx => fx.charisma), ownerKey, owns, 'skill', 'Persuadir')
+    .map(({ fx, owned, suffix, value }) => ({ kind, name: `${owned}${suffix}`, value, ...(fx.when ? { when: fx.when } : {}) }));
+  return [
+    ...pick(EDGE_ROLL_EFFECTS, 'edge', edgeOwns(advantages), 'Vantagem'),
+    ...pick(HINDRANCE_ROLL_EFFECTS, 'hindrance', hindranceOwns(hindrances), 'Complicação'),
+  ];
+}
+
+// Bônus das vantagens da ficha para um atributo (kind 'attribute') ou perícia (kind 'skill').
+// A mesma vantagem repetida na ficha conta uma vez só. Devolve { always, optional } no formato de sheetRoll.
+export function edgeParts(advantages, kind, name, attrOf) {
+  return collect(EDGE_ROLL_EFFECTS, 'edge', edgeOwns(advantages), 'Vantagem', kind, name, attrOf);
+}
+
+// Penalidades (e o Carisma) das complicações da ficha. Complicação repetida conta uma vez; a gravidade vale a maior.
+export function hindranceParts(hindrances, kind, name, attrOf) {
+  return collect(HINDRANCE_ROLL_EFFECTS, 'hindrance', hindranceOwns(hindrances), 'Complicação', kind, name, attrOf);
 }

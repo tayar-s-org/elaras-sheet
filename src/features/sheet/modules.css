@@ -38,6 +38,15 @@
 .mod-points[data-state="ok"] strong { color: var(--success); }
 .mod-points[data-state="deficit"] { background: var(--danger-bg); }
 .mod-points[data-state="deficit"] strong { color: var(--danger); }
+.charisma-box { @apply grid gap-[8px] m-[18px_0]; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.charisma-head { @apply flex items-center justify-between gap-[12px]; }
+.charisma-head h3 { @apply m-0; }
+.charisma-head p { @apply m-[2px_0_0] text-app-muted; font-size: .9rem; }
+.charisma-head strong { font-family: var(--font-display); font-size: 1.8rem; line-height: 1; @apply text-app-accent; font-variant-numeric: tabular-nums; }
+.charisma-box ul { @apply grid gap-[4px] m-0 p-0; list-style: none; }
+.charisma-box li { @apply flex justify-between gap-[12px]; font-size: .92rem; }
+.charisma-box li.when span { @apply text-app-muted; }
+.charisma-box li b { font-variant-numeric: tabular-nums; }
 .mod-editor-body { @apply overflow-auto p-[22px_24px_28px]; }
 
 /* Vantagens, complicacoes e itens: cada um abre para mostrar o efeito */

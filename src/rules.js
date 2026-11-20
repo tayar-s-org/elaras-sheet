@@ -1,5 +1,6 @@
 import { tokenArtwork } from './tokenArtwork.js';
 import { racialEffects } from "./templates.js";
+import { charismaBreakdown } from "./rpg/charisma.js";
 import { START_MONEY, normalizeMoney } from "./money.js";
 import { inventoryEffects, itemById, unitFills } from "./market/items.js";
 import { sanitizeCustom, isCustomId } from "./market/custom.js";
@@ -213,11 +214,15 @@ export function calculate(c) {
     skillCost +
     Math.max(0, advantageCost) +
     c.rules.spentElsewhere;
+  const charismaInfo = charismaBreakdown(c);
   return {
     racial,
     level,
     progressionPoints,
     charisma: racial.charisma,
+    // Carisma total (raça, vantagens e complicações) e o detalhe de onde ele vem.
+    charismaInfo,
+    charismaTotal: charismaInfo.total,
     attributeCost,
     skillCost,
     advantageCost: Math.max(0, advantageCost),

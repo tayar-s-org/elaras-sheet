@@ -5,6 +5,7 @@ import LiveVitals from "./LiveVitals.jsx";
 import ActiveConditions from "./ActiveConditions.jsx";
 import { useCharacterConditions, useTableExtras } from "../room/masterHub/extras.jsx";
 import ExperienceIcon from "../room/masterHub/ExperienceIcon.jsx";
+import { charismaTitle, signed } from "../../rpg/charisma.js";
 
 // tableId e cloudId: a ficha já vinculada a uma mesa mostra Vida, Stamina e Mana atuais como no token.
 export default function SheetSummary({ c, d, tableId, cloudId }) {
@@ -50,6 +51,11 @@ export default function SheetSummary({ c, d, tableId, cloudId }) {
                 </div>
               ))}
             </div>}
+          <p className="summary-charisma" title={charismaTitle(d.charismaInfo)}>
+            <span>Carisma</span>
+            <b>{signed(d.charismaTotal)}</b>
+            {d.charismaInfo.conditional.length > 0 && <small>{d.charismaInfo.conditional.length} {d.charismaInfo.conditional.length === 1 ? "situacional" : "situacionais"}</small>}
+          </p>
           <ActiveConditions conditions={conditions} />
           <div className="summary-wallet">
             <MoneyTag value={c.money} />

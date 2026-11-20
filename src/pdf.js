@@ -86,7 +86,7 @@ export function createPdfBlob(character) {
     line(`Carisma racial ${d.charisma} | Benes raciais extras ${d.racial.benes} | Bônus racial Perceber +${d.racial.notice} | Escalar +${d.racial.climb}`);
   }
   section("Atributos");
-  line(ATTRIBUTES.map((name) => `${name} d${c.attributes[name]}`).join(" | "));
+  line(ATTRIBUTES.map((name) => `${name} d${c.attributes[name]}`).join(" | ") + ` | Carisma ${d.charismaTotal > 0 ? "+" : ""}${d.charismaTotal}`);
   section("Valores derivados");
   line(
     `Vida ${d.life} | Stamina ${d.stamina} | Mana ${d.mana} | Movimentação ${d.movement}`,

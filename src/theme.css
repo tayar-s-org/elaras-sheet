@@ -111,6 +111,10 @@ input, select, textarea { font-family: inherit; }
 .summary-id .summary-token { @apply w-[60px] h-[60px] m-0 flex-none; }
 .summary-id .crest { @apply w-[56px] h-[56px] m-0 flex-none; font-size: 1.9rem; }
 .summary .stats { @apply m-[14px_0]; }
+.summary-charisma { @apply flex items-baseline gap-[8px] m-[0_0_12px]; font-size: .9rem; }
+.summary-charisma span { @apply text-app-muted; }
+.summary-charisma b { font-variant-numeric: tabular-nums; }
+.summary-charisma small { @apply text-app-muted ml-auto; font-size: .8rem; }
 .summary-wallet { @apply grid gap-[6px] m-[12px_0]; }
 .points { @apply mt-[14px] rounded-[8px] overflow-hidden; border: 1px solid var(--border); background: var(--surface-soft); }
 .points-summary { @apply flex items-center gap-[10px] p-[8px_12px] min-h-[44px] cursor-pointer; list-style: none; color: var(--text); }
