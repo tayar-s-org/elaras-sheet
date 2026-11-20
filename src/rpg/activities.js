@@ -105,8 +105,9 @@ export const newDay = dayNo => ({
 
 const round = n => Math.round(n * 1000) / 1000;
 
-// Cada atividade tem seu tratador: recebe { row, stats, state, d (estado do dia), ev (evento), fed, rng, fail } e devolve a variação
-// de recursos { stamina, mana } (ausente = 0). Recusar a hora = fail(motivo); recursos e XP só valem se ev.ok.
+// Cada atividade tem seu tratador: recebe { act, row, stats, state, d (estado do dia), ev (evento), fed, rng, fail } e devolve a variação
+// de recursos { stamina, mana } (ausente = 0). Os tratadores MUTAM d e ev de propósito (o estado do dia e o evento da hora).
+// Recusar a hora = fail(motivo); recursos e XP só valem se ev.ok.
 function handleSkill({ row, stats, state, d, ev, fail }) {
   if (rowIssue(row, stats)) return fail(`Perícia ${rowIssue(row, stats)}.`);
   if (d.trainHours >= SKILL_TRAIN_MAX_HOURS) return fail(`Limite de ${SKILL_TRAIN_MAX_HOURS} horas de treino por dia.`);
@@ -197,7 +198,7 @@ function handleWork({ row, stats, state, d, ev, fail }) {
 }
 
 // Linha vazia = hora ociosa; atividade desconhecida não tem efeito.
-function handleIdle({ ev }, act) {
+function handleIdle({ act, ev }) {
   ev.ok = act === '';
   if (act === '') ev.idle = true;
 }
@@ -226,9 +227,8 @@ export function processHour({ dayNo, row, fed = true, stats, state, day, rng }) 
   }
   if (d.medActive && act !== ACT.MEDITATE) closeMeditation();
 
-  const ctx = { row, stats, state, d, ev, fed, rng, fail };
-  const handler = HANDLERS[act];
-  const { stamina: dS = 0, mana: dM = 0 } = (handler ? handler(ctx) : handleIdle(ctx, act)) || {};
+  const handler = Object.hasOwn(HANDLERS, act) ? HANDLERS[act] : handleIdle;
+  const { stamina: dS = 0, mana: dM = 0 } = handler({ act, row, stats, state, d, ev, fed, rng, fail }) || {};
 
   // O estado também fica arredondado (3 casas): assim a soma dos efeitos gravados é sempre igual ao estado final.
   const stamina = round(Math.min(stats.maxStamina, Math.max(0, state.stamina + dS)));

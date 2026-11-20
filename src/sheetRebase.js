@@ -1,6 +1,7 @@
 // Ficha aberta x ficha na nuvem quando SÓ o XP e o dinheiro mudaram lá (o mestre concede e o servidor aplica na ficha,
 // mesmo com o app do jogador fechado). Em vez de apontar "ficha mudou em outro lugar", soma a diferença à ficha local.
 import { addMoney, normalizeMoney } from './money.js';
+import { MAX_QTY } from './market/inventory.js';
 
 const MAX_XP = 1000000;
 const num = v => { const n = Math.trunc(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0; };
@@ -16,42 +17,48 @@ const withoutRewards = ({ xp: _xp, money: _money, inventory: _inventory, ...rest
 // O servidor mexe na mochila (mestre entrega, outro jogador transfere, o token gasta/ajusta) enquanto a ficha aberta também
 // mexe. Em vez de apontar conflito, soma o que cada lado mudou em relação à base comum (a última versão que a ficha
 // conhecia da nuvem): quantidade = local + (nuvem − base). Assim "−1 flecha na ficha" e "+5 do mestre" valem os dois.
-const MAX_QTY = 99;
 const byId = list => new Map((Array.isArray(list) ? list : []).filter(e => e?.id).map(e => [e.id, e]));
 const fillsOf = e => (Array.isArray(e?.fills) ? e.fills : []);
 const sameEntry = (a, b) => a.qty === b.qty && Boolean(a.equipped) === Boolean(b.equipped) && sameSheet(fillsOf(a), fillsOf(b));
 
-// Identidade das unidades de um recipiente de líquido: o nível guardado na base. Cada nível da base que continua na nuvem é a
-// mesma unidade; as sobras da base e da nuvem se pareiam na ordem (a unidade teve o nível alterado lá); o que sobra só da base
-// foi retirado e o que sobra só da nuvem foi acrescentado.
-function diffUnits(baseF, cloudF) {
+// Unidades retiradas na nuvem (ela tem menos que a base): o nível guardado na base é a identidade. Cada nível da base que
+// continua na nuvem é a mesma unidade; as sobras da base e da nuvem se pareiam na ordem (a unidade teve o nível alterado lá) e o
+// que sobra só da base foi retirado. Devolve índices da base.
+function diffRemovedUnits(baseF, cloudF) {
   const unseen = [...cloudF];
-  const unmatchedBase = baseF.filter(was => {
+  const unmatched = [];
+  baseF.forEach((was, i) => {
     const k = unseen.indexOf(was);
-    if (k >= 0) unseen.splice(k, 1);
-    return k < 0;
+    if (k >= 0) unseen.splice(k, 1); else unmatched.push(i);
   });
-  return {
-    changed: unmatchedBase.slice(0, unseen.length).map((was, i) => [was, unseen[i]]),
-    removed: unmatchedBase.slice(unseen.length),
-    added: unseen.slice(unmatchedBase.length),
-  };
+  return { changed: unmatched.slice(0, unseen.length).map((i, n) => [i, unseen[n]]), removed: unmatched.slice(unseen.length) };
 }
 
 // Níveis dos recipientes (um por unidade). Parte dos níveis locais e aplica o que a nuvem mudou; unidade que a ficha também
-// alterou não casa mais com o nível da base e fica com o valor local.
+// alterou fica com o valor local. Quando a nuvem não tem menos unidades que a base, a unidade é a da mesma posição e as
+// acrescentadas ficam no fim. Quando tem menos, vale a identidade por nível (diffRemovedUnits). Se a ficha tem a quantidade
+// da base, os índices da base valem na ficha; senão a unidade é achada pelo nível.
 function mergeFills(baseF, localF, cloudF) {
-  const { changed, removed, added } = diffUnits(baseF, cloudF);
+  const aligned = localF.length === baseF.length;
+  const locate = i => (aligned ? i : localF.indexOf(baseF[i]));
   const out = [...localF];
-  for (const [was, now] of changed) {
-    const j = out.indexOf(was);
-    if (j >= 0) out[j] = now;
+  if (cloudF.length >= baseF.length) {
+    baseF.forEach((was, i) => {
+      const j = aligned ? i : out.indexOf(was);
+      if (cloudF[i] !== was && j >= 0 && out[j] === was) out[j] = cloudF[i];
+    });
+    return [...out, ...cloudF.slice(baseF.length)];
   }
-  for (const was of removed) {
-    const j = out.lastIndexOf(was);
+  const { changed, removed } = diffRemovedUnits(baseF, cloudF);
+  for (const [i, now] of changed) {
+    const j = locate(i);
+    if (j >= 0 && out[j] === baseF[i]) out[j] = now;
+  }
+  for (const i of [...removed].reverse()) {
+    const j = aligned ? i : out.lastIndexOf(baseF[i]);
     out.splice(j >= 0 ? j : out.length - 1, 1);
   }
-  return [...out, ...added];
+  return out;
 }
 
 export function mergeInventory(base, local, cloud) {
@@ -66,7 +73,7 @@ export function mergeInventory(base, local, cloud) {
       } else if (le) out.push(le);
       continue;
     }
-    if (be && le && sameEntry(be, le)) { out.push(ce); continue; } // a ficha não mexeu na entrada: vale a nuvem inteira
+    if (be && le && sameEntry(be, le) && ce.qty <= MAX_QTY) { out.push(ce); continue; } // a ficha não mexeu na entrada: vale a nuvem inteira
     const bq = be?.qty || 0, lq = le?.qty || 0;
     let qty = Math.min(MAX_QTY, Math.max(0, lq + ce.qty - bq));
     if (!be && le && id.startsWith('custom-')) qty = Math.max(lq, ce.qty); // o mesmo item customizado entregue duas vezes não duplica

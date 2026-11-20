@@ -126,7 +126,7 @@ test('falha com pelo menos 50% do valor da tabela dá +1 de Pity (máx. 5); abai
   assert.equal(judgeAttempt(260, 3, 2).pityAfter, 3);
 });
 
-test('dados de Astúcia: 25 h = 1, máximo 24; precisa de 16 para tentar e cada tentativa gasta 16', () => {
+test('dados de Astúcia: 25 h = 1, sem teto; precisa de 16 para tentar e cada tentativa gasta 16', () => {
   assert.equal(ATTEMPT_DICE, 16);
   assert.equal(astuciaDice(24).available, 0);
   assert.equal(astuciaDice(25).available, 1);

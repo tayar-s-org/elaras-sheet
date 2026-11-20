@@ -45,6 +45,16 @@ test('comprar no limite da pilha recusa antes de cobrar', () => {
   assert.equal(buyBlockedReason({ ...full, money: 0, inventory: [] }, dagger), 'Sem dinheiro');
 });
 
+test('comprar várias unidades perto do limite só passa se todas couberem', () => {
+  const dagger = find('Adaga');
+  const c = { ...newCharacter(), money: 500, inventory: [{ id: dagger.id, qty: MAX_QTY - 3, equipped: false }] };
+  assert.equal(buyBlockedReason(c, dagger, 3), '');
+  assert.equal(buyItem(c, dagger.id, 3).inventory[0].qty, MAX_QTY);
+  assert.equal(buyBlockedReason(c, dagger, 4), `Mochila cheia (${MAX_QTY})`);
+  assert.equal(buyItem(c, dagger.id, 4), null, 'nada é cobrado nem entregue pela metade');
+  assert.equal(buyItem({ ...c, inventory: [] }, dagger.id, MAX_QTY + 1), null, 'primeira compra também respeita o limite');
+});
+
 test('vender devolve metade do preço e remove da mochila ao acabar', () => {
   const sword = find('Espada Longa'); // $300
   let c = buyItem(newCharacter(), sword.id, 1);

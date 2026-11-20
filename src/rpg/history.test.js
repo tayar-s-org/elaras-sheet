@@ -94,6 +94,13 @@ test('sessões de meditação: na virada do dia fecha a sessão antiga e mantém
   assert.deepEqual([current.startTick, current.hours, current.closed], [24, 2, false]);
 });
 
+test('sessões de meditação: virada do dia sem meditar fecha a sessão aberta e não abre outra', () => {
+  const runs = ledger(plan([slots(12, 12, row(ACT.MEDITATE)), [[0, row('')]]]), { start: { stamina: 10, mana: 0 }, hours: 25 });
+  const sessions = meditationSessions(runs);
+  assert.equal(sessions.length, 1);
+  assert.deepEqual([sessions[0].startTick, sessions[0].hours, sessions[0].closed], [12, 12, true]);
+});
+
 test('situação de hoje: descanso em andamento, sessões e limites que sobram', () => {
   const day = { dayNo: 3, restStreak: 2, restHours: 2, trainHours: 5, spellHours: 1, medClosed: 1, medActive: true };
   const limits = { restMax: 12, trainMax: 12, spellMax: 6, sessions: 3 };
