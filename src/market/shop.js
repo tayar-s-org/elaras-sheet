@@ -25,11 +25,11 @@ export const priceText = (price, currency) => `${currency?.symbol ? `${iconText(
 // Dá para pagar? (a conferência de verdade é do servidor; isto só habilita o botão)
 export const canAfford = (balance, price, qty = 1) => Number.isFinite(Number(balance)) && Number(balance) >= Number(price) * qty;
 
-// Preço digitado: inteiro de 1 a 999.999.999.
-export function parsePrice(text) {
+// Preço digitado: inteiro de 1 a 999.999.999 (min 0 nos itens aprovados, que podem ser grátis).
+export function parsePrice(text, min = 1) {
   const n = Math.trunc(Number(String(text ?? '').replace(',', '.')));
   if (!Number.isFinite(n) || String(text ?? '').trim() === '') return { ok: false, error: 'Informe o preço.' };
-  if (n < 1 || n > MAX_PRICE) return { ok: false, error: `O preço deve ficar entre 1 e ${MAX_PRICE.toLocaleString('pt-BR')}.` };
+  if (n < min || n > MAX_PRICE) return { ok: false, error: `O preço deve ficar entre ${min} e ${MAX_PRICE.toLocaleString('pt-BR')}.` };
   return { ok: true, price: n };
 }
 
@@ -47,3 +47,9 @@ export function saleOptions({ sell, currencyId, price }, currencies, allowMoney 
 
 // Anúncios que o jogador vê (ativos), na ordem de criação; o mestre vê todos.
 export const visibleListings = (shop, isGm) => (shop || []).filter(l => isGm || l.active);
+
+// Loja aprovada (migração 0044): o anúncio de um item customizado aprovado tem source_id (o pedido de origem); o criado pelo mestre não tem.
+export const isApprovedListing = l => Boolean(l?.source_id);
+// Os dois "balcões" do Mercado: itens do mestre e itens aprovados dos jogadores.
+export const masterListings = (shop, isGm) => visibleListings(shop, isGm).filter(l => !isApprovedListing(l));
+export const approvedListings = (shop, isGm) => visibleListings(shop, isGm).filter(isApprovedListing);

@@ -74,7 +74,7 @@ try {
     await u.sb.from('characters').update({ table_id: t }).eq('id', ch);
   }
   const ver = await ok('master_hub_version', rpc(gm, 'master_hub_version', {}));
-  check('versão 3 (Central + Loja do Mestre + preço em $)', ver.data === 3);
+  check('versão 4 (Central + Loja do Mestre + preço em $ + Loja aprovada)', ver.data === 4);
 
   console.log('— permissões —');
   const mon = (u, ch, mode, amount, req = rid(), t = T1) => rpc(u, 'gm_adjust_money', { p_table: t, p_character: ch, p_mode: mode, p_amount: amount, p_note: '', p_request_id: req });
@@ -452,13 +452,72 @@ try {
   await ok('mestre remove o anúncio em $', rpc(gm, 'gm_shop_delete', { p_table: T1, p_id: M1, p_request_id: rid() }));
   await ok('apaga a moeda Prata (sem anúncio nela)', rpc(gm, 'gm_delete_currency', { p_table: T1, p_id: coin2, p_force: true, p_request_id: rid() }));
 
+  console.log('— Loja aprovada (0044): todo item aprovado entra na loja —');
+  const submit = (u, ch, name) => u.sb.from('table_custom_items').insert({ table_id: T1, character_id: ch, name, weight: 1, effects: [], description: 'item de jogador' }).select('id').single();
+  const listing = async id => (await gm.sb.from('table_shop_items').select('*').eq('id', id).maybeSingle()).data;
+  const approve = (id, price) => rpc(gm, 'approve_custom_item', { p_id: id, p_price: price, p_note: '' });
+  const buyAp = (u, ch, id, qty = 1, req = rid()) => rpc(u, 'shop_buy', { p_table: T1, p_character: ch, p_listing: id, p_qty: qty, p_request_id: req });
+  await ok('B: dinheiro 100 (para pagar a aprovação)', mon(gm, chB, 'set', 100));
+  r = await submit(b, chB, 'Amuleto Aprovado'); const AP1 = r.data?.id;
+  check('B envia o pedido', Boolean(AP1), r.error?.message);
+  check('pedido pendente NÃO vira anúncio', !(await listing(AP1)));
+  await ok('mestre aprova por $ 12', approve(AP1, 12));
+  let l1 = await listing(AP1);
+  check('aprovado vira anúncio em $ com o mesmo id, o preço da aprovação e origem no pedido', Boolean(l1) && l1.currency_id === null && l1.price === 12 && l1.source_id === AP1 && l1.active && l1.name === 'Amuleto Aprovado', JSON.stringify(l1));
+  check('outro jogador (A) lê o anúncio aprovado', ((await a.sb.from('table_shop_items').select('id,source_id').eq('id', AP1)).data || []).length === 1);
+  check('estranho (fora da mesa) não lê', ((await c.sb.from('table_shop_items').select('id').eq('id', AP1)).data || []).length === 0);
+  await ok('A: dinheiro 50', mon(gm, chA, 'set', 50));
+  await denied('B não compra para A', buyAp(b, chA, AP1), /próprio personagem/);
+  r = await ok('A compra o item aprovado', buyAp(a, chA, AP1));
+  check('A pagou 12 ($ 50 → 38) e recebeu custom-<id do pedido>', await moneyA() === 38 && (await row(a, chA)).data.inventory.some(e => e.id === `custom-${AP1}` && e.qty === 1 && e.custom?.name === 'Amuleto Aprovado'), JSON.stringify(r.data));
+  check('o mesmo item de B (id igual) fica intacto', (await row(b, chB)).data.money <= 100);
+  await ok('mestre pausa o anúncio aprovado', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: AP1, p_custom: null, p_currency: null, p_price: 12, p_active: false, p_request_id: rid() }));
+  check('pausado: o jogador não lê mais', ((await a.sb.from('table_shop_items').select('id').eq('id', AP1)).data || []).length === 0);
+  await denied('pausado: não dá para comprar', buyAp(a, chA, AP1), /não está mais à venda/);
+  await ok('mestre reativa', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: AP1, p_custom: null, p_currency: null, p_price: 12, p_active: true, p_request_id: rid() }));
+  // grátis (preço 0): só para item aprovado
+  r = await submit(b, chB, 'Pedra Grátis'); const AP0 = r.data?.id;
+  await ok('mestre aprova por $ 0', approve(AP0, 0));
+  const l0 = await listing(AP0);
+  check('preço 0 vira anúncio grátis', Boolean(l0) && l0.price === 0 && l0.source_id === AP0, JSON.stringify(l0));
+  const moneyBefore = await moneyA();
+  r = await ok('A compra grátis (2 unidades)', buyAp(a, chA, AP0, 2));
+  check('grátis: dinheiro não muda, entra na mochila e não grava money_awards', await moneyA() === moneyBefore && (await row(a, chA)).data.inventory.find(e => e.id === `custom-${AP0}`)?.qty === 2
+    && ((await gm.sb.from('money_awards').select('id').eq('character_id', chA).like('note', '%Pedra Grátis%')).data || []).length === 0, JSON.stringify(r.data));
+  await ok('preço 0 aceito ao editar anúncio aprovado', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: AP0, p_custom: null, p_currency: null, p_price: 5, p_active: true, p_request_id: rid() }));
+  await ok('...e ao voltar para grátis', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: AP0, p_custom: null, p_currency: null, p_price: 0, p_active: true, p_request_id: rid() }));
+  const manual = (await up(gm, { p_currency: null, p_price: 3, p_custom: { ...item, name: 'Item do Mestre 0044' } })).data?.id;
+  await denied('item do mestre continua sem preço 0 ao editar', rpc(gm, 'gm_shop_upsert', { p_table: T1, p_id: manual, p_custom: null, p_currency: null, p_price: 0, p_active: true, p_request_id: rid() }), /preço/);
+  check('o anúncio do mestre não tem origem (source_id nulo)', (await listing(manual))?.source_id === null);
+  const zeroManual = sqlTry(`insert into public.table_shop_items (table_id, currency_id, price, name) values ('${T1}', null, 0, 'sem origem')`);
+  check('banco recusa preço 0 em anúncio sem origem', /check|violates/i.test(zeroManual), zeroManual);
+  // recusado nunca entra; revogado sai, mas quem comprou fica
+  r = await submit(b, chB, 'Item Recusado'); const APR = r.data?.id;
+  await ok('mestre recusa', gm.sb.from('table_custom_items').update({ status: 'rejected' }).eq('id', APR));
+  check('recusado não vira anúncio', !(await listing(APR)));
+  await ok('mestre revoga o amuleto', rpc(gm, 'revoke_custom_item', { p_id: AP1, p_note: '' }));
+  check('revogado sai da loja', !(await listing(AP1)));
+  await denied('revogado: não dá para comprar', buyAp(a, chA, AP1), /não está mais à venda/);
+  check('quem já comprou continua com o item', (await row(a, chA)).data.inventory.some(e => e.id === `custom-${AP1}`));
+  check('todo item aprovado do banco tem anúncio (preenchimento da 0044)', /"n":\s*0|"missing":\s*0/.test(sql(`select count(*) as missing from public.table_custom_items t where t.status = 'approved' and not exists (select 1 from public.table_shop_items s where s.id = t.id)`)));
+  await ok('mestre tira o item dele da loja', rpc(gm, 'gm_shop_delete', { p_table: T1, p_id: manual, p_request_id: rid() }));
+
+  console.log('— registro da mesa: moedas e experiências do próprio jogador (0045) —');
+  const ownAudit = async (u, extra = q => q) => ((await extra(u.sb.from('master_audit_log').select('character_id,category').eq('table_id', T1))).data || []);
+  const aRows = await ownAudit(a);
+  check('A lê as moedas/experiências do próprio personagem e só elas', aRows.length > 0 && aRows.every(x => ['wallet', 'experience'].includes(x.category) && x.character_id === chA), JSON.stringify(aRows.slice(0, 3)));
+  check('B não lê as de A', (await ownAudit(b)).every(x => x.character_id === chB));
+  check('estranho não lê nada', (await ownAudit(c)).length === 0);
+  const aWrite = await a.sb.from('master_audit_log').insert({ table_id: T1, category: 'wallet', kind: 'x', character_id: chA });
+  check('jogador continua sem escrever no histórico', Boolean(aWrite.error));
+
   console.log('— histórico —');
   const all = (await gm.sb.from('master_audit_log').select('*').eq('table_id', T1)).data;
   check('histórico tem todas as categorias', ['money', 'xp', 'item', 'wallet', 'currency', 'experience', 'condition'].every(k => all.some(x => x.category === k)));
   check('toda linha tem responsável e data (o mestre; nas compras da loja, o jogador que comprou)', all.every(x => x.created_at && x.actor_id === (x.kind === 'shop_buy' ? a.id : gm.id)));
   const period = (await gm.sb.from('master_audit_log').select('id').eq('table_id', T1).eq('category', 'money').gte('created_at', new Date(Date.now() - 3600e3).toISOString()).lte('created_at', new Date(Date.now() + 60e3).toISOString())).data;
   check('filtro por período, categoria e jogador funciona', period.length > 0 && (await gm.sb.from('master_audit_log').select('id').eq('table_id', T1).eq('character_id', chB).eq('category', 'item')).data.length >= 3);
-  check('jogador NÃO lê o histórico', ((await a.sb.from('master_audit_log').select('id').eq('table_id', T1)).data || []).length === 0);
+  check('jogador NÃO lê o histórico (só moedas/experiências do próprio personagem, 0045)', ((await a.sb.from('master_audit_log').select('id,category,character_id').eq('table_id', T1)).data || []).every(x => ['wallet', 'experience'].includes(x.category) && x.character_id === chA));
   check('estranho NÃO lê o histórico', ((await c.sb.from('master_audit_log').select('id').eq('table_id', T1)).data || []).length === 0);
   const forge = await a.sb.from('master_audit_log').insert({ table_id: T1, category: 'money', kind: 'x' });
   check('jogador não escreve no histórico', Boolean(forge.error));

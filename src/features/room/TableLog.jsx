@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { describeRoll } from '../../diceRoll.js';
 import { formatMoney } from '../../money.js';
 import { mergeRewards, rewardAmount } from './rewardsLog.js';
+import ExperienceIcon from './masterHub/ExperienceIcon.jsx';
 import './tablelog.css';
 
 const time = iso => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -26,7 +27,7 @@ export default function TableLog({ messages, rolls, stateLog, rewards, hidden, m
   // Jogadores não veem as mudanças de mana dos outros (só as da própria ficha); o mestre vê tudo.
   const myCharacter = members.find(m => m.user_id === me)?.character_id;
   const vitalEntries = useMemo(() => [...(stateLog || [])].filter(v => isGm || v.resource !== 'mana' || v.character_id === myCharacter).sort((a, b) => b.id - a.id).slice(0, LIMIT), [stateLog, isGm, myCharacter]);
-  const rewardEntries = useMemo(() => mergeRewards(rewards?.xp, rewards?.money, LIMIT), [rewards]);
+  const rewardEntries = useMemo(() => mergeRewards(rewards?.xp, rewards?.money, LIMIT, rewards?.custom), [rewards]);
   const newestKey = tab === 'dice' ? diceEntries[0]?.key : tab === 'vitals' ? vitalEntries[0]?.id : rewardEntries[0]?.key;
   // A novidade aparece no topo; volta o quadro (so ele, nao a pagina) para o inicio.
   useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = 0; }, [newestKey, tab]);
@@ -62,12 +63,15 @@ export default function TableLog({ messages, rolls, stateLog, rewards, hidden, m
           </p>;
         })}
       </> : tab === 'rewards' ? <>
-        {!rewardEntries.length && <p className="muted">Nenhuma concessão de XP ou dinheiro ainda. Elas aparecem aqui quando o mestre dá ou remove XP e dinheiro, e quando o mercado e o trabalho pagam.</p>}
+        {!rewardEntries.length && <p className="muted">Nenhuma concessão de XP, dinheiro, moeda ou experiência ainda. Elas aparecem aqui quando o mestre dá ou remove, e quando o mercado e o trabalho pagam.</p>}
         {rewardEntries.map(r => <p key={r.key} className={`log-line log-reward ${r.kind} ${Number(r.amount) < 0 ? 'down' : 'up'}`}>
           <span className="log-time">{time(r.created_at)}</span>
           <strong>{characters?.[r.character_id]?.name || 'Personagem'}</strong>
-          <span> · {r.kind === 'xp' ? 'XP' : 'Dinheiro'} </span>
+          {r.kind === 'wallet' || r.kind === 'experience'
+            ? <span> · <ExperienceIcon icon={r.icon} /> {r.label || (r.kind === 'wallet' ? 'Moeda' : 'Experiência')} </span>
+            : <span> · {r.kind === 'xp' ? 'XP' : 'Dinheiro'} </span>}
           <b className="log-delta">{rewardAmount(r, formatMoney)}</b>
+          {(r.kind === 'wallet' || r.kind === 'experience') && <span className="log-detail"> · {r.set ? `definido em ${formatMoney(r.total)}` : `saldo ${formatMoney(r.total)}`}</span>}
           {r.note && <span className="log-detail"> · {r.note}</span>}
           {r.granted_by && <span className="log-detail"> · por {names[r.granted_by] || 'Mestre'}</span>}
           {!r.claimed_at && <span className="log-detail"> · a caminho</span>}

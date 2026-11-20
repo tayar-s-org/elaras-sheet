@@ -49,17 +49,20 @@ export default function ItemApprovals({ items, available, refresh, members, char
   return <div className="approvals">
     {error && <p role="alert" className="muted">{error}</p>}
     <h3>Aguardando aprovação ({pending.length})</h3>
-    {!pending.length ? <p className="muted">Nenhum item esperando. Quando um jogador enviar um item customizado, ele aparece aqui.</p> : <div className="mk-list">
+    {!pending.length ? <p className="muted">Nenhum item esperando. Quando um jogador enviar um item customizado, ele aparece aqui.</p> : <>
+      <p className="muted">O item aprovado entra na aba “Loja aprovada” do Mercado, onde qualquer jogador da mesa pode comprá-lo pelo preço definido aqui (preço 0 = grátis). Para esconder da loja, pause o item em Central › Itens.</p>
+      <div className="mk-list">
       {pending.map(row => card(row, <div className="approval-actions">
         <label className="ap-price">Preço ($)
           <input type="number" min="0" max="1000000" step="1" inputMode="numeric" aria-label={`Preço de ${row.name}`} placeholder="0" value={prices[row.id] ?? ''} onChange={e => setPrices(p => ({ ...p, [row.id]: e.target.value }))} />
         </label>
         <input aria-label={`Nota para ${row.name}`} maxLength={300} placeholder="Nota para o jogador (opcional)" value={notes[row.id] || ''} onChange={e => setNotes(n => ({ ...n, [row.id]: e.target.value }))} />
-        <button type="button" className="primary" disabled={busy === row.id || (priceOf(row) > 0 && balanceOf(row) !== null && balanceOf(row) < priceOf(row))} onClick={() => approve(row)}>{priceOf(row) > 0 ? `Aprovar e cobrar $ ${formatMoney(priceOf(row))}` : 'Aprovar'}</button>
+        <button type="button" className="primary" disabled={busy === row.id || (priceOf(row) > 0 && balanceOf(row) !== null && balanceOf(row) < priceOf(row))} onClick={() => approve(row)}>{priceOf(row) > 0 ? `Aprovar e cobrar $ ${formatMoney(priceOf(row))}` : 'Aprovar (grátis na loja)'}</button>
         <button type="button" className="outline" disabled={busy === row.id} onClick={() => reject(row)}>Recusar</button>
         {balanceOf(row) !== null && <span className="muted ap-balance">Saldo do jogador: $ {formatMoney(balanceOf(row))}{priceOf(row) > balanceOf(row) ? ' — insuficiente' : ''}</span>}
       </div>))}
-    </div>}
+      </div>
+    </>}
     {decided.length > 0 && <>
       <h3>Decididos</h3>
       <div className="mk-list">{decided.map(row => card(row, row.status === 'approved' ? <div className="approval-actions">

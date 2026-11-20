@@ -26,6 +26,7 @@
 .log-reward.up .log-delta { color: var(--success); }
 .log-reward.xp.up .log-delta { color: var(--gold); }
 .log-reward.down .log-delta { color: var(--danger); }
+.log-reward .xp-icon { vertical-align: -5px; }
 
 .log-steps { @apply grid gap-[1px] mt-[4px] pl-[8px]; border-left: 2px solid var(--border); @apply text-app-muted; font-size: .82rem; }
 .log-step:last-child { @apply font-semibold; }

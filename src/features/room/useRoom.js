@@ -11,7 +11,7 @@ export function useRoom(tableId, user, displayName) {
   const [messages, setMessages] = useState([]);
   const [rolls, setRolls] = useState([]);
   const [stateLog, setStateLog] = useState([]);
-  const [rewards, setRewards] = useState({ xp: [], money: [] });
+  const [rewards, setRewards] = useState({ xp: [], money: [], custom: [] });
   const [ready, setReady] = useState(false);
   const [states, setStates] = useState({});
   const [characters, setCharacters] = useState({});

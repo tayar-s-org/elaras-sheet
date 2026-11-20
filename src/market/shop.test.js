@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { shopEntry, priceText, canAfford, parsePrice, saleOptions, visibleListings, shopCurrency, saleCurrencies, MONEY_CURRENCY, MAX_PRICE } from './shop.js';
+import { shopEntry, priceText, canAfford, parsePrice, saleOptions, visibleListings, shopCurrency, saleCurrencies, MONEY_CURRENCY, MAX_PRICE, isApprovedListing, masterListings, approvedListings } from './shop.js';
 import { resolveItem } from './items.js';
 import { validateCharacter, newCharacter } from '../rules.js';
 
@@ -65,6 +65,37 @@ test('o jogador só vê anúncios ativos; o mestre vê todos', () => {
   assert.deepEqual(visibleListings(shop, false).map(l => l.id), ['a']);
   assert.deepEqual(visibleListings(shop, true).map(l => l.id), ['a', 'b']);
   assert.deepEqual(visibleListings(undefined, false), []);
+});
+
+test('Loja aprovada: anúncios com source_id vão para a aba dos aprovados; o resto fica na Loja do Mestre', () => {
+  const shop = [{ id: 'm', active: true }, { id: 'a', active: true, source_id: 'a' }, { id: 'p', active: false, source_id: 'p' }, { id: 'n', active: false }];
+  assert.equal(isApprovedListing(shop[1]), true);
+  assert.equal(isApprovedListing(shop[0]), false);
+  assert.deepEqual(masterListings(shop, false).map(l => l.id), ['m']);
+  assert.deepEqual(approvedListings(shop, false).map(l => l.id), ['a']); // pausado não aparece ao jogador
+  assert.deepEqual(approvedListings(shop, true).map(l => l.id), ['a', 'p']);
+  assert.deepEqual(approvedListings(undefined, false), []);
+});
+
+test('preço mínimo 0 só quando o item é aprovado (grátis)', () => {
+  assert.equal(parsePrice('0').ok, false);
+  assert.deepEqual(parsePrice('0', 0), { ok: true, price: 0 });
+  assert.equal(parsePrice('-1', 0).ok, false);
+});
+
+test('a migração 0044 lista todo item aprovado na loja, tira o revogado e compra grátis não grava money_awards', () => {
+  const sql = readFileSync(new URL('../../supabase/migrations/0044_approved_shop.sql', import.meta.url), 'utf8');
+  assert.match(sql, /add column if not exists source_id uuid references public\.table_custom_items \(id\) on delete cascade/);
+  assert.match(sql, /create trigger custom_item_to_shop after insert or update of status on public\.table_custom_items/);
+  assert.match(sql, /new\.status = 'approved'/); // aprovado entra
+  assert.match(sql, /delete from public\.table_shop_items where source_id = new\.id/); // revogado sai
+  assert.match(sql, /values \(new\.id, new\.table_id, null,/); // mesmo id do pedido, pago em $
+  assert.match(sql, /check \(price between 0 and 999999999 and \(price >= 1 or source_id is not null\)\)/); // grátis só para aprovados
+  assert.match(sql, /if total > 0 then[\s\S]*insert into public\.money_awards/);
+  assert.match(sql, /source_id is null\) >= 100/); // o limite de 100 conta só os do mestre
+  assert.match(sql, /select 4;/);
+  assert.match(sql, /where t\.status = 'approved'/); // os já aprovados entram
+  assert.doesNotMatch(sql, /create or replace function public\.(approve_custom_item|revoke_custom_item|grant_money|grant_xp|gm_give_item)\(/);
 });
 
 test('a migração 0041 existe, é do mestre/dono e não reescreve funções em uso', () => {

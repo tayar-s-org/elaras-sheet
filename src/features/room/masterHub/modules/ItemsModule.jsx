@@ -75,7 +75,7 @@ export default function ItemsModule({ ctx }) {
   </div>;
 
   return <div className="mh-sections">
-    {shopReady && <ModuleTabs label="Seções de itens" value={view} onChange={setView} tabs={[['deliver', 'Entregar'], ['shop', `Loja do Mestre (${extras.shop.length})`]]} />}
+    {shopReady && <ModuleTabs label="Seções de itens" value={view} onChange={setView} tabs={[['deliver', 'Entregar'], ['shop', `Lojas (${extras.shop.length})`]]} />}
     {view === 'shop' && shopReady
       ? <ShopManager tableId={tableId} extras={extras} closed={closed} allowMoney={moneyShop} />
       : <>

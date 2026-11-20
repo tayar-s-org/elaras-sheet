@@ -12,7 +12,7 @@ import { formatMoney, normalizeMoney } from "../../money.js";
 import "../../ui/money.css";
 import MasterShop from "./MasterShop.jsx";
 import { useExtras, useTableExtras } from "../room/masterHub/extras.jsx";
-import { visibleListings } from "../../market/shop.js";
+import { masterListings, approvedListings } from "../../market/shop.js";
 import "./market.css";
 
 const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -43,7 +43,8 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
   const roomExtras = useExtras();
   const ownExtras = useTableExtras(tableId, roomExtras.status === "off" && Boolean(tableId));
   const extras = roomExtras.status !== "off" ? roomExtras : ownExtras;
-  const shopCount = visibleListings(extras.shop, false).length;
+  const shopCount = masterListings(extras.shop, false).length;
+  const approvedCount = approvedListings(extras.shop, false).length;
   const [view, setView] = useState(initialView);
   const [category, setCategory] = useState(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
@@ -91,10 +92,11 @@ export default function MarketTab({ c, d, setC, setToast, cloudId, cloudBase, ta
       <button type="button" role="tab" aria-selected={view === "shop"} className={view === "shop" ? "primary" : "outline"} onClick={() => setView("shop")}>Loja</button>
       <button type="button" role="tab" aria-selected={view === "custom"} className={view === "custom" ? "primary" : "outline"} onClick={() => setView("custom")}>Item custom</button>
       <button type="button" role="tab" aria-selected={view === "master"} className={view === "master" ? "primary" : "outline"} onClick={() => setView("master")}>Loja do Mestre{shopCount ? ` (${shopCount})` : ""}</button>
+      <button type="button" role="tab" aria-selected={view === "approved"} className={view === "approved" ? "primary" : "outline"} onClick={() => setView("approved")}>Loja aprovada{approvedCount ? ` (${approvedCount})` : ""}</button>
       <button type="button" role="tab" aria-selected={view === "bag"} className={view === "bag" ? "primary" : "outline"} onClick={() => setView("bag")}>Mochila ({c.inventory.reduce((n, e) => n + e.qty, 0)})</button>
     </div>
 
-    {view === "master" ? <MasterShop extras={extras} cloudId={cloudId} tableId={tableId} money={money} setToast={setToast} /> : view === "custom" ? <CustomItemForm cloudId={cloudId} tableId={tableId} /> : view === "shop" ? <>
+    {view === "master" || view === "approved" ? <MasterShop key={view} approved={view === "approved"} extras={extras} cloudId={cloudId} tableId={tableId} money={money} setToast={setToast} /> : view === "custom" ? <CustomItemForm cloudId={cloudId} tableId={tableId} /> : view === "shop" ? <>
       <div className="mk-filters">
         <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar item em todo o mercado…" aria-label="Buscar item" />
       </div>

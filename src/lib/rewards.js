@@ -8,6 +8,12 @@ export async function recentRewards(tableId, limit = 80) {
     const { data, error } = await supabase.from(table).select(COLS).eq('table_id', tableId).order('created_at', { ascending: false }).limit(limit);
     return error ? null : data;
   };
-  const [xp, money] = await Promise.all([get('xp_awards'), get('money_awards')]);
-  return { xp, money };
+  // Moedas e experiências personalizadas (migração 0045): vêm do histórico administrativo; o mestre lê todas, o jogador as do próprio personagem.
+  const custom = async () => {
+    const { data, error } = await supabase.from('master_audit_log').select('id,character_id,category,kind,before,after,note,actor_id,created_at')
+      .eq('table_id', tableId).in('category', ['wallet', 'experience']).order('created_at', { ascending: false }).limit(limit);
+    return error ? null : data;
+  };
+  const [xp, money, audit] = await Promise.all([get('xp_awards'), get('money_awards'), custom()]);
+  return { xp, money, custom: audit };
 }

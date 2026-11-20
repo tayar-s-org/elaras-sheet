@@ -38,7 +38,7 @@ export async function callIdempotent(fn, args, { retries = 3, delay = 600 } = {}
 }
 
 // ---------- capacidade (a interface só liga a Central/Loja se a migração existir; nunca chama função que não existe) ----------
-// master_hub_version(): 1 = Central (0040), 2 = Central + Loja do Mestre (0041). 0 = sem migração; null = rede incerta (tenta de novo).
+// master_hub_version(): 1 = Central (0040), 2 = Central + Loja do Mestre (0041), 3 = + preço em $ (0043), 4 = + Loja aprovada (0044). 0 = sem migração; null = rede incerta (tenta de novo).
 let versionCache = null;
 export function masterHubVersion(force = false) {
   if (!supabase) return Promise.resolve(0);
@@ -99,6 +99,14 @@ const read = async query => {
   return data;
 };
 
+// Anúncios da loja. Sem a migração 0044 a coluna source_id não existe: relê sem ela (tudo vira "Loja do Mestre").
+const SHOP_COLS = 'id,currency_id,price,name,weight,effects,description,active,created_at';
+async function readShop(tableId) {
+  const q = cols => supabase.from('table_shop_items').select(cols).eq('table_id', tableId).order('created_at');
+  const rows = await read(q(`${SHOP_COLS},source_id`));
+  return rows ?? read(q(SHOP_COLS));
+}
+
 // { currencies, types, shop, wallets: { [characterId]: { [currencyId]: amount } }, experience: { [characterId]: { [typeId]: amount } } }
 // ou null se a migração ainda não existe.
 export async function loadExtras(tableId) {
@@ -107,8 +115,8 @@ export async function loadExtras(tableId) {
     read(supabase.from('table_experience_types').select('id,name,description,icon,category,created_at').eq('table_id', tableId).order('created_at')),
     read(supabase.from('character_wallets').select('character_id,currency_id,amount').eq('table_id', tableId)),
     read(supabase.from('character_experience').select('character_id,type_id,amount').eq('table_id', tableId)),
-    // Loja do Mestre (0041): se ainda não existir, a Central continua e a loja fica vazia.
-    read(supabase.from('table_shop_items').select('id,currency_id,price,name,weight,effects,description,active,created_at').eq('table_id', tableId).order('created_at')),
+    // Loja do Mestre (0041) e Loja aprovada (0044, coluna source_id): se ainda não existirem, a Central continua e a loja fica vazia.
+    readShop(tableId),
   ]);
   if (!currencies || !types || !wallets || !experience) return null;
   const nest = (rows, a, b) => rows.reduce((acc, r) => { (acc[r[a]] ||= {})[r[b]] = Number(r.amount) || 0; return acc; }, {});

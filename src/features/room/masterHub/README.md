@@ -133,6 +133,21 @@ O item comprado é uma entrada **custom** da mochila (mesmo caminho dos itens qu
 reconcilia pelo merge de 3 vias que já existia. Tirar um item da loja **não** tira de quem já comprou. Testes de banco da loja: seção "Loja do Mestre" de `scripts/masterHubDbTest.mjs`
 (permissões, saldo insuficiente, empilhar, reenvio idempotente, 10 compras simultâneas com saldo para 5, 6 cliques com o mesmo id, moeda de outra mesa, FK ao apagar moeda).
 
+## Loja aprovada (migração `0044_approved_shop.sql`)
+
+Todo item customizado **aprovado** pelo mestre (fluxo de `ItemApprovals`/`approve_custom_item`) entra à venda para a mesa toda na aba **Loja aprovada** do Mercado.
+Reaproveita a Loja do Mestre em vez de criar outra tabela: cada item aprovado vira um anúncio em `table_shop_items`, pago em `$`, e a compra é a mesma `shop_buy`.
+
+| Parte | Como funciona |
+|---|---|
+| Origem | `table_shop_items.source_id` = pedido (`table_custom_items`) de onde veio; `NULL` = item criado pelo mestre. O anúncio usa o **mesmo id** do pedido, então a mochila guarda `custom-<id>` igual ao item que o autor recebeu e as compras empilham |
+| Entrar / sair | Gatilho `custom_item_to_shop` em `table_custom_items`: `status` vira `approved` → cria o anúncio (preço = o preço da aprovação); deixa de ser `approved` (revogado) → apaga o anúncio. `approve_custom_item`/`revoke_custom_item` não mudam. Os itens já aprovados na época da migração entram no preenchimento |
+| Preço | O preço da aprovação é cobrado do autor (como sempre) **e** vira o preço da loja para os demais. **Preço 0 = grátis**: só vale para anúncio com origem (`check` da tabela); `gm_shop_upsert` mantém 1..999.999.999 para os itens do mestre. Compra de preço 0 em `$` não grava `money_awards` (a coluna não aceita 0) |
+| Mestre | Em Central › Itens › Lojas os anúncios aprovados aparecem com a marca "Loja aprovada"; dá para mudar o preço, **pausar** (esconde da loja sem apagar) ou tirar. O limite de 100 itens conta só os criados pelo mestre |
+| Revogar | Sai da loja e da mochila do autor (como antes). Quem já comprou **continua com o item** (pagou por ele) |
+| Jogador | `MarketTab` › aba "Loja aprovada" (`MasterShop approved`), com `approvedListings(extras.shop)`; a aba "Loja do Mestre" mostra só `masterListings`. Capacidade: `master_hub_version() = 4`; sem a 0044 a coluna `source_id` não existe e `loadExtras` relê sem ela (tudo cai na Loja do Mestre) |
+| Testes | `src/market/shop.test.js` (regras puras e a migração) e a seção "Loja aprovada" de `scripts/masterHubDbTest.mjs` |
+
 ## Armadilha conhecida: nomes de canal Realtime
 O Supabase devolve o canal existente quando o nome se repete, e registrar `postgres_changes` num canal já assinado derruba o app. `useTableExtras` e `useCharacterConditions` usam nome **único por uso** (`uniqueName` em `extras.jsx`), porque a página da ficha monta dois usos ao mesmo tempo (resumo lateral e Mercado). Ao criar um hook novo com canal, dê um nome único ou garanta uma só instância.
 
