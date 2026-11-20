@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AVATAR, NAME } from './branding.js';
 import { isSheet, panelLayout } from './panelGeometry.js';
+import { useViewport } from './useViewport.js';
 import { useFabPosition } from './useFabPosition.js';
 import { useConversation } from './useConversation.js';
 import { ChatLog } from './Messages.jsx';
@@ -19,12 +20,20 @@ export default function Assistant() {
   const [hidden, setHidden] = useState(readHidden);
   const [viewer, setViewer] = useState(null);
   const inputRef = useRef(null);
-  const { fabRef, pos, vp, dragging, dragProps, nudge, consumeDragClick } = useFabPosition();
+  const vp = useViewport();
+  const { fabRef, pos, dragging, dragProps, nudge, consumeDragClick } = useFabPosition(vp);
   const { messages, input, setInput, busy, showAll, setShowAll, ask, openTopic, onAsk } = useConversation();
   const { style: panelStyle, compact } = panelLayout(pos, vp);
   const movable = !isSheet(vp);
 
-  const closePanel = () => { setOpen(false); fabRef.current?.focus(); };
+  const closePanel = () => setOpen(false);
+
+  // Devolve o foco ao botão depois de fechar: em telas estreitas ele fica oculto enquanto o painel está aberto.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !open) fabRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   // O foco inicial do chat só depende de abrir o painel: abrir/navegar uma página do livro não deve devolvê-lo ao campo coberto.
   useEffect(() => {
@@ -61,7 +70,7 @@ export default function Assistant() {
             <button type="button" className="as-text-btn" onClick={hide}>Ocultar botão</button>
             <button type="button" className="as-icon" aria-label="Fechar o assistente" onClick={closePanel}>×</button>
           </header>
-          <ChatLog messages={messages} busy={busy} onAsk={onAsk} onOpenPage={setViewer} />
+          <ChatLog inert={showAll} messages={messages} busy={busy} onAsk={onAsk} onOpenPage={setViewer} />
           {showAll && <AllQuestions onAsk={ask} onClose={() => setShowAll(false)} />}
           <ChatFooter showAll={showAll} onToggleAll={() => setShowAll(v => !v)} onOpenTopic={openTopic} input={input} onInput={setInput} busy={busy} onSubmit={ask} inputRef={inputRef} />
         </section>

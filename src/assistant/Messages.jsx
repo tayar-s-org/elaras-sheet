@@ -68,7 +68,7 @@ function Typing() {
   return <div className="as-row as-bot" role="status" aria-label="O arquivista está procurando no livro"><img className="as-mini" src={AVATAR} alt="" width="34" height="34" /><div className="as-bubble as-typing"><i /><i /><i /></div></div>;
 }
 
-export function ChatLog({ messages, busy, onAsk, onOpenPage }) {
+export function ChatLog({ inert, messages, busy, onAsk, onOpenPage }) {
   const log = useRef(null);
   const botStart = useRef(null);
   const lastBotIndex = messages.reduce((acc, m, i) => (m.role === 'bot' ? i : acc), -1);
@@ -83,7 +83,7 @@ export function ChatLog({ messages, busy, onAsk, onOpenPage }) {
   }, [messages, busy]);
 
   return (
-    <div className="as-log" ref={log} role="log" aria-live="polite" aria-relevant="additions">
+    <div className="as-log" ref={log} inert={inert} role="log" aria-live="polite" aria-relevant="additions">
       {messages.map((m, i) => (
         <div key={m.id} ref={i === lastBotIndex ? botStart : undefined}><Message message={m} onAsk={onAsk} onOpenPage={onOpenPage} /></div>
       ))}

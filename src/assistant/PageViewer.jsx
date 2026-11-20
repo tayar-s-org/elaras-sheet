@@ -11,7 +11,7 @@ export default function PageViewer({ page, onClose, onGo }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [page]);
   return (
-    <Modal onClose={onClose} aria-label={`Página ${page} do livro`}>
+    <Modal onClose={onClose} className="as-viewer-dialog" aria-label={`Página ${page} do livro`}>
       <div className="as-viewer-box">
         <header>
           <strong>Página {Math.max(1, page - PRINTED_PAGE_OFFSET)} do livro</strong>

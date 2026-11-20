@@ -1,13 +1,13 @@
 // Busca de texto no livro. O texto das páginas é normalizado (sem acento, minúsculo) uma única vez, ao montar o índice.
-export const normalize = value => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+import { fold } from './assistant/text.js';
 
 const EXCERPT_LEAD = 65;
 const EXCERPT_LENGTH = 180;
 
-export const buildBookIndex = pages => pages.map(page => ({ page: page.page, text: page.text, folded: normalize(page.text) }));
+export const buildBookIndex = pages => pages.map(page => ({ page: page.page, text: page.text, folded: fold(page.text) }));
 
 export function searchBookIndex(index, query) {
-  const needle = normalize(query.trim());
+  const needle = fold(query.trim());
   if (!needle) return [];
   const hits = [];
   for (const entry of index) {

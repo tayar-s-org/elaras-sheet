@@ -56,3 +56,24 @@ test('a posição do botão é presa à janela', () => {
   const vp = { w: 800, h: 400 };
   assert.deepEqual(clampFabPosition({ right: -50, bottom: 9999 }, vp), { right: EDGE, bottom: vp.h - FAB_SIZE - EDGE });
 });
+
+// Altura que cabeçalho e rodapé compacto (sem a faixa de assuntos) tomam do painel.
+const COMPACT_CHROME_HEIGHT = 64 + 120;
+const MIN_MESSAGE_AREA = 120;
+
+test('em janela baixa, ainda sobra área útil para as mensagens entre cabeçalho e rodapé', () => {
+  for (const vp of [{ w: 800, h: 400 }, { w: 1024, h: 420 }, { w: 700, h: 380 }]) {
+    for (let bottom = EDGE; bottom <= vp.h - FAB_SIZE - EDGE; bottom += 17) {
+      const { style } = panelLayout({ right: 16, bottom }, vp);
+      assert.ok(style.height - COMPACT_CHROME_HEIGHT >= MIN_MESSAGE_AREA, `${vp.w}x${vp.h} bottom:${bottom} altura ${style.height}`);
+    }
+  }
+  const sheet = panelLayout(null, { w: 480, h: 420 });
+  assert.equal(sheet.compact, true);
+});
+
+test('janela minúscula (80px de altura) ainda mantém o painel dentro da janela', () => {
+  const vp = { w: 800, h: 80 };
+  const rect = panelRect(panelLayout({ right: EDGE, bottom: EDGE }, vp).style, vp);
+  assert.ok(rect.top >= 0 && rect.bottom <= vp.h);
+});

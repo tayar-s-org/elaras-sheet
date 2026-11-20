@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildBookIndex, searchBookIndex, normalize } from './bookSearch.js';
+import { buildBookIndex, searchBookIndex } from './bookSearch.js';
+
+// Normalização que o leitor usava antes da busca indexada.
+const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 // Comportamento anterior do leitor (Book.jsx), copiado para garantir que a busca otimizada acha e recorta igual.
 function legacySearch(pages, query) {

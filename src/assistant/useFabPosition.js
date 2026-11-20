@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_ANCHOR, clampFabPosition } from './panelGeometry.js';
+import { readViewport } from './useViewport.js';
 
 // Posição do botão (arrastável). Sem valor salvo, vale o canto padrão do CSS.
 const POS_KEY = 'elara-assistant-pos';
@@ -7,8 +8,6 @@ const DRAG_THRESHOLD = 6;
 const NUDGE_STEP = 24;
 const NUDGE_DELTAS = { ArrowLeft: [-NUDGE_STEP, 0], ArrowRight: [NUDGE_STEP, 0], ArrowUp: [0, -NUDGE_STEP], ArrowDown: [0, NUDGE_STEP] };
 
-// Tamanho útil da janela (sem a barra de rolagem): é a referência do "right/bottom" de um elemento fixo.
-const readViewport = () => ({ w: document.documentElement.clientWidth, h: document.documentElement.clientHeight });
 const readStoredPosition = () => {
   try {
     const p = JSON.parse(localStorage.getItem(POS_KEY));
@@ -18,23 +17,15 @@ const readStoredPosition = () => {
 const storePosition = p => { try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch { /* sem storage: vale só nesta sessão */ } };
 
 // Arrastar: o botão (sempre) e o topo do chat (em telas largas) movem o assistente. Um toque sem mover continua abrindo/fechando.
-export function useFabPosition() {
+export function useFabPosition(vp) {
   const fabRef = useRef(null);
   const [pos, setPos] = useState(readStoredPosition);
-  const [vp, setVp] = useState(readViewport);
   const [dragging, setDragging] = useState(false);
   const drag = useRef(null);
   const justDragged = useRef(false);
 
-  useEffect(() => {
-    const onResize = () => { setVp(readViewport()); setPos(p => (p ? clampFabPosition(p, readViewport()) : p)); };
-    onResize();
-    window.addEventListener('resize', onResize);
-    // a barra de rolagem aparece/some quando a página carrega ou muda: isso muda a largura útil sem disparar "resize"
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
-    observer?.observe(document.documentElement);
-    return () => { window.removeEventListener('resize', onResize); observer?.disconnect(); };
-  }, []);
+  // Janela menor: o botão não pode ficar para fora dela.
+  useEffect(() => { setPos(p => (p ? clampFabPosition(p, vp) : p)); }, [vp]);
 
   const currentAnchor = () => {
     if (pos) return pos;
@@ -88,5 +79,5 @@ export function useFabPosition() {
     return wasDrag;
   }, []);
 
-  return { fabRef, pos, vp, dragging, dragProps, nudge, consumeDragClick };
+  return { fabRef, pos, dragging, dragProps, nudge, consumeDragClick };
 }
