@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { draggedOffset, wheelZoom, offsetToPercent, offsetFromPercent, ZOOM_MIN, ZOOM_MAX } from './tokenFraming.js';
+import { draggedOffset, wheelZoom, offsetToPercent, offsetFromPercent, verticalToPercent, verticalFromPercent, ZOOM_MIN, ZOOM_MAX } from './tokenFraming.js';
 
 test('arrastar move a imagem proporcionalmente e nunca passa de -1 a 1', () => {
   assert.equal(draggedOffset(0, 32, 320), 0.1);
@@ -21,4 +21,12 @@ test('campos de posição (teclado) convertem porcentagem inteira de e para o de
   assert.equal(offsetFromPercent('25'), 0.25);
   assert.equal(offsetFromPercent(250), 1);
   assert.equal(offsetFromPercent(-250), -1);
+});
+
+test('posição vertical é invertida: valor positivo do controle sobe a imagem (y negativo)', () => {
+  assert.equal(verticalToPercent(-0.25), 25);
+  assert.equal(verticalToPercent(0), 0);
+  assert.equal(verticalFromPercent(25), -0.25);
+  assert.equal(verticalFromPercent(0), 0);
+  assert.equal(verticalFromPercent(-250), 1);
 });

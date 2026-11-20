@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import EffectEditor from '../../../token/EffectEditor.jsx';
 import ActiveConditions from '../../../sheet/ActiveConditions.jsx';
-import { changeConditions } from '../conditionsDelta.js';
+import { changeConditions } from '../../../../lib/masterHub.js';
 import { creatureOf } from '../../../../creature.js';
 import { addEffect, removeEffect, conditionsOf, effectsOf, displayName } from '../../../../tokenState.js';
 import { BatchResults, useMasterRun, targetsFor, defaultTarget, previewText } from '../ui.jsx';

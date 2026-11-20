@@ -19,8 +19,8 @@ export default function AdjustForm({ kind, storageKey, players, closed, blocked 
   const run = useMasterRun({ onDone });
   const value = (target === 'all' && players.length > 1) || players.some(p => p.id === target) ? target : defaultTarget(players);
   const targets = targetsFor(players, value);
-  const amount = parseWholeNumber(text);
-  const api = amount.ok ? apiOf(mode, amount.value) : null;
+  const parsed = parseWholeNumber(text);
+  const api = parsed.ok ? apiOf(mode, parsed.value) : null;
   const previews = api ? targets.map(p => ({ p, v: previewAdjust(kind, currentOf(p), api.mode, api.amount) })) : [];
   const bad = previews.find(x => !x.v.ok);
   const line = ({ p, v }) => `${p.name}: ${format(v.current)} → ${format(v.next)}`;
@@ -53,11 +53,11 @@ export default function AdjustForm({ kind, storageKey, players, closed, blocked 
       <div className="mh-amount">
         <label className="field"><span>{amountLabel(mode)}</span>
           <input type="number" inputMode="numeric" value={text} onChange={e => setText(e.target.value)} onFocus={e => e.target.select()}
-            aria-invalid={!amount.ok || Boolean(bad)} aria-describedby={`${uid}-${amount.ok ? 'preview' : 'amount-error'}`} />
-          {!amount.ok && <small id={`${uid}-amount-error`} className="mh-field-error" role="alert">{amount.error}</small>}</label>
+            aria-invalid={!parsed.ok || Boolean(bad)} aria-describedby={`${uid}-${parsed.ok ? 'preview' : 'amount-error'}`} /></label>
         {mode !== 'set' && quick.length > 0 && <div className="mh-quick" role="group" aria-label="Valores rápidos">
           {quick.map(q => <button key={q} type="button" className="outline" onClick={() => setText(String(q))}>{mode === 'subtract' ? '−' : '+'}{q}</button>)}
         </div>}
+        {!parsed.ok && <small id={`${uid}-amount-error`} className="mh-field-error" role="alert">{parsed.error}</small>}
       </div>
       <ul className="mh-preview" id={`${uid}-preview`} aria-label="Prévia do resultado">
         {previews.map(({ p, v }) => <li key={p.id}>{v.ok ? <><b>{p.name}</b> {format(v.current)} → <b>{format(v.next)}</b>{api.mode === 'add' && v.delta !== api.amount ? <small> (limitado)</small> : null}</> : <><b>{p.name}</b> <small className="muted">{v.error}</small></>}</li>)}

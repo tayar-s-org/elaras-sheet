@@ -12,3 +12,7 @@ export const wheelZoom = (zoom, deltaY) => clamp(zoom * (deltaY < 0 ? 1.06 : 0.9
 // Os campos de posição trabalham em porcentagem inteira (-100 a 100), para o teclado mover de 1 em 1.
 export const offsetToPercent = offset => Math.round(clampOffset(offset) * 100);
 export const offsetFromPercent = percent => clampOffset(Number(percent) / 100);
+
+// O eixo y do desenho cresce para baixo, mas o controle deslizante precisa subir com a seta para cima: o vertical é invertido.
+export const verticalToPercent = offset => offsetToPercent(-offset) + 0; // + 0 evita -0
+export const verticalFromPercent = percent => offsetFromPercent(-percent) + 0;

@@ -38,8 +38,8 @@ export default function TokenMaker({ name = '', onSave, onSavePreset, onClose, s
   const [error, setError] = useState('');
   const [over, setOver] = useState(false);
   const patch = useCallback(p => setDesign(d => ({ ...d, ...p })), []);
-  const applyLegacyDesign = useCallback(() => setDesign(prev => ({ ...defaultDesign(), initials: prev.initials, frameColor: prev.frameColor, frame: 'none', shine: false, legacyBase: true })), []);
-  const showLoadFailure = useCallback(() => setError(LOAD_FAILED), []);
+  const applyLegacyDesign = () => setDesign(prev => ({ ...defaultDesign(), initials: prev.initials, frameColor: prev.frameColor, frame: 'none', shine: false, legacyBase: true }));
+  const showLoadFailure = () => setError(LOAD_FAILED);
   const { image, imageState, legacyPath, usingFallback, sourceFile, replaceWithFile } = useTokenImage({
     sourcePath, initialLegacyPath: saved?.legacyPath || (!saved ? imagePath : '') || '',
     fallbackPath: imagePath, onFallback: applyLegacyDesign, onFailed: showLoadFailure,

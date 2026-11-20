@@ -53,7 +53,8 @@ Todos recebem `p_request_id uuid` (um por alvo) e devolvem `jsonb { ok, replayed
 | `gm_wallet_adjust(table, character, currency, mode, amount, note, request)` | soma/define o saldo | 0..999.999.999 |
 | `gm_upsert_experience_type` / `gm_delete_experience_type` | tipos de experiência | idem |
 | `gm_experience_adjust(table, character, type, mode, amount, note, request)` | soma/define o contador | 0..1.000.000 |
-| `gm_set_conditions(table, character, conditions, note, request)` | troca a lista de condições (máx. 8, rótulo único, `note`/`duration` opcionais) | — |
+| `gm_conditions_delta(table, character, add, remove, note, request)` | acrescenta condições e/ou remove por id sobre a lista do banco, com a linha travada (a interface usa este) | — |
+| `gm_set_conditions(table, character, conditions, note, request)` | troca a lista inteira de condições (máx. 8, rótulo único, `note`/`duration` opcionais); `gm_conditions_delta` grava por ela | — |
 | `master_hub_version()` | sonda de capacidade (devolve 1) | qualquer autenticado |
 
 Internos (sem permissão para ninguém): `mh_begin`, `mh_log`, `mh_clean_conditions`, `state_keep_conditions`.
@@ -71,10 +72,9 @@ histórico guardam o valor exato.
 
 ### Condições
 Personagens: `table_character_state.state.conditions` (mesmo formato dos efeitos de criatura: `{id,label,icon[,note][,duration]}`).
-Só `gm_set_conditions` altera a chave. O gatilho `state_keep_conditions` (BEFORE INSERT/UPDATE) preserva `conditions` em qualquer outra
+Só `gm_conditions_delta` (por `gm_set_conditions`) altera a chave. O gatilho `state_keep_conditions` (BEFORE INSERT/UPDATE) preserva `conditions` em qualquer outra
 escrita (jogador, `PartyPanel`, upsert do PostgREST — que passa pelo caminho de UPDATE com `OLD` —, funções de rotina como `advance_time`),
-exceto quando o RPC liga a flag de transação `elara.mh`. Escritores conhecidos de `state`: `saveState` (`PartyPanel.change/setFaint`, agora com
-spread do estado), `useRoom.patchState` (mescla e mantém `conditions`) e as funções SQL das migrações 0024/0025/0026/0031 (releem o estado
+exceto quando o RPC liga a flag de transação `elara.mh`. Escritores conhecidos de `state`: as funções `set_state_resource` e `set_state_faint` (`PartyPanel`, migração 0049, um campo por vez sob trava), `useRoom.patchState` (mescla e mantém `conditions`) e as funções SQL das migrações 0024/0025/0026/0031 (releem o estado
 travado e regravam, preservando chaves extras). Criaturas: continuam em `board_tokens.effects`. O token escolhe a fonte por
 `tokenEffects(token, states)`. A duração é só texto (não expira sozinha).
 
@@ -152,10 +152,10 @@ Reaproveita a Loja do Mestre em vez de criar outra tabela: cada item aprovado vi
 O Supabase devolve o canal existente quando o nome se repete, e registrar `postgres_changes` num canal já assinado derruba o app. `useTableExtras` e `useCharacterConditions` usam nome **único por uso** (`uniqueName` em `extras.jsx`), porque a página da ficha monta dois usos ao mesmo tempo (resumo lateral e Mercado). Ao criar um hook novo com canal, dê um nome único ou garanta uma só instância.
 
 ## Ícones das experiências
-O seletor oferece só as imagens embutidas; o tipo guarda a **chave** da imagem (até 8 caracteres, começa com `@`: `@fita`, `@placar`, `@trofeu`, `@selo`, `@xp`). Tipos antigos com emoji continuam aparecendo. As imagens ficam em `public/assets/experience/` (128 px) e o mapa chave → arquivo está em `experienceIcons.js` (`IMAGE_ICONS`). `ExperienceIcon`/`HoldingChip` (`ExperienceIcon.jsx`) mostram a imagem ou o texto; em listas só de texto (listas suspensas, confirmações, histórico) a imagem vira `★` (`iconText`). Para somar um ícone novo: copiar o PNG para a pasta e uma linha em `IMAGE_ICONS` (chave com `@` e até 8 caracteres); não precisa de migração.
+O seletor oferece só as imagens embutidas; o tipo guarda a **chave** da imagem (até 8 caracteres, começa com `@`: `@fita`, `@placar`, `@trofeu`, `@selo`, `@xp`). Tipos antigos com emoji continuam aparecendo. As imagens ficam em `public/assets/experience/` (128 px) e o mapa chave → arquivo está em `src/market/experienceIcons.js` (`IMAGE_ICONS`). `ExperienceIcon`/`HoldingChip` (`ExperienceIcon.jsx`) mostram a imagem ou o texto; em listas só de texto (listas suspensas, confirmações, histórico) a imagem vira `★` (`iconText`). Para somar um ícone novo: copiar o PNG para a pasta e uma linha em `IMAGE_ICONS` (chave com `@` e até 8 caracteres); não precisa de migração.
 
 ## Ícones das moedas
-O seletor de moeda oferece só as imagens embutidas (`CURRENCY_ICONS` em `experienceIcons.js`, arquivos em `public/assets/currency/`): `@cedula`, `@euro`, `@lingote`, `@chines`, `@maco`. A chave vai no campo `symbol` da moeda (limite de 8 caracteres do banco). Imagem onde há espaço (chips, cabeçalhos, preços); em textos puros vira `¤` (`iconText(symbol, '¤')`), e `cleanIconKeys` limpa chaves cruas que o servidor coloca nos resumos do histórico. Moedas antigas com emoji continuam como estão. Sem migração.
+O seletor de moeda oferece só as imagens embutidas (`CURRENCY_ICONS` em `src/market/experienceIcons.js`, arquivos em `public/assets/currency/`): `@cedula`, `@euro`, `@lingote`, `@chines`, `@maco`. A chave vai no campo `symbol` da moeda (limite de 8 caracteres do banco). Imagem onde há espaço (chips, cabeçalhos, preços); em textos puros vira `¤` (`iconText(symbol, '¤')`), e `cleanIconKeys` limpa chaves cruas que o servidor coloca nos resumos do histórico. Moedas antigas com emoji continuam como estão. Sem migração.
 
 ## Glossário (use estes termos na interface)
 - **Dinheiro ($)**: o `$` da ficha (`characters.data.money`); é o que o jogador gasta no Mercado do livro. Sempre escrito com o `$` e rotulado "Dinheiro".
